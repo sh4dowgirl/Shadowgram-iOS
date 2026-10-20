@@ -1,0 +1,168 @@
+name: Build Telegram (Ad Hoc IPA)
+
+# Запускается только вручную: Actions -> Build Telegram -> Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: "Номер сборки (целое число, увеличивайте при каждом запуске)"
+        required: true
+        default: "100001"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telegram-build
+  cancel-in-progress: false
+
+env:
+  # Каталог дискового кэша Bazel. Его же сохраняем/восстанавливаем через actions/cache.
+  BAZEL_DISK_CACHE: ~/telegram-bazel-cache
+
+jobs:
+  build:
+    # macos-26 нужен потому, что versions.json требует Xcode 26.6, он есть в этом образе.
+    # Если не хватит памяти или диска, поставьте в Settings -> Variables переменную
+    # RUNNER_LABEL = macos-26-xlarge (платный, более мощный runner).
+    runs-on: ${{ vars.RUNNER_LABEL || 'macos-26' }}
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout (с сабмодулями)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Выбрать Xcode из versions.json
+        run: |
+          XCODE_VERSION=$(python3 -c "import json; print(json.load(open('versions.json'))['xcode'])")
+          echo "Нужен Xcode $XCODE_VERSION"
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          xcodebuild -version
+          df -h /
+
+      - name: Собрать configuration.json
+        env:
+          BUNDLE_ID: ${{ vars.BUNDLE_ID }}
+          TEAM_ID: ${{ vars.TEAM_ID }}
+          API_ID: ${{ secrets.TG_API_ID }}
+          API_HASH: ${{ secrets.TG_API_HASH }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          # Берём шаблон из репозитория и меняем только четыре поля,
+          # чтобы типы остальных значений остались как в оригинале.
+          cfg = json.load(open("build-system/template_minimal_development_configuration.json"))
+          cfg["bundle_id"] = os.environ["BUNDLE_ID"]
+          cfg["team_id"] = os.environ["TEAM_ID"]
+          cfg["api_id"] = os.environ["API_ID"]
+          cfg["api_hash"] = os.environ["API_HASH"]
+          for key in ("bundle_id", "team_id", "api_id", "api_hash"):
+              if not cfg[key]:
+                  raise SystemExit("Пустое значение: " + key)
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "configuration.json"), "w") as f:
+              json.dump(cfg, f, indent=2)
+          print("configuration.json готов, bundle_id =", cfg["bundle_id"])
+          PY
+
+      - name: Импортировать сертификат подписи в временную связку ключей
+        env:
+          P12_BASE64: ${{ secrets.DIST_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.DIST_P12_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          printf '%s' "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/dist.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          # Добавляем нашу связку в список поиска, сохраняя существующие.
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v -p codesigning "$KEYCHAIN"
+          rm -f "$RUNNER_TEMP/dist.p12"
+
+      - name: Разложить профили (7 штук)
+        env:
+          P_TELEGRAM: ${{ secrets.PROFILE_TELEGRAM }}
+          P_SHARE: ${{ secrets.PROFILE_SHARE }}
+          P_NOTIFICATION_SERVICE: ${{ secrets.PROFILE_NOTIFICATION_SERVICE }}
+          P_NOTIFICATION_CONTENT: ${{ secrets.PROFILE_NOTIFICATION_CONTENT }}
+          P_WIDGET: ${{ secrets.PROFILE_WIDGET }}
+          P_SIRI_INTENTS: ${{ secrets.PROFILE_SIRI_INTENTS }}
+          P_BROADCAST_UPLOAD: ${{ secrets.PROFILE_BROADCAST_UPLOAD }}
+        run: |
+          DIR="$RUNNER_TEMP/codesigning"
+          mkdir -p "$DIR/profiles" "$DIR/certs"
+          put() { printf '%s' "$2" | base64 --decode > "$DIR/profiles/$1.mobileprovision"; }
+          put Telegram "$P_TELEGRAM"
+          put Share "$P_SHARE"
+          put NotificationService "$P_NOTIFICATION_SERVICE"
+          put NotificationContent "$P_NOTIFICATION_CONTENT"
+          put Widget "$P_WIDGET"
+          put Intents "$P_SIRI_INTENTS"
+          put BroadcastUpload "$P_BROADCAST_UPLOAD"
+          # Имена файлов не важны: Make.py сопоставляет профили по application-identifier внутри.
+          ls -l "$DIR/profiles"
+
+      - name: Восстановить кэш Bazel
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.BAZEL_DISK_CACHE }}
+          # Ключ уникален для каждого запуска, а restore-keys подтягивает самый свежий предыдущий кэш.
+          key: bazel-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}
+          restore-keys: |
+            bazel-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Сборка (release_arm64)
+        # Таймаут шага меньше таймаута job, чтобы шаг сохранения кэша успел выполниться,
+        # даже если первая (холодная) сборка не уложится во время.
+        timeout-minutes: 320
+        run: |
+          mkdir -p "$HOME/telegram-bazel-cache" "$RUNNER_TEMP/artifacts"
+          python3 build-system/Make/Make.py \
+            --cacheDir="$HOME/telegram-bazel-cache" \
+            build \
+            --configurationPath="$RUNNER_TEMP/configuration.json" \
+            --codesigningInformationPath="$RUNNER_TEMP/codesigning" \
+            --buildNumber="${{ inputs.build_number }}" \
+            --configuration=release_arm64 \
+            --outputBuildArtifactsPath="$RUNNER_TEMP/artifacts"
+
+      - name: Сохранить кэш Bazel (даже если сборка упала или превысила время)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.BAZEL_DISK_CACHE }}
+          key: bazel-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}
+
+      - name: Диагностика диска
+        if: always()
+        run: df -h / && du -sh "$HOME/telegram-bazel-cache" 2>/dev/null || true
+
+      - name: Зашифровать IPA (если задан ARTIFACT_PASSPHRASE)
+        env:
+          ARTIFACT_PASSPHRASE: ${{ secrets.ARTIFACT_PASSPHRASE }}
+        run: |
+          IPA="$RUNNER_TEMP/artifacts/Telegram.ipa"
+          if [ -n "$ARTIFACT_PASSPHRASE" ]; then
+            openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:ARTIFACT_PASSPHRASE -in "$IPA" -out "$IPA.enc"
+            rm "$IPA"
+            echo "IPA зашифрован: Telegram.ipa.enc"
+          else
+            echo "ARTIFACT_PASSPHRASE не задан: IPA будет загружен как есть."
+          fi
+
+      - name: Загрузить результат
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegram-build
+          path: |
+            ${{ runner.temp }}/artifacts/Telegram.ipa
+            ${{ runner.temp }}/artifacts/Telegram.ipa.enc
+            ${{ runner.temp }}/artifacts/Telegram.DSYMs.zip
+          if-no-files-found: error
+          retention-days: 7
