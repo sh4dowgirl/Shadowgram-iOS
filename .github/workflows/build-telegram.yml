@@ -1,13 +1,13 @@
-name: Build Telegram (Ad Hoc IPA)
+name: Build Telegram (TestFlight)
 
-# Запускается только вручную: Actions -> Build Telegram -> Run workflow.
+# Запускается только вручную: Actions -> Build Telegram (TestFlight) -> Run workflow.
 on:
   workflow_dispatch:
     inputs:
       build_number:
-        description: "Номер сборки (целое число, увеличивайте при каждом запуске)"
-        required: true
-        default: "100001"
+        description: "Номер сборки (целое число). Пусто = номер запуска + 1000. Для каждой загрузки в TestFlight должен быть новым."
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -17,16 +17,17 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # Каталог дискового кэша Bazel. Его же сохраняем/восстанавливаем через actions/cache.
   BAZEL_DISK_CACHE: ~/telegram-bazel-cache
 
 jobs:
   build:
     # macos-26 нужен потому, что versions.json требует Xcode 26.6, он есть в этом образе.
-    # Если не хватит памяти или диска, поставьте в Settings -> Variables переменную
+    # Если не хватит памяти или диска, задайте в Settings -> Variables переменную
     # RUNNER_LABEL = macos-26-xlarge (платный, более мощный runner).
     runs-on: ${{ vars.RUNNER_LABEL || 'macos-26' }}
     timeout-minutes: 360
+    env:
+      HAS_ARTIFACT_PASSPHRASE: ${{ secrets.ARTIFACT_PASSPHRASE != '' }}
 
     steps:
       - name: Checkout (с сабмодулями)
@@ -47,18 +48,24 @@ jobs:
         env:
           BUNDLE_ID: ${{ vars.BUNDLE_ID }}
           TEAM_ID: ${{ vars.TEAM_ID }}
+          APPSTORE_ID: ${{ vars.APPSTORE_ID }}
           API_ID: ${{ secrets.TG_API_ID }}
           API_HASH: ${{ secrets.TG_API_HASH }}
         run: |
           python3 - <<'PY'
           import json, os
-          # Берём шаблон из репозитория и меняем только четыре поля,
+          # Берём шаблон из репозитория и меняем только нужные поля,
           # чтобы типы остальных значений остались как в оригинале.
           cfg = json.load(open("build-system/template_minimal_development_configuration.json"))
           cfg["bundle_id"] = os.environ["BUNDLE_ID"]
           cfg["team_id"] = os.environ["TEAM_ID"]
           cfg["api_id"] = os.environ["API_ID"]
           cfg["api_hash"] = os.environ["API_HASH"]
+          # Сборка для App Store / TestFlight. Make.py записывает эти значения в строки
+          # через format(), поэтому здесь именно строки в нижнем регистре, как в шаблоне.
+          cfg["is_internal_build"] = "false"
+          cfg["is_appstore_build"] = "true"
+          cfg["appstore_id"] = os.environ.get("APPSTORE_ID") or "0"
           for key in ("bundle_id", "team_id", "api_id", "api_hash"):
               if not cfg[key]:
                   raise SystemExit("Пустое значение: " + key)
@@ -85,7 +92,7 @@ jobs:
           security find-identity -v -p codesigning "$KEYCHAIN"
           rm -f "$RUNNER_TEMP/dist.p12"
 
-      - name: Разложить профили (7 штук)
+      - name: Разложить профили App Store (7 штук)
         env:
           P_TELEGRAM: ${{ secrets.PROFILE_TELEGRAM }}
           P_SHARE: ${{ secrets.PROFILE_SHARE }}
@@ -117,6 +124,14 @@ jobs:
           restore-keys: |
             bazel-${{ runner.os }}-${{ runner.arch }}-
 
+      - name: Определить номер сборки
+        env:
+          INPUT_BUILD_NUMBER: ${{ inputs.build_number }}
+        run: |
+          BN="${INPUT_BUILD_NUMBER:-$((GITHUB_RUN_NUMBER + 1000))}"
+          echo "BUILD_NUMBER=$BN" >> "$GITHUB_ENV"
+          echo "Номер сборки: $BN"
+
       - name: Сборка (release_arm64)
         # Таймаут шага меньше таймаута job, чтобы шаг сохранения кэша успел выполниться,
         # даже если первая (холодная) сборка не уложится во время.
@@ -128,7 +143,7 @@ jobs:
             build \
             --configurationPath="$RUNNER_TEMP/configuration.json" \
             --codesigningInformationPath="$RUNNER_TEMP/codesigning" \
-            --buildNumber="${{ inputs.build_number }}" \
+            --buildNumber="$BUILD_NUMBER" \
             --configuration=release_arm64 \
             --outputBuildArtifactsPath="$RUNNER_TEMP/artifacts"
 
@@ -143,26 +158,41 @@ jobs:
         if: always()
         run: df -h / && du -sh "$HOME/telegram-bazel-cache" 2>/dev/null || true
 
-      - name: Зашифровать IPA (если задан ARTIFACT_PASSPHRASE)
+      - name: Загрузить в TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          printf '%s' "$ASC_KEY_P8_BASE64" | base64 --decode > "$KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
+          xcrun altool --upload-app --type ios \
+            --file "$RUNNER_TEMP/artifacts/Telegram.ipa" \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
+          rm -f "$KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
+
+      # Запасной вариант: если загрузка из CI не сработала, зашифрованный IPA можно скачать
+      # и загрузить в App Store Connect вручную (Transporter). Без ARTIFACT_PASSPHRASE
+      # артефакт не публикуется, чтобы не раскрыть api_hash в публичном репозитории.
+      - name: Зашифровать IPA
+        if: always() && env.HAS_ARTIFACT_PASSPHRASE == 'true'
         env:
           ARTIFACT_PASSPHRASE: ${{ secrets.ARTIFACT_PASSPHRASE }}
         run: |
           IPA="$RUNNER_TEMP/artifacts/Telegram.ipa"
-          if [ -n "$ARTIFACT_PASSPHRASE" ]; then
+          if [ -f "$IPA" ]; then
             openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:ARTIFACT_PASSPHRASE -in "$IPA" -out "$IPA.enc"
             rm "$IPA"
-            echo "IPA зашифрован: Telegram.ipa.enc"
-          else
-            echo "ARTIFACT_PASSPHRASE не задан: IPA будет загружен как есть."
           fi
 
-      - name: Загрузить результат
+      - name: Загрузить зашифрованный IPA как артефакт
+        if: always() && env.HAS_ARTIFACT_PASSPHRASE == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: telegram-build
-          path: |
-            ${{ runner.temp }}/artifacts/Telegram.ipa
-            ${{ runner.temp }}/artifacts/Telegram.ipa.enc
-            ${{ runner.temp }}/artifacts/Telegram.DSYMs.zip
-          if-no-files-found: error
+          path: ${{ runner.temp }}/artifacts/Telegram.ipa.enc
+          if-no-files-found: ignore
           retention-days: 7
