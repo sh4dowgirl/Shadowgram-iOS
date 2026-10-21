@@ -738,13 +738,13 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
             }
         )
         // Shadowgram: ID row toast.
-        self._interaction.shadowgramPeerIdCopied = { [weak self] in
+        self._interaction?.shadowgramPeerIdCopied = { [weak self] in
             guard let self else { return }
             let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
             // "ID copied to clipboard" built from the universal "Username copied" base so no new
             // localization string is needed.
             let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
-            let text = strings.isRussian ? "ID СЃРєРѕРїРёСЂРѕРІР°РЅ РІ Р±СѓС„РµСЂ РѕР±РјРµРЅР°" : "ID copied to clipboard"
+            let text = strings.isRussian ? "ID скопирован в буфер обмена" : "ID copied to clipboard"
             self.controller?.present(UndoOverlayController(presentationData: presentationData, content: .copy(text: text), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return false }), in: .current)
         }
         
