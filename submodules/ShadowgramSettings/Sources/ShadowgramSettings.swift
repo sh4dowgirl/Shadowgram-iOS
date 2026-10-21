@@ -34,6 +34,18 @@ public struct ShadowgramSettingsValues: Equatable {
     public var keepEditHistory: Bool
     /// Replace the left-swipe camera panel in the main chat list with a plain left swipe.
     public var disableCameraSwipe: Bool
+    /// Hide the phone number from screenshots, screen recordings and streams (it stays visible on
+    /// the device itself).
+    public var hidePhoneOnCapture: Bool
+    /// Same for the e-mail address.
+    public var hideEmailOnCapture: Bool
+    /// Same for numeric user, group and channel IDs.
+    public var hideIdOnCapture: Bool
+    /// Same for @usernames.
+    public var hideUsernameOnCapture: Bool
+    /// Chats marked Private from the chat list: their content is hidden from screenshots,
+    /// recordings and streams. Raw peer ids (`PeerId.toInt64()`).
+    public var privateChatIds: Set<Int64>
 
     public static let defaultValues = ShadowgramSettingsValues(
         saveDeletedMessages: false,
@@ -48,10 +60,15 @@ public struct ShadowgramSettingsValues: Equatable {
         showPeerIds: false,
         openByPeerId: false,
         keepEditHistory: false,
-        disableCameraSwipe: false
+        disableCameraSwipe: false,
+        hidePhoneOnCapture: false,
+        hideEmailOnCapture: false,
+        hideIdOnCapture: false,
+        hideUsernameOnCapture: false,
+        privateChatIds: Set()
     )
 
-    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool) {
+    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>) {
         self.saveDeletedMessages = saveDeletedMessages
         self.unlimitedAccounts = unlimitedAccounts
         self.ghostModeEnabled = ghostModeEnabled
@@ -65,6 +82,11 @@ public struct ShadowgramSettingsValues: Equatable {
         self.openByPeerId = openByPeerId
         self.keepEditHistory = keepEditHistory
         self.disableCameraSwipe = disableCameraSwipe
+        self.hidePhoneOnCapture = hidePhoneOnCapture
+        self.hideEmailOnCapture = hideEmailOnCapture
+        self.hideIdOnCapture = hideIdOnCapture
+        self.hideUsernameOnCapture = hideUsernameOnCapture
+        self.privateChatIds = privateChatIds
     }
 
     /// What the client actually sends: everything unless ghost mode is on and hides it.
@@ -105,6 +127,11 @@ public final class ShadowgramSettings {
         static let openByPeerId = "shadowgram.openByPeerId"
         static let keepEditHistory = "shadowgram.keepEditHistory"
         static let disableCameraSwipe = "shadowgram.disableCameraSwipe"
+        static let hidePhoneOnCapture = "shadowgram.capture.hidePhone"
+        static let hideEmailOnCapture = "shadowgram.capture.hideEmail"
+        static let hideIdOnCapture = "shadowgram.capture.hideId"
+        static let hideUsernameOnCapture = "shadowgram.capture.hideUsername"
+        static let privateChatIds = "shadowgram.privateChatIds"
     }
 
     private let defaults: UserDefaults
@@ -135,7 +162,12 @@ public final class ShadowgramSettings {
             showPeerIds: bool(Key.showPeerIds, defaultValues.showPeerIds),
             openByPeerId: bool(Key.openByPeerId, defaultValues.openByPeerId),
             keepEditHistory: bool(Key.keepEditHistory, defaultValues.keepEditHistory),
-            disableCameraSwipe: bool(Key.disableCameraSwipe, defaultValues.disableCameraSwipe)
+            disableCameraSwipe: bool(Key.disableCameraSwipe, defaultValues.disableCameraSwipe),
+            hidePhoneOnCapture: bool(Key.hidePhoneOnCapture, defaultValues.hidePhoneOnCapture),
+            hideEmailOnCapture: bool(Key.hideEmailOnCapture, defaultValues.hideEmailOnCapture),
+            hideIdOnCapture: bool(Key.hideIdOnCapture, defaultValues.hideIdOnCapture),
+            hideUsernameOnCapture: bool(Key.hideUsernameOnCapture, defaultValues.hideUsernameOnCapture),
+            privateChatIds: Set(((defaults.array(forKey: Key.privateChatIds) as? [NSNumber]) ?? []).map { $0.int64Value })
         )
         self.currentValues = values
         self.valuesPromise = ValuePromise(values, ignoreRepeated: true)
@@ -176,6 +208,11 @@ public final class ShadowgramSettings {
         self.defaults.set(values.openByPeerId, forKey: Key.openByPeerId)
         self.defaults.set(values.keepEditHistory, forKey: Key.keepEditHistory)
         self.defaults.set(values.disableCameraSwipe, forKey: Key.disableCameraSwipe)
+        self.defaults.set(values.hidePhoneOnCapture, forKey: Key.hidePhoneOnCapture)
+        self.defaults.set(values.hideEmailOnCapture, forKey: Key.hideEmailOnCapture)
+        self.defaults.set(values.hideIdOnCapture, forKey: Key.hideIdOnCapture)
+        self.defaults.set(values.hideUsernameOnCapture, forKey: Key.hideUsernameOnCapture)
+        self.defaults.set(values.privateChatIds.sorted().map { NSNumber(value: $0) }, forKey: Key.privateChatIds)
 
         self.valuesPromise.set(values)
     }

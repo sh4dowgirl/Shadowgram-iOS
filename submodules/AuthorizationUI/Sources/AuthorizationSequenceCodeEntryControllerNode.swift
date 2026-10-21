@@ -16,6 +16,7 @@ import SolidRoundedButtonNode
 import AuthorizationUtils
 import TelegramStringFormatting
 import TextNodeWithEntities
+import ShadowgramCapture
 
 final class AuthorizationSequenceCodeEntryControllerNode: ASDisplayNode, UITextFieldDelegate {
     private let strings: PresentationStrings
@@ -75,6 +76,9 @@ final class AuthorizationSequenceCodeEntryControllerNode: ASDisplayNode, UITextF
     }
     
     var email: String?
+    
+    /// Shadowgram: keeps the phone number or e-mail the code went to out of screen capture.
+    private var shadowgramCurrentOptionCaptureGuard: ShadowgramCaptureGuard?
     
     var currentCode: String {
         switch self.codeType {
@@ -422,6 +426,14 @@ final class AuthorizationSequenceCodeEntryControllerNode: ASDisplayNode, UITextF
         self.appleSignInAllowed = appleSignInAllowed
         
         self.currentOptionNode.attributedText = authorizationCurrentOptionText(codeType, phoneNumber: self.phoneNumber, email: self.email, strings: self.strings, primaryColor: self.theme.list.itemPrimaryTextColor, accentColor: self.theme.list.itemAccentColor)
+        if self.shadowgramCurrentOptionCaptureGuard == nil {
+            self.shadowgramCurrentOptionCaptureGuard = ShadowgramCaptureGuard(layer: self.currentOptionNode.layer)
+        }
+        if case .email = codeType {
+            self.shadowgramCurrentOptionCaptureGuard?.update(kinds: [.email])
+        } else {
+            self.shadowgramCurrentOptionCaptureGuard?.update(kinds: [.phone])
+        }
         self.currentOptionActivateAreaNode.accessibilityLabel = self.currentOptionNode.attributedText?.string ?? ""
         if case .missedCall = codeType {
             self.currentOptionInfoNode.attributedText = NSAttributedString(string: self.strings.Login_CodePhonePatternInfoText, font: Font.regular(17.0), textColor: self.theme.list.itemPrimaryTextColor, paragraphAlignment: .center)

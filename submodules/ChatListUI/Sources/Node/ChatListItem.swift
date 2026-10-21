@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import AsyncDisplayKit
 import Display
+import ShadowgramCapture
 import SwiftSignalKit
 import TelegramCore
 import TelegramPresentationData
@@ -1454,6 +1455,8 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
     private var currentTextLeftCutout: CGFloat = 0.0
     private var currentMediaPreviewSpecs: [ContentImageSpec] = []
     private var mediaPreviewNodes: [EngineMedia.Id: ChatListMediaPreviewNode] = [:]
+    /// Shadowgram: the message preview of a chat marked Private is hidden from screen capture.
+    private var shadowgramPrivateCaptureGuard: ShadowgramPrivateChatCaptureGuard?
     
     var selectableControlNode: ItemListSelectableControlNode?
     var reorderControlNode: ItemListEditableReorderControlNode?
@@ -1903,6 +1906,24 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
         } else if let iconNode = self.shadowgramFolderIconNode {
             iconNode.removeFromSupernode()
             self.shadowgramFolderIconNode = nil
+        }
+        
+        if self.shadowgramPrivateCaptureGuard == nil {
+            self.shadowgramPrivateCaptureGuard = ShadowgramPrivateChatCaptureGuard(layers: { [weak self] in
+                guard let self else {
+                    return []
+                }
+                var layers: [CALayer] = [self.textNode.textNode.layer, self.authorNode.layer]
+                for (_, previewNode) in self.mediaPreviewNodes {
+                    layers.append(previewNode.layer)
+                }
+                return layers
+            })
+        }
+        if case let .peer(peerData) = item.content {
+            self.shadowgramPrivateCaptureGuard?.update(rawPeerId: peerData.peer.peerId.toInt64())
+        } else {
+            self.shadowgramPrivateCaptureGuard?.update(rawPeerId: nil)
         }
         
         if item.interaction.activateChatPreview == nil {
@@ -5156,6 +5177,9 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                             previewNode = ChatListMediaPreviewNode(context: item.context, message: message, media: media)
                             strongSelf.mediaPreviewNodes[mediaId] = previewNode
                             strongSelf.mainContentContainerNode.addSubnode(previewNode)
+                            if strongSelf.shadowgramPrivateCaptureGuard?.isHidden == true {
+                                shadowgramSetHiddenFromCapture(previewNode.layer, true)
+                            }
                         }
                         previewNode.updateLayout(size: mediaSize, synchronousLoads: synchronousLoads)
                         previewNodeAlphaTransition.updateAlpha(node: previewNode, alpha: strongSelf.inputActivitiesNode.alpha.isZero ? 1.0 : 0.0)

@@ -22,6 +22,7 @@ swift_library(
         "//submodules/TelegramUIPreferences:TelegramUIPreferences",
         "//submodules/AccountContext:AccountContext",
         "//submodules/ShadowgramSettings:ShadowgramSettings",
+        "//submodules/ShadowgramCapture:ShadowgramCapture",
         "//submodules/TelegramBaseController:TelegramBaseController",
         "//submodules/OverlayStatusController:OverlayStatusController",
         "//submodules/AlertUI:AlertUI",

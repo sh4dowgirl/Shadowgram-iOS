@@ -15,6 +15,7 @@ import ComponentFlow
 import ButtonComponent
 import ComponentDisplayAdapters
 import TextNodeWithEntities
+import ShadowgramCapture
 
 enum PeerInfoScreenLabeledValueTextColor {
     case primary
@@ -82,6 +83,8 @@ final class PeerInfoScreenLabeledValueItem: PeerInfoScreenItem {
     let button: Button?
     let contextAction: ((ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?
     let requestLayout: (Bool) -> Void
+    /// Shadowgram: what the value shows, so it can be hidden from screen capture (Extra Settings).
+    var shadowgramCaptureKinds: Set<ShadowgramCaptureKind> = Set()
     
     init(
         id: AnyHashable,
@@ -164,6 +167,8 @@ private final class PeerInfoScreenLabeledValueItemNode: PeerInfoScreenItemNode {
     private var spoilerTextNode: ImmediateTextNodeWithEntities?
     private let textNode: ImmediateTextNodeWithEntities
     private let additionalTextNode: ImmediateTextNode
+    private var shadowgramTextCaptureGuard: ShadowgramCaptureGuard?
+    private var shadowgramAdditionalTextCaptureGuard: ShadowgramCaptureGuard?
     private let measureTextNode: ImmediateTextNode
     private let bottomSeparatorNode: ASDisplayNode
     
@@ -477,6 +482,15 @@ private final class PeerInfoScreenLabeledValueItemNode: PeerInfoScreenItemNode {
         
         self.item = item
         self.theme = presentationData.theme
+        
+        if !item.shadowgramCaptureKinds.isEmpty || self.shadowgramTextCaptureGuard != nil {
+            if self.shadowgramTextCaptureGuard == nil {
+                self.shadowgramTextCaptureGuard = ShadowgramCaptureGuard(layer: self.textNode.layer)
+                self.shadowgramAdditionalTextCaptureGuard = ShadowgramCaptureGuard(layer: self.additionalTextNode.layer)
+            }
+            self.shadowgramTextCaptureGuard?.update(kinds: item.shadowgramCaptureKinds)
+            self.shadowgramAdditionalTextCaptureGuard?.update(kinds: item.shadowgramCaptureKinds)
+        }
         
         if let action = item.action {
             self.selectionNode.pressed = { [weak self] in

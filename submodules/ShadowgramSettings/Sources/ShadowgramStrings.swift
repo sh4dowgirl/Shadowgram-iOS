@@ -74,3 +74,15 @@ extension ShadowgramStrings {
     public var openByPeerIdCancel: String { return t("Отмена", "Cancel") }
     public var openByPeerIdNotFound: String { return t("Чат с таким ID не найден на этом аккаунте.", "No chat with this ID was found on this account.") }
 }
+
+extension ShadowgramStrings {
+    public var captureHeader: String { return t("СКРЫВАТЬ НА СКРИНШОТАХ И ЗАПИСИ ЭКРАНА", "HIDE ON SCREENSHOTS AND SCREEN RECORDING") }
+    public var hidePhoneOnCapture: String { return t("Номер телефона", "Phone Number") }
+    public var hideEmailOnCapture: String { return t("Электронная почта", "Email") }
+    public var hideIdOnCapture: String { return t("ID", "ID") }
+    public var hideUsernameOnCapture: String { return t("Юзернейм (@тег)", "Username (@tag)") }
+    public var captureFooter: String { return t("Включённые данные видны вам на экране, но на скриншотах, записи экрана и трансляциях вместо них пусто. В шапке настроек номер и юзернейм стоят в одной строке, поэтому она скрывается целиком, если скрыто хотя бы одно из двух.", "Selected data stays visible on your screen but is blank on screenshots, screen recordings and streams. In the Settings header the phone number and username share one line, so the whole line is hidden if either of them is.") }
+
+    public var markChatPrivate: String { return t("Сделать приватным", "Mark as Private") }
+    public var unmarkChatPrivate: String { return t("Убрать из приватных", "Remove from Private") }
+}

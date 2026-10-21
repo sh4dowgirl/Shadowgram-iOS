@@ -18,6 +18,7 @@ import PeerNameColorItem
 import BoostLevelIconComponent
 import ShadowgramSettings
 import ShadowgramUI
+import ShadowgramCapture
 
 private let enabledPublicBioEntities: EnabledEntityTypes = [.allUrl, .mention, .hashtag]
 private let enabledPrivateBioEntities: EnabledEntityTypes = [.internalUrl, .mention, .hashtag]
@@ -186,13 +187,15 @@ func infoItems(
             } else {
                 label = presentationData.strings.ContactInfo_PhoneLabelMobile
             }
-            items[currentPeerInfoSection]!.append(PeerInfoScreenLabeledValueItem(id: ItemPhoneNumber, label: label, text: formattedPhone, textColor: .accent, action: { node, progress in
+            let phoneItem = PeerInfoScreenLabeledValueItem(id: ItemPhoneNumber, label: label, text: formattedPhone, textColor: .accent, action: { node, progress in
                 interaction.openPhone(phone, node, nil, progress)
             }, longTapAction: nil, contextAction: { node, gesture, _ in
                 interaction.openPhone(phone, node, gesture, nil)
             }, requestLayout: { animated in
                 interaction.requestLayout(animated)
-            }))
+            })
+            phoneItem.shadowgramCaptureKinds = [.phone]
+            items[currentPeerInfoSection]!.append(phoneItem)
         }
         if let mainUsername = user.addressName {
             var additionalUsernames: String?
@@ -202,7 +205,7 @@ func infoItems(
             }
             
             items[currentPeerInfoSection]!.append(
-                PeerInfoScreenLabeledValueItem(
+                shadowgramCaptureProtected(kinds: [.username], PeerInfoScreenLabeledValueItem(
                     id: ItemUsername,
                     label: presentationData.strings.Profile_Username,
                     text: "@\(mainUsername)",
@@ -224,7 +227,7 @@ func infoItems(
                     }, requestLayout: { animated in
                         interaction.requestLayout(animated)
                     }
-                )
+                ))
             )
         }
         
@@ -588,7 +591,7 @@ func infoItems(
             let linkText = "https://t.me/\(mainUsername)/\(threadId)"
             
             items[currentPeerInfoSection]!.append(
-                PeerInfoScreenLabeledValueItem(
+                shadowgramCaptureProtected(kinds: [.username], PeerInfoScreenLabeledValueItem(
                     id: ItemUsername,
                     label: presentationData.strings.Channel_LinkItem,
                     text: linkText,
@@ -609,7 +612,7 @@ func infoItems(
                     }, requestLayout: { animated in
                         interaction.requestLayout(animated)
                     }
-                )
+                ))
             )
             if let _ = channel.addressName {
                 
@@ -640,7 +643,7 @@ func infoItems(
                 }
                 
                 items[currentPeerInfoSection]!.append(
-                    PeerInfoScreenLabeledValueItem(
+                    shadowgramCaptureProtected(kinds: [.username], PeerInfoScreenLabeledValueItem(
                         id: ItemUsername,
                         label: presentationData.strings.Channel_LinkItem,
                         text: "https://t.me/\(mainUsername)",
@@ -666,7 +669,7 @@ func infoItems(
                         }, requestLayout: { animated in
                             interaction.requestLayout(animated)
                         }
-                    )
+                    ))
                 )
             }
             if let cachedData = data.cachedData as? CachedChannelData {
@@ -1884,7 +1887,7 @@ private func shadowgramPeerIdInfoItem(peerId: EnginePeer.Id, section: InfoSectio
     // Treating `_` the label keeps the row aligned with the username/phone rows above it, which
     // use short string labels too.
     let value = "\(peerId.id._internalGetInt64Value())"
-    return PeerInfoScreenLabeledValueItem(
+    return shadowgramCaptureProtected(kinds: [.id], PeerInfoScreenLabeledValueItem(
         id: shadowgramPeerIdItemBase,
         label: "ID",
         text: value,
@@ -1896,5 +1899,11 @@ private func shadowgramPeerIdInfoItem(peerId: EnginePeer.Id, section: InfoSectio
         requestLayout: { animated in
             interaction.requestLayout(animated)
         }
-    )
+    ))
+}
+
+/// Shadowgram: marks a labelled value as personal data that Extra Settings can hide from screen capture.
+private func shadowgramCaptureProtected(kinds: Set<ShadowgramCaptureKind>, _ item: PeerInfoScreenLabeledValueItem) -> PeerInfoScreenLabeledValueItem {
+    item.shadowgramCaptureKinds = kinds
+    return item
 }

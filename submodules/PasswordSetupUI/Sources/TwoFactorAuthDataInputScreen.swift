@@ -15,6 +15,7 @@ import TelegramCore
 import AnimatedStickerNode
 import TelegramAnimatedStickerNode
 import ActivityIndicator
+import ShadowgramCapture
 
 public enum TwoFactorDataInputMode {
     public struct Recovery {
@@ -1291,6 +1292,8 @@ private final class TwoFactorDataInputScreenNode: ViewControllerTracingNode, ASS
     private let resendCodeActionTitleNode: ImmediateTextNode
     private let resendCodeActionButtonNode: HighlightTrackingButtonNode
     private let inputNodes: [TwoFactorDataInputTextNode]
+    /// Shadowgram: keeps the e-mail address out of screen capture (Extra Settings).
+    private var shadowgramCaptureGuards: [ShadowgramCaptureGuard] = []
     private let button = ComponentView<Empty>()
     private let buttonText: String
     private var buttonIsHidden = false
@@ -1571,6 +1574,23 @@ private final class TwoFactorDataInputScreenNode: ViewControllerTracingNode, ASS
         
         if case .rememberPassword = mode {
             self.buttonAlpha = 0.0
+        }
+        
+        switch mode {
+        case .passwordRecoveryEmail, .emailConfirmation:
+            // "We have sent a code to e***@example.com".
+            let captureGuard = ShadowgramCaptureGuard(layer: self.textNode.layer)
+            captureGuard.update(kinds: [.email])
+            self.shadowgramCaptureGuards.append(captureGuard)
+        case .emailAddress, .updateEmailAddress:
+            // The address being typed.
+            for inputNode in self.inputNodes {
+                let captureGuard = ShadowgramCaptureGuard(layer: inputNode.layer)
+                captureGuard.update(kinds: [.email])
+                self.shadowgramCaptureGuards.append(captureGuard)
+            }
+        default:
+            break
         }
         
         self.backgroundColor = self.presentationData.theme.list.plainBackgroundColor

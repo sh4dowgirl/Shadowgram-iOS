@@ -1,4 +1,5 @@
 import Foundation
+import ShadowgramSettings
 import UIKit
 import AsyncDisplayKit
 import Postbox
@@ -1225,14 +1226,19 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
             }
         }
         
-        let isSecret = self.chatPresentationInterfaceState.copyProtectionEnabled || self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat || self.chatLocation.peerId?.isVerificationCodes == true
-        if self.historyNodeContainer.isSecret != isSecret {
-            #if DEBUG
-            self.historyNodeContainer.isSecret = false
-            #else
-            self.historyNodeContainer.isSecret = isSecret
-            #endif
-            setLayerDisableScreenshots(self.titleAccessoryPanelContainer.layer, isSecret)
+        // Shadowgram: a chat marked Private from the chat list is hidden from screen capture too.
+        let isShadowgramPrivate = self.chatLocation.peerId.flatMap({ ShadowgramSettings.shared.values.privateChatIds.contains($0.toInt64()) }) ?? false
+        let isSecret = self.chatPresentationInterfaceState.copyProtectionEnabled || self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat || self.chatLocation.peerId?.isVerificationCodes == true || isShadowgramPrivate
+        // Debug builds leave stock protection off (as before); a Shadowgram Private chat is
+        // protected in every build, so it can be checked on a debug build too.
+        #if DEBUG
+        let effectiveIsSecret = isShadowgramPrivate
+        #else
+        let effectiveIsSecret = isSecret
+        #endif
+        if self.historyNodeContainer.isSecret != effectiveIsSecret {
+            self.historyNodeContainer.isSecret = effectiveIsSecret
+            setLayerDisableScreenshots(self.titleAccessoryPanelContainer.layer, effectiveIsSecret)
         }
 
         var previousListBottomInset: CGFloat?

@@ -26,6 +26,7 @@ private enum ShadowgramExtraSettingsSection: Int32 {
     case groups
     case interface
     case messagesExtra
+    case capture
 }
 
 private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
@@ -59,6 +60,13 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
     case keepEditHistory(Bool)
     case keepEditHistoryFooter
 
+    case captureHeader
+    case hidePhoneOnCapture(Bool)
+    case hideEmailOnCapture(Bool)
+    case hideIdOnCapture(Bool)
+    case hideUsernameOnCapture(Bool)
+    case captureFooter
+
     var section: ItemListSectionId {
         switch self {
         case .messagesHeader, .saveDeletedMessages, .messagesFooter:
@@ -73,6 +81,8 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return ShadowgramExtraSettingsSection.interface.rawValue
         case .messagesExtraHeader, .keepEditHistory, .keepEditHistoryFooter:
             return ShadowgramExtraSettingsSection.messagesExtra.rawValue
+        case .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter:
+            return ShadowgramExtraSettingsSection.capture.rawValue
         }
     }
 
@@ -126,6 +136,18 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return 22
         case .keepEditHistoryFooter:
             return 23
+        case .captureHeader:
+            return 24
+        case .hidePhoneOnCapture:
+            return 25
+        case .hideEmailOnCapture:
+            return 26
+        case .hideIdOnCapture:
+            return 27
+        case .hideUsernameOnCapture:
+            return 28
+        case .captureFooter:
+            return 29
         }
     }
 
@@ -205,6 +227,26 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             })
         case .keepEditHistoryFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain(strings.keepEditHistoryFooter), sectionId: self.section)
+        case .captureHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.captureHeader, sectionId: self.section)
+        case let .hidePhoneOnCapture(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.hidePhoneOnCapture, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.hidePhoneOnCapture = value }
+            })
+        case let .hideEmailOnCapture(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.hideEmailOnCapture, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.hideEmailOnCapture = value }
+            })
+        case let .hideIdOnCapture(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.hideIdOnCapture, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.hideIdOnCapture = value }
+            })
+        case let .hideUsernameOnCapture(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.hideUsernameOnCapture, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.hideUsernameOnCapture = value }
+            })
+        case .captureFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.captureFooter), sectionId: self.section)
         }
     }
 }
@@ -245,6 +287,13 @@ private func shadowgramExtraSettingsEntries(values: ShadowgramSettingsValues) ->
     entries.append(.messagesExtraHeader)
     entries.append(.keepEditHistory(values.keepEditHistory))
     entries.append(.keepEditHistoryFooter)
+
+    entries.append(.captureHeader)
+    entries.append(.hidePhoneOnCapture(values.hidePhoneOnCapture))
+    entries.append(.hideEmailOnCapture(values.hideEmailOnCapture))
+    entries.append(.hideIdOnCapture(values.hideIdOnCapture))
+    entries.append(.hideUsernameOnCapture(values.hideUsernameOnCapture))
+    entries.append(.captureFooter)
 
     return entries
 }

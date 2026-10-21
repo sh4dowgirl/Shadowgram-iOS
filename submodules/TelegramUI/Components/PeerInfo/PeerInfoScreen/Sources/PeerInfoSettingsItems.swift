@@ -1,4 +1,5 @@
 import Foundation
+import ShadowgramCapture
 import UIKit
 import Display
 import AccountContext
@@ -477,17 +478,21 @@ func settingsEditingItems(data: PeerInfoScreenData?, state: PeerInfoState, conte
     }
     
     if case let .user(user) = data.peer {
-        items[.info]!.append(PeerInfoScreenDisclosureItem(id: ItemPhoneNumber, label: .text(user.phone.flatMap({ formatPhoneNumber(context: context, number: $0) }) ?? ""), text: presentationData.strings.Settings_PhoneNumber, icon: PresentationResourcesSettings.recentCalls, action: {
+        let phoneItem = PeerInfoScreenDisclosureItem(id: ItemPhoneNumber, label: .text(user.phone.flatMap({ formatPhoneNumber(context: context, number: $0) }) ?? ""), text: presentationData.strings.Settings_PhoneNumber, icon: PresentationResourcesSettings.recentCalls, action: {
             interaction.openSettings(.phoneNumber)
-        }))
+        })
+        phoneItem.shadowgramCaptureKinds = [.phone]
+        items[.info]!.append(phoneItem)
     }
     var username = ""
     if let addressName = data.peer?.addressName, !addressName.isEmpty {
         username = "@\(addressName)"
     }
-    items[.info]!.append(PeerInfoScreenDisclosureItem(id: ItemUsername, label: .text(username), text: presentationData.strings.Settings_Username, icon: PresentationResourcesSettings.email, action: {
+    let usernameItem = PeerInfoScreenDisclosureItem(id: ItemUsername, label: .text(username), text: presentationData.strings.Settings_Username, icon: PresentationResourcesSettings.email, action: {
           interaction.openSettings(.username)
-    }))
+    })
+    usernameItem.shadowgramCaptureKinds = [.username]
+    items[.info]!.append(usernameItem)
     
     if case let .user(peer) = data.peer {
         var colors: [PeerNameColors.Colors] = []

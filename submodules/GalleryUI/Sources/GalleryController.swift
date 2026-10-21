@@ -1,4 +1,5 @@
 import Foundation
+import ShadowgramCapture
 import UIKit
 import Display
 import QuickLook
@@ -1560,6 +1561,20 @@ public class GalleryController: ViewController, StandalonePresentableController,
         let disableTapNavigation = !(self.context.sharedContext.currentMediaDisplaySettings.with { $0 }.showNextMediaOnTap)
         self.displayNode = GalleryControllerNode(context: self.context, controllerInteraction: controllerInteraction, titleView: titleView, disableTapNavigation: disableTapNavigation)
         self.displayNodeDidLoad()
+        
+        // Shadowgram: media opened from a chat marked Private is hidden from screen capture as well.
+        let shadowgramPeerId: EnginePeer.Id
+        switch self.source {
+        case let .peerMessagesAtId(messageId, _, _, _):
+            shadowgramPeerId = messageId.peerId
+        case let .standaloneMessage(message, _):
+            shadowgramPeerId = message.id.peerId
+        case let .custom(_, messageId, _):
+            shadowgramPeerId = messageId.peerId
+        }
+        if shadowgramIsPrivateChat(shadowgramPeerId.toInt64()) {
+            shadowgramSetHiddenFromCapture(self.displayNode.layer, true)
+        }
         
         self.galleryNode.statusBar = self.statusBar
         self.galleryNode.navigationBar = self.navigationBar

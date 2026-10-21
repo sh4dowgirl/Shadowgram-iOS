@@ -9,6 +9,7 @@ import AuthenticationServices
 import AnimatedStickerNode
 import TelegramAnimatedStickerNode
 import SolidRoundedButtonNode
+import ShadowgramCapture
 
 final class AuthorizationDividerNode: ASDisplayNode {
     private let titleNode: ImmediateTextNode
@@ -63,6 +64,8 @@ final class AuthorizationSequenceEmailEntryControllerNode: ASDisplayNode, UIText
     
     private let codeField: TextFieldNode
     private let codeSeparatorNode: ASDisplayNode
+    /// Shadowgram: keeps the address being typed out of screen capture (Extra Settings).
+    private var shadowgramCaptureGuard: ShadowgramCaptureGuard?
     
     private var layoutArguments: (ContainerViewLayout, CGFloat)?
     
@@ -146,6 +149,10 @@ final class AuthorizationSequenceEmailEntryControllerNode: ASDisplayNode, UIText
         })
         
         self.backgroundColor = self.theme.list.plainBackgroundColor
+        
+        let captureGuard = ShadowgramCaptureGuard(layer: self.codeField.textField.layer)
+        captureGuard.update(kinds: [.email])
+        self.shadowgramCaptureGuard = captureGuard
         
         self.codeField.textField.delegate = self
         

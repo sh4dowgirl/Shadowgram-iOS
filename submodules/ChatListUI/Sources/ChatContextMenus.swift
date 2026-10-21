@@ -15,6 +15,7 @@ import TelegramPresentationData
 import TelegramStringFormatting
 import ChatTimerScreen
 import NotificationPeerExceptionController
+import ShadowgramSettings
 
 func archiveContextMenuItems(context: AccountContext, group: EngineChatList.Group, chatListController: ChatListControllerImpl?) -> Signal<[ContextMenuItem], NoError> {
     let presentationData = context.sharedContext.currentPresentationData.with({ $0 })
@@ -472,6 +473,20 @@ func chatContextMenuItems(context: AccountContext, peerId: EnginePeer.Id, promoI
                                     })
                                 })))
                             }
+                            
+                            // Shadowgram: a Private chat cannot be screenshotted, recorded or streamed.
+                            let shadowgramStrings = ShadowgramStrings(languageCode: strings.primaryComponent.languageCode)
+                            let isPrivateChat = ShadowgramSettings.shared.values.privateChatIds.contains(peerId.toInt64())
+                            items.append(.action(ContextMenuActionItem(text: isPrivateChat ? shadowgramStrings.unmarkChatPrivate : shadowgramStrings.markChatPrivate, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: isPrivateChat ? "Chat/Context Menu/Eye" : "Chat/Context Menu/EyeLocked"), color: theme.contextMenu.primaryColor) }, action: { _, f in
+                                ShadowgramSettings.shared.update { values in
+                                    if isPrivateChat {
+                                        values.privateChatIds.remove(peerId.toInt64())
+                                    } else {
+                                        values.privateChatIds.insert(peerId.toInt64())
+                                    }
+                                }
+                                f(.default)
+                            })))
                         } else {
                             if case .search = source {
                                 if case let .channel(peer) = peer {

@@ -183,6 +183,7 @@ swift_library(
         "//submodules/TelegramUI/Components/PeerInfo/AccountPeerContextItem",
         "//submodules/ShadowgramSettings:ShadowgramSettings",
         "//submodules/ShadowgramUI:ShadowgramUI",
+        "//submodules/ShadowgramCapture:ShadowgramCapture",
     ],
     visibility = [
         "//visibility:public",

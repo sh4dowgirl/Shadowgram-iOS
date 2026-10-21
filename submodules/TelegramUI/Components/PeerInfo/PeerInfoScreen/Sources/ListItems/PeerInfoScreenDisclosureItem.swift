@@ -6,6 +6,7 @@ import SwiftSignalKit
 import TelegramPresentationData
 import TextNodeWithEntities
 import AccountContext
+import ShadowgramCapture
 
 final class PeerInfoScreenDisclosureItem: PeerInfoScreenItem {
     enum Label {
@@ -54,6 +55,8 @@ final class PeerInfoScreenDisclosureItem: PeerInfoScreenItem {
     let iconSignal: Signal<UIImage?, NoError>?
     let hasArrow: Bool
     let action: (() -> Void)?
+    /// Shadowgram: what the label shows, so it can be hidden from screen capture (Extra Settings).
+    var shadowgramCaptureKinds: Set<ShadowgramCaptureKind> = Set()
     
     init(id: AnyHashable, label: Label = .none, additionalBadgeLabel: String? = nil, additionalBadgeIcon: UIImage? = nil, text: String, icon: UIImage? = nil, iconSignal: Signal<UIImage?, NoError>? = nil, hasArrow: Bool = true, action: (() -> Void)?) {
         self.id = id
@@ -78,6 +81,7 @@ private final class PeerInfoScreenDisclosureItemNode: PeerInfoScreenItemNode {
     private let iconNode: ASImageNode
     private let labelBadgeNode: ASImageNode
     private let labelNode: ImmediateTextNodeWithEntities
+    private var shadowgramLabelCaptureGuard: ShadowgramCaptureGuard?
     private var additionalLabelNode: ImmediateTextNode?
     private var additionalLabelBadgeNode: ASImageNode?
     private let textNode: ImmediateTextNode
@@ -150,6 +154,13 @@ private final class PeerInfoScreenDisclosureItemNode: PeerInfoScreenItemNode {
         
         let previousItem = self.item
         self.item = item
+        
+        if !item.shadowgramCaptureKinds.isEmpty || self.shadowgramLabelCaptureGuard != nil {
+            if self.shadowgramLabelCaptureGuard == nil {
+                self.shadowgramLabelCaptureGuard = ShadowgramCaptureGuard(layer: self.labelNode.layer)
+            }
+            self.shadowgramLabelCaptureGuard?.update(kinds: item.shadowgramCaptureKinds)
+        }
         
         self.selectionNode.pressed = item.action
         

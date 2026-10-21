@@ -44,6 +44,7 @@ import PlainButtonComponent
 import BundleIconComponent
 import MarqueeComponent
 import EdgeEffect
+import ShadowgramCapture
 
 final class PeerInfoHeaderNavigationTransition {
     let sourceNavigationBar: NavigationBar
@@ -147,6 +148,11 @@ final class PeerInfoHeaderNode: ASDisplayNode {
     var subtitleArrowNode: ASImageNode?
     var subtitleBadgeView: PeerInfoSubtitleBadgeView?
     let panelSubtitleNode: MultiScaleTextNode
+    /// Shadowgram: in Settings the subtitle is "phone • @username"; it is hidden from screen capture
+    /// when either of the two is (Extra Settings). One text, so the whole line goes.
+    private var shadowgramSubtitleCaptureKinds: Set<ShadowgramCaptureKind> = Set()
+    private var shadowgramSubtitleCaptureGuard: ShadowgramCaptureGuard?
+    private var shadowgramPanelSubtitleCaptureGuard: ShadowgramCaptureGuard?
     let usernameNodeContainer: ASDisplayNode
     let usernameNodeRawContainer: ASDisplayNode
     let usernameNode: MultiScaleTextNode
@@ -1226,11 +1232,14 @@ final class PeerInfoHeaderNode: ASDisplayNode {
             titleAttributes = MultiScaleTextState.Attributes(font: Font.medium(28.0), color: .white)
             smallTitleAttributes = MultiScaleTextState.Attributes(font: Font.medium(28.0), color: .white, shadowColor: titleShadowColor)
             
+            self.shadowgramSubtitleCaptureKinds = Set()
             if self.isSettings, case let .user(user) = peer {
                 var subtitle = formatPhoneNumber(context: self.context, number: user.phone ?? "")
+                self.shadowgramSubtitleCaptureKinds.insert(.phone)
                 
                 if let mainUsername = user.addressName, !mainUsername.isEmpty {
                     subtitle = "\(subtitle) • @\(mainUsername)"
+                    self.shadowgramSubtitleCaptureKinds.insert(.username)
                 }
                 subtitleStringText = subtitle
                 subtitleAttributes = MultiScaleTextState.Attributes(font: Font.regular(17.0), color: .white)
@@ -1574,6 +1583,15 @@ final class PeerInfoHeaderNode: ASDisplayNode {
             panelSubtitleNodeLayout = self.panelSubtitleNode.updateLayout(text: panelSubtitleString?.text ?? subtitleStringText, states: panelSubtitleStates, mainState: subtitleMainState)
         }
         self.panelSubtitleNode.accessibilityLabel = panelSubtitleString?.text ?? subtitleStringText
+        
+        if !self.shadowgramSubtitleCaptureKinds.isEmpty || self.shadowgramSubtitleCaptureGuard != nil {
+            if self.shadowgramSubtitleCaptureGuard == nil {
+                self.shadowgramSubtitleCaptureGuard = ShadowgramCaptureGuard(layer: self.subtitleNode.layer)
+                self.shadowgramPanelSubtitleCaptureGuard = ShadowgramCaptureGuard(layer: self.panelSubtitleNode.layer)
+            }
+            self.shadowgramSubtitleCaptureGuard?.update(kinds: self.shadowgramSubtitleCaptureKinds)
+            self.shadowgramPanelSubtitleCaptureGuard?.update(kinds: self.shadowgramSubtitleCaptureKinds)
+        }
         
         let usernameNodeLayout = self.usernameNode.updateLayout(text: usernameString.text, states: [
             TitleNodeStateRegular: MultiScaleTextState(attributes: usernameString.attributes, constrainedSize: CGSize(width: titleConstrainedSize.width, height: titleConstrainedSize.height)),
