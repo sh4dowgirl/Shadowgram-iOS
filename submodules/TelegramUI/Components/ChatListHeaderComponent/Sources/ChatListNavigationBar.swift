@@ -440,7 +440,11 @@ public final class ChatListNavigationBar: Component {
                 }
             }
             
-            var edgeEffectHeight: CGFloat = currentLayout.size.height + 14.0
+            // Shadowgram: the fade below the folder tabs used to end 14pt under them, which read as
+            // a hard cut over the first chat row. It now runs further out over a longer gradient
+            // (the solid part still ends at the same place, 40pt above the bottom of the tabs).
+            let edgeEffectTail: CGFloat = 26.0
+            var edgeEffectHeight: CGFloat = currentLayout.size.height + edgeEffectTail
             if component.search != nil {
                 if component.activeSearch != nil {
                 } else {
@@ -451,7 +455,7 @@ public final class ChatListNavigationBar: Component {
             edgeEffectHeight = max(0.0, edgeEffectHeight)
             let edgeEffectFrame = CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: CGSize(width: currentLayout.size.width, height: edgeEffectHeight))
             transition.setFrame(view: self.edgeEffectView, frame: edgeEffectFrame)
-            self.edgeEffectView.update(content: nil, blur: true, alpha: 0.85, rect: edgeEffectFrame, edge: .top, edgeSize: min(54.0, edgeEffectHeight), transition: transition)
+            self.edgeEffectView.update(content: nil, blur: true, alpha: 0.85, rect: edgeEffectFrame, edge: .top, edgeSize: min(40.0 + edgeEffectTail, edgeEffectHeight), transition: transition)
             
             let headerTransition = transition
             

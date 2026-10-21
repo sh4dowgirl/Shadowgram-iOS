@@ -27,7 +27,8 @@ struct ShadowgramGroupsFolderMembership: Equatable {
             return group.participantCount >= Int(self.minMembers)
         }
         if let channel = peer as? TelegramChannel, case .group = channel.info, !channel.flags.contains(.isMonoforum) {
-            return self.includedSupergroupIds.contains(channel.id)
+            // With no minimum every supergroup belongs, member count known or not.
+            return self.minMembers == 0 || self.includedSupergroupIds.contains(channel.id)
         }
         return false
     }
@@ -43,10 +44,14 @@ struct ShadowgramGroupsFolderMembership: Equatable {
     }
 }
 
-/// How many recent supergroups of the root list are considered.
-private let shadowgramGroupsFolderSupergroupLimit = 300
+/// How many recent supergroups of the root list are considered for a member-count minimum.
+private let shadowgramGroupsFolderSupergroupLimit = 2000
 /// Pause between two background member-count requests.
-private let shadowgramGroupsFolderFetchInterval: Double = 1.5
+private let shadowgramGroupsFolderFetchInterval: Double = 0.4
+
+/// Supergroups whose member count was already requested in this session. Shared so that a list
+/// update (the order of chats changes with every new message) does not start the queue over.
+private let shadowgramGroupsFolderRequestedIds = Atomic<Set<EnginePeer.Id>>(value: Set())
 
 private func shadowgramIsSupergroup(_ peer: Peer) -> Bool {
     if let channel = peer as? TelegramChannel, case .group = channel.info, !channel.flags.contains(.isMonoforum) {
@@ -62,14 +67,15 @@ private func shadowgramGroupsFolderMembershipSignal(account: Account) -> Signal<
         return shadowgramIsSupergroup(peer)
     })
 
-    let supergroupIds: Signal<[EnginePeer.Id], NoError> = account.viewTracker.tailChatListView(groupId: .root, filterPredicate: supergroupsPredicate, count: shadowgramGroupsFolderSupergroupLimit)
-    |> map { view, _ -> [EnginePeer.Id] in
-        var result: [EnginePeer.Id] = []
-        var seen = Set<EnginePeer.Id>()
+    // A set, not the list order: the order changes with every new message, and each change used to
+    // restart the count requests from the first group, so groups further down never got a count
+    // and never reached the folder.
+    let supergroupIds: Signal<Set<EnginePeer.Id>, NoError> = account.viewTracker.tailChatListView(groupId: .root, filterPredicate: supergroupsPredicate, count: shadowgramGroupsFolderSupergroupLimit)
+    |> map { view, _ -> Set<EnginePeer.Id> in
+        var result = Set<EnginePeer.Id>()
         for item in EngineChatList(view, accountPeerId: account.peerId).items {
-            if let peer = item.renderedPeer.peer, shadowgramIsSupergroup(peer._asPeer()), !seen.contains(peer.id) {
-                seen.insert(peer.id)
-                result.append(peer.id)
+            if let peer = item.renderedPeer.peer, shadowgramIsSupergroup(peer._asPeer()) {
+                result.insert(peer.id)
             }
         }
         return result
@@ -85,17 +91,20 @@ private func shadowgramGroupsFolderMembershipSignal(account: Account) -> Signal<
         guard let minMembers else {
             return .single(nil)
         }
+        if minMembers == 0 {
+            // Every group belongs: no member counts needed.
+            return .single(ShadowgramGroupsFolderMembership(minMembers: 0, includedSupergroupIds: Set()))
+        }
         return supergroupIds
-        |> mapToSignal { ids -> Signal<ShadowgramGroupsFolderMembership?, NoError> in
+        |> mapToSignal { idSet -> Signal<ShadowgramGroupsFolderMembership?, NoError> in
+            let ids = idSet.sorted()
             let countItems = ids.map { TelegramEngine.EngineData.Item.Peer.ParticipantCount(id: $0) }
 
             let counts = engine.data.subscribe(EngineDataMap(countItems))
             |> map { counts -> ShadowgramGroupsFolderMembership? in
                 var included = Set<EnginePeer.Id>()
                 for id in ids {
-                    if minMembers == 0 {
-                        included.insert(id)
-                    } else if let maybeCount = counts[id], let count = maybeCount, count >= Int(minMembers) {
+                    if let maybeCount = counts[id], let count = maybeCount, count >= Int(minMembers) {
                         included.insert(id)
                     }
                 }
@@ -110,10 +119,22 @@ private func shadowgramGroupsFolderMembershipSignal(account: Account) -> Signal<
                     if let maybeCount = counts[id], maybeCount != nil {
                         continue
                     }
+                    if shadowgramGroupsFolderRequestedIds.with({ $0.contains(id) }) {
+                        continue
+                    }
                     let pause: Signal<Never, NoError> = Signal<Never, NoError>.complete()
                     |> delay(shadowgramGroupsFolderFetchInterval, queue: Queue.concurrentDefaultQueue())
+                    let fetch: Signal<Never, NoError> = engine.peers.fetchAndUpdateCachedPeerData(peerId: id)
+                    |> ignoreValues
+                    |> afterCompleted {
+                        let _ = shadowgramGroupsFolderRequestedIds.modify { current in
+                            var current = current
+                            current.insert(id)
+                            return current
+                        }
+                    }
                     signal = signal
-                    |> then(engine.peers.fetchAndUpdateCachedPeerData(peerId: id) |> ignoreValues)
+                    |> then(fetch)
                     |> then(pause)
                 }
                 return signal

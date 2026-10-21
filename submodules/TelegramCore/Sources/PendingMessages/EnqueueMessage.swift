@@ -886,6 +886,21 @@ func enqueueMessages(transaction: Transaction, account: Account, peerId: PeerId,
                     }
                 }
             case let .forward(sourceId, threadId, grouping, forwardAttributes, _):
+                // Shadowgram: a kept deleted message no longer exists on the server, so a forward of
+                // it would fail. Send a copy instead, the text inside a quote block.
+                if let sourceMessage = transaction.getMessage(sourceId), sourceMessage.shadowgramIsDeleted {
+                    let replacement = shadowgramForwardCopyOfDeletedMessage(
+                        sourceMessage: sourceMessage,
+                        peerId: peerId,
+                        threadId: threadId,
+                        forwardAttributes: forwardAttributes,
+                        localGroupingKey: forwardGroupingKey(grouping: grouping, sourceGroupingKey: sourceMessage.groupingKey, generatedKeys: &localGroupingKeyBySourceKey)
+                    )
+                    if let replacement {
+                        updatedMessages.append((transformedMedia, replacement))
+                    }
+                    continue outer
+                }
                 if let sourceMessage = forwardedMessageToBeReuploaded(transaction: transaction, id: sourceId) {
                     var mediaReference: AnyMediaReference?
                     if sourceMessage.id.peerId.namespace == Namespaces.Peer.SecretChat {

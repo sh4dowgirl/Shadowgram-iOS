@@ -40,7 +40,22 @@ public func shadowgramGhostNavigationIcon() -> UIImage? {
     }
 }
 
-/// 30x30 settings-row icon: the Shadowgram gradient with a white ghost.
+/// Draws a crescent moon into `rect` (UIKit coordinates): a full disc with an offset disc cut out.
+private func drawMoon(in rect: CGRect, color: UIColor, context: CGContext) {
+    let unit = rect.width / 24.0
+    func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+        return CGPoint(x: rect.minX + x * unit, y: rect.minY + y * unit)
+    }
+
+    context.setFillColor(color.cgColor)
+    UIBezierPath(arcCenter: p(11.0, 13.0), radius: 8.5 * unit, startAngle: 0.0, endAngle: CGFloat.pi * 2.0, clockwise: true).fill()
+
+    context.setBlendMode(.clear)
+    UIBezierPath(arcCenter: p(16.2, 8.2), radius: 7.2 * unit, startAngle: 0.0, endAngle: CGFloat.pi * 2.0, clockwise: true).fill()
+    context.setBlendMode(.normal)
+}
+
+/// 30x30 settings-row icon: the Shadowgram gradient with a white crescent moon.
 public let shadowgramExtraSettingsIcon: UIImage = {
     let size = CGSize(width: 30.0, height: 30.0)
     let renderer = UIGraphicsImageRenderer(size: size)
@@ -58,7 +73,7 @@ public let shadowgramExtraSettingsIcon: UIImage = {
         context.restoreGState()
 
         context.beginTransparencyLayer(auxiliaryInfo: nil)
-        drawGhost(in: CGRect(x: 5.0, y: 5.0, width: 20.0, height: 20.0), color: .white, context: context)
+        drawMoon(in: CGRect(x: 5.0, y: 5.0, width: 20.0, height: 20.0), color: .white, context: context)
         context.endTransparencyLayer()
     }
 }()

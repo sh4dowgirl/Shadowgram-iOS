@@ -76,6 +76,12 @@ public class ChatMessageBackground: ASDisplayNode {
     private var tearBands: [BubbleTearBand] = []
     private var tearMaskView: BubbleTearMaskView?
     
+    // Shadowgram: soft red tint over the bubble of a message someone else deleted. It is the
+    // bubble's own image drawn as a template, so it follows the shape, tail and merge state.
+    private var shadowgramTintShapeImage: UIImage?
+    private var shadowgramTintColor: UIColor?
+    private var shadowgramTintView: UIImageView?
+    
     public var customHighlightColor: UIColor? {
         didSet {
             self.imageView?.tintColor = self.customHighlightColor
@@ -120,6 +126,9 @@ public class ChatMessageBackground: ASDisplayNode {
         if let imageView = self.imageView {
             transition.updateFrame(view: imageView, frame: imageFrame)
         }
+        if let shadowgramTintView = self.shadowgramTintView {
+            transition.updateFrame(view: shadowgramTintView, frame: imageFrame)
+        }
         transition.updateFrame(node: self.outlineImageNode, frame: CGRect(origin: CGPoint(), size: size).insetBy(dx: -1.0, dy: -1.0))
         self.updateTearMask(size: size, animation: .None)
     }
@@ -129,6 +138,9 @@ public class ChatMessageBackground: ASDisplayNode {
         self.imageFrame = imageFrame
         if let imageView = self.imageView {
             transition.animator.updateFrame(layer: imageView.layer, frame: imageFrame, completion: nil)
+        }
+        if let shadowgramTintView = self.shadowgramTintView {
+            transition.animator.updateFrame(layer: shadowgramTintView.layer, frame: imageFrame, completion: nil)
         }
 
         transition.animator.updateFrame(layer: self.outlineImageNode.layer, frame: CGRect(origin: CGPoint(), size: size).insetBy(dx: -1.0, dy: -1.0), completion: nil)
@@ -386,6 +398,103 @@ public class ChatMessageBackground: ASDisplayNode {
         }
         
         self.outlineImageNode.image = outlineImage
+        
+        // The plain bubble image of this type, even where mask mode leaves the bubble itself to
+        // the wallpaper backdrop: the tint only needs its shape.
+        let shapeImage: UIImage?
+        switch type {
+        case .none:
+            shapeImage = nil
+        case let .incoming(mergeType):
+            switch mergeType {
+            case .None:
+                shapeImage = graphics.chatMessageBackgroundIncomingImage
+            case let .Top(side):
+                shapeImage = side ? graphics.chatMessageBackgroundIncomingMergedTopSideImage : graphics.chatMessageBackgroundIncomingMergedTopImage
+            case .Bottom:
+                shapeImage = graphics.chatMessageBackgroundIncomingMergedBottomImage
+            case .Both:
+                shapeImage = graphics.chatMessageBackgroundIncomingMergedBothImage
+            case .Side:
+                shapeImage = graphics.chatMessageBackgroundIncomingMergedSideImage
+            case .Extracted:
+                shapeImage = graphics.chatMessageBackgroundIncomingExtractedImage
+            }
+        case let .outgoing(mergeType):
+            switch mergeType {
+            case .None:
+                shapeImage = graphics.chatMessageBackgroundOutgoingImage
+            case let .Top(side):
+                shapeImage = side ? graphics.chatMessageBackgroundOutgoingMergedTopSideImage : graphics.chatMessageBackgroundOutgoingMergedTopImage
+            case .Bottom:
+                shapeImage = graphics.chatMessageBackgroundOutgoingMergedBottomImage
+            case .Both:
+                shapeImage = graphics.chatMessageBackgroundOutgoingMergedBothImage
+            case .Side:
+                shapeImage = graphics.chatMessageBackgroundOutgoingMergedSideImage
+            case .Extracted:
+                shapeImage = graphics.chatMessageBackgroundOutgoingExtractedImage
+            }
+        }
+        self.shadowgramTintShapeImage = shapeImage?.withRenderingMode(.alwaysTemplate)
+        self.shadowgramTintView?.image = self.shadowgramTintShapeImage
+    }
+    
+    /// Shadowgram: tints the bubble with `color` (nil removes the tint). `animated` fades the tint
+    /// in with a short soft pulse, for a message that gets deleted while it is on screen.
+    public func setShadowgramDeletedTint(color: UIColor?, animated: Bool) {
+        if self.shadowgramTintColor == color {
+            return
+        }
+        self.shadowgramTintColor = color
+        
+        if let color {
+            let tintView: UIImageView
+            var isNew = false
+            if let current = self.shadowgramTintView {
+                tintView = current
+            } else {
+                isNew = true
+                tintView = UIImageView()
+                tintView.isUserInteractionEnabled = false
+                self.shadowgramTintView = tintView
+                if let imageView = self.imageView {
+                    self.view.insertSubview(tintView, aboveSubview: imageView)
+                } else {
+                    self.view.addSubview(tintView)
+                }
+                if let imageFrame = self.imageFrame {
+                    tintView.frame = imageFrame
+                }
+            }
+            tintView.image = self.shadowgramTintShapeImage
+            tintView.tintColor = color
+            tintView.layer.removeAllAnimations()
+            tintView.alpha = 1.0
+            if animated && isNew {
+                let fade = CAKeyframeAnimation(keyPath: "opacity")
+                fade.values = [0.0, 1.0, 0.65, 1.0] as [NSNumber]
+                fade.keyTimes = [0.0, 0.45, 0.72, 1.0] as [NSNumber]
+                fade.duration = 0.9
+                fade.timingFunctions = [
+                    CAMediaTimingFunction(name: .easeOut),
+                    CAMediaTimingFunction(name: .easeInEaseOut),
+                    CAMediaTimingFunction(name: .easeInEaseOut)
+                ]
+                tintView.layer.add(fade, forKey: "shadowgramDeletedTint")
+            }
+        } else if let tintView = self.shadowgramTintView {
+            self.shadowgramTintView = nil
+            if animated {
+                UIView.animate(withDuration: 0.25, animations: {
+                    tintView.alpha = 0.0
+                }, completion: { _ in
+                    tintView.removeFromSuperview()
+                })
+            } else {
+                tintView.removeFromSuperview()
+            }
+        }
     }
 
     public func animateFrom(sourceView: UIView, transition: CombinedTransition) {

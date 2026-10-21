@@ -89,3 +89,49 @@ func shadowgramMarkMessagesDeleted(transaction: Transaction, ids: [MessageId]) {
         })
     }
 }
+
+/// The message a forward of a kept deleted message is replaced with: the same text wrapped in a
+/// quote block (the look a reply to such a message gets), plus its photo or file when it has one.
+/// The original formatting is kept inside the quote. Nil when there is nothing to send.
+func shadowgramForwardCopyOfDeletedMessage(sourceMessage: Message, peerId: PeerId, threadId: Int64?, forwardAttributes: [MessageAttribute], localGroupingKey: Int64?) -> EnqueueMessage? {
+    var mediaReference: AnyMediaReference?
+    for media in sourceMessage.media {
+        if media is TelegramMediaImage || media is TelegramMediaFile {
+            mediaReference = .standalone(media: media)
+            break
+        }
+    }
+
+    let text = sourceMessage.text
+    var attributes: [MessageAttribute] = []
+    if !text.isEmpty {
+        var entities: [MessageTextEntity] = []
+        for attribute in sourceMessage.attributes {
+            if let attribute = attribute as? TextEntitiesMessageAttribute {
+                entities = attribute.entities.filter { entity in
+                    if case .BlockQuote = entity.type {
+                        return false
+                    }
+                    return true
+                }
+            }
+        }
+        let length = (text as NSString).length
+        entities.insert(MessageTextEntity(range: 0 ..< length, type: .BlockQuote(isCollapsed: false)), at: 0)
+        attributes.append(TextEntitiesMessageAttribute(entities: entities))
+    } else if mediaReference == nil {
+        return nil
+    }
+
+    // Send options picked in the forward sheet (silent, scheduled, send as, ...). The forward-only
+    // ones (hide sender names and captions) have nothing to apply to in a copy.
+    for attribute in forwardAttributes {
+        if attribute is ForwardOptionsMessageAttribute {
+            continue
+        }
+        attributes.append(attribute)
+    }
+
+    let replyToMessageId = threadId.flatMap { EngineMessageReplySubject(messageId: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: Int32(clamping: $0)), quote: nil, innerSubject: nil) }
+    return .message(text: text, attributes: attributes, inlineStickers: [:], mediaReference: mediaReference, threadId: threadId, replyToMessageId: replyToMessageId, replyToStoryId: nil, localGroupingKey: localGroupingKey, correlationId: nil, bubbleUpEmojiOrStickersets: [])
+}

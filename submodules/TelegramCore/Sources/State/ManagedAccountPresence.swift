@@ -9,6 +9,18 @@ private typealias SignalKitTimer = SwiftSignalKit.Timer
 
 
 private final class AccountPresenceManagerImpl {
+    /// What the account reports to the server.
+    private enum Mode: Equatable {
+        /// Online, refreshed every 30 s (stock behaviour).
+        case online
+        /// Shadowgram ghost mode with online status hidden while the app is in front. The server also
+        /// marks an account online on its own activity (sending a message, for example), so offline is
+        /// sent right away and then repeated, which keeps the account "last seen" instead of "online".
+        case ghostForeground
+        /// Offline: the app is in the background.
+        case offline
+    }
+    
     private let queue: Queue
     private let network: Network
     let isPerformingUpdate = ValuePromise<Bool>(false, ignoreRepeated: true)
@@ -17,32 +29,44 @@ private final class AccountPresenceManagerImpl {
     private let currentRequestDisposable = MetaDisposable()
     private var onlineTimer: SignalKitTimer?
     
-    private var wasOnline: Bool = false
+    private var mode: Mode?
     
     init(queue: Queue, shouldKeepOnlinePresence: Signal<Bool, NoError>, network: Network) {
         self.queue = queue
         self.network = network
         
-        // Shadowgram ghost mode: with online status hidden the account always reports offline,
-        // and switching it off while online sends an explicit offline right away.
         let sendsOnlineStatus = ShadowgramSettings.shared.valuesSignal
         |> map { values -> Bool in
             return values.effectiveSendOnlineStatus
         }
         |> distinctUntilChanged
         self.shouldKeepOnlinePresenceDisposable = (combineLatest(shouldKeepOnlinePresence, sendsOnlineStatus)
-        |> map { shouldKeepOnline, sendsOnlineStatus -> Bool in
-            return shouldKeepOnline && sendsOnlineStatus
+        |> map { shouldKeepOnline, sendsOnlineStatus -> (Mode, Bool) in
+            if !shouldKeepOnline {
+                return (.offline, !sendsOnlineStatus)
+            } else if sendsOnlineStatus {
+                return (.online, false)
+            } else {
+                return (.ghostForeground, true)
+            }
         }
-        |> distinctUntilChanged
-        |> deliverOn(self.queue)).start(next: { [weak self] value in
-            guard let `self` = self else {
+        |> distinctUntilChanged(isEqual: { lhs, rhs in
+            return lhs.0 == rhs.0 && lhs.1 == rhs.1
+        })
+        |> deliverOn(self.queue)).start(next: { [weak self] mode, isGhost in
+            guard let self else {
                 return
             }
-            if self.wasOnline != value {
-                self.wasOnline = value
-                self.updatePresence(value)
+            let previousMode = self.mode
+            if previousMode == mode {
+                return
             }
+            self.mode = mode
+            if mode == .offline && previousMode == nil && !isGhost {
+                // Stock behaviour: nothing to report at launch in the background.
+                return
+            }
+            self.updatePresence(mode)
         })
     }
     
@@ -53,21 +77,23 @@ private final class AccountPresenceManagerImpl {
         self.onlineTimer?.invalidate()
     }
     
-    private func updatePresence(_ isOnline: Bool) {
+    private func updatePresence(_ mode: Mode) {
+        self.onlineTimer?.invalidate()
+        self.onlineTimer = nil
+        
         let request: Signal<Api.Bool, MTRpcError>
-        if isOnline {
-            let timer = SignalKitTimer(timeout: 30.0, repeat: false, completion: { [weak self] in
-                guard let strongSelf = self else {
+        switch mode {
+        case .online, .ghostForeground:
+            let timer = SignalKitTimer(timeout: mode == .online ? 30.0 : 15.0, repeat: false, completion: { [weak self] in
+                guard let self, self.mode == mode else {
                     return
                 }
-                strongSelf.updatePresence(true)
+                self.updatePresence(mode)
             }, queue: self.queue)
             self.onlineTimer = timer
             timer.start()
-            request = self.network.request(Api.functions.account.updateStatus(offline: .boolFalse))
-        } else {
-            self.onlineTimer?.invalidate()
-            self.onlineTimer = nil
+            request = self.network.request(Api.functions.account.updateStatus(offline: mode == .online ? .boolFalse : .boolTrue))
+        case .offline:
             request = self.network.request(Api.functions.account.updateStatus(offline: .boolTrue))
         }
         self.isPerformingUpdate.set(true)

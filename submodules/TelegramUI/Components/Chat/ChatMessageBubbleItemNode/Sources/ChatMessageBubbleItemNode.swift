@@ -681,6 +681,8 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
     private var trailingItemSpaceOffset: CGFloat = 0.0
     private let backgroundWallpaperNode: ChatMessageBubbleBackdrop
     private let backgroundNode: ChatMessageBackground
+    /// Shadowgram: whether the bubble shows the deleted-message tint; nil before the first layout.
+    private var shadowgramDisplaysDeletedTint: Bool?
     private var backgroundHighlightNode: ChatMessageBackground?
     private let shadowNode: ChatMessageShadowNode
     private var clippingNode: ChatMessageBubbleClippingNode
@@ -4017,6 +4019,20 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         strongSelf.backgroundNode.setType(type: backgroundType, highlighted: false, graphics: graphics, maskMode: strongSelf.backgroundMaskMode, hasWallpaper: hasWallpaper, transition: legacyTransition, backgroundNode: presentationContext.backgroundNode)
         strongSelf.backgroundWallpaperNode.setType(type: backgroundType, theme: item.presentationData.theme, essentialGraphics: graphics, maskMode: strongSelf.backgroundMaskMode, backgroundNode: presentationContext.backgroundNode)
         strongSelf.shadowNode.setType(type: backgroundType, hasWallpaper: hasWallpaper, graphics: graphics)
+        
+        // Shadowgram: a message someone else deleted gets a soft red bubble. The tint fades in when
+        // the deletion arrives while the message is on screen.
+        var shadowgramIsDeleted = false
+        for (contentMessage, _) in item.content {
+            if contentMessage.shadowgramIsDeleted {
+                shadowgramIsDeleted = true
+                break
+            }
+        }
+        let shadowgramWasDeleted = strongSelf.shadowgramDisplaysDeletedTint
+        strongSelf.shadowgramDisplaysDeletedTint = shadowgramIsDeleted
+        let shadowgramTintColor: UIColor? = shadowgramIsDeleted ? UIColor(red: 1.0, green: 0.27, blue: 0.23, alpha: item.presentationData.theme.theme.overallDarkAppearance ? 0.3 : 0.2) : nil
+        strongSelf.backgroundNode.setShadowgramDeletedTint(color: shadowgramTintColor, animated: shadowgramWasDeleted != nil && shadowgramWasDeleted != shadowgramIsDeleted)
         
         strongSelf.backgroundType = backgroundType
         
