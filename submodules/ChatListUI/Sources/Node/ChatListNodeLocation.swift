@@ -201,7 +201,7 @@ public func chatListViewForLocation(chatListLocation: ChatListControllerLocation
     // Shadowgram groups folder: the folder screen is the root list behind the folder's predicate,
     // and the plain root list ("All", no filter) loses the folder's groups and gains its entry.
     if case let .chatList(groupId) = chatListLocation {
-        if groupId == .shadowgramGroups {
+        if groupId == .shadowgramGroups || (groupId == .root && location.filter?.id == shadowgramGroupsTabFilterId) {
             return shadowgramGroupsFolderMembership(account: account)
             |> mapToSignal { membership -> Signal<ChatListNodeViewUpdate, NoError> in
                 let predicate: ChatListFilterPredicate

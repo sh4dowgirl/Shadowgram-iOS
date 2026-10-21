@@ -1,6 +1,22 @@
 import Foundation
 import SwiftSignalKit
 
+/// Who gets an automatic reaction on their messages (Extra Settings ▸ Auto Reaction).
+public enum ShadowgramAutoReactionMode: Int32 {
+    /// Off, apart from the "always" exceptions.
+    case nobody = 0
+    case contacts = 1
+    case everybody = 2
+}
+
+/// Where the groups folder shows up.
+public enum ShadowgramGroupsFolderPlacement: Int32 {
+    /// An entry under the archive in "All", with the archive's hide-on-scroll behaviour.
+    case archive = 0
+    /// Its own tab next to the chat folders.
+    case tab = 1
+}
+
 /// Client-side switches of Shadowgram's "Extra Settings".
 ///
 /// Stored in the app group's user defaults, so the main app and its extensions read the same
@@ -46,6 +62,16 @@ public struct ShadowgramSettingsValues: Equatable {
     /// Chats marked Private from the chat list: their content is hidden from screenshots,
     /// recordings and streams. Raw peer ids (`PeerId.toInt64()`).
     public var privateChatIds: Set<Int64>
+    /// Where the groups folder shows up.
+    public var groupsFolderPlacement: ShadowgramGroupsFolderPlacement
+    /// Whose new messages get the automatic reaction.
+    public var autoReactionMode: ShadowgramAutoReactionMode
+    /// The reaction, a standard reaction emoji.
+    public var autoReaction: String
+    /// Users and groups that always get the reaction (raw peer ids).
+    public var autoReactionAlwaysIds: Set<Int64>
+    /// Users and groups that never get it (raw peer ids).
+    public var autoReactionNeverIds: Set<Int64>
 
     public static let defaultValues = ShadowgramSettingsValues(
         saveDeletedMessages: false,
@@ -65,10 +91,15 @@ public struct ShadowgramSettingsValues: Equatable {
         hideEmailOnCapture: false,
         hideIdOnCapture: false,
         hideUsernameOnCapture: false,
-        privateChatIds: Set()
+        privateChatIds: Set(),
+        groupsFolderPlacement: .archive,
+        autoReactionMode: .nobody,
+        autoReaction: "👍",
+        autoReactionAlwaysIds: Set(),
+        autoReactionNeverIds: Set()
     )
 
-    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>) {
+    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactionMode: ShadowgramAutoReactionMode, autoReaction: String, autoReactionAlwaysIds: Set<Int64>, autoReactionNeverIds: Set<Int64>) {
         self.saveDeletedMessages = saveDeletedMessages
         self.unlimitedAccounts = unlimitedAccounts
         self.ghostModeEnabled = ghostModeEnabled
@@ -87,6 +118,11 @@ public struct ShadowgramSettingsValues: Equatable {
         self.hideIdOnCapture = hideIdOnCapture
         self.hideUsernameOnCapture = hideUsernameOnCapture
         self.privateChatIds = privateChatIds
+        self.groupsFolderPlacement = groupsFolderPlacement
+        self.autoReactionMode = autoReactionMode
+        self.autoReaction = autoReaction
+        self.autoReactionAlwaysIds = autoReactionAlwaysIds
+        self.autoReactionNeverIds = autoReactionNeverIds
     }
 
     /// What the client actually sends: everything unless ghost mode is on and hides it.
@@ -132,6 +168,11 @@ public final class ShadowgramSettings {
         static let hideIdOnCapture = "shadowgram.capture.hideId"
         static let hideUsernameOnCapture = "shadowgram.capture.hideUsername"
         static let privateChatIds = "shadowgram.privateChatIds"
+        static let groupsFolderPlacement = "shadowgram.groupsFolder.placement"
+        static let autoReactionMode = "shadowgram.autoReaction.mode"
+        static let autoReaction = "shadowgram.autoReaction.reaction"
+        static let autoReactionAlwaysIds = "shadowgram.autoReaction.always"
+        static let autoReactionNeverIds = "shadowgram.autoReaction.never"
     }
 
     private let defaults: UserDefaults
@@ -148,6 +189,9 @@ public final class ShadowgramSettings {
             return (defaults.object(forKey: key) as? NSNumber)?.boolValue ?? fallback
         }
         let minMembers = (defaults.object(forKey: Key.groupsFolderMinMembers) as? NSNumber)?.int32Value ?? defaultValues.groupsFolderMinMembers
+        func idSet(_ key: String) -> Set<Int64> {
+            return Set(((defaults.array(forKey: key) as? [NSNumber]) ?? []).map { $0.int64Value })
+        }
 
         let values = ShadowgramSettingsValues(
             saveDeletedMessages: bool(Key.saveDeletedMessages, defaultValues.saveDeletedMessages),
@@ -167,7 +211,12 @@ public final class ShadowgramSettings {
             hideEmailOnCapture: bool(Key.hideEmailOnCapture, defaultValues.hideEmailOnCapture),
             hideIdOnCapture: bool(Key.hideIdOnCapture, defaultValues.hideIdOnCapture),
             hideUsernameOnCapture: bool(Key.hideUsernameOnCapture, defaultValues.hideUsernameOnCapture),
-            privateChatIds: Set(((defaults.array(forKey: Key.privateChatIds) as? [NSNumber]) ?? []).map { $0.int64Value })
+            privateChatIds: idSet(Key.privateChatIds),
+            groupsFolderPlacement: (defaults.object(forKey: Key.groupsFolderPlacement) as? NSNumber).flatMap { ShadowgramGroupsFolderPlacement(rawValue: $0.int32Value) } ?? defaultValues.groupsFolderPlacement,
+            autoReactionMode: (defaults.object(forKey: Key.autoReactionMode) as? NSNumber).flatMap { ShadowgramAutoReactionMode(rawValue: $0.int32Value) } ?? defaultValues.autoReactionMode,
+            autoReaction: (defaults.string(forKey: Key.autoReaction)).flatMap { $0.isEmpty ? nil : $0 } ?? defaultValues.autoReaction,
+            autoReactionAlwaysIds: idSet(Key.autoReactionAlwaysIds),
+            autoReactionNeverIds: idSet(Key.autoReactionNeverIds)
         )
         self.currentValues = values
         self.valuesPromise = ValuePromise(values, ignoreRepeated: true)
@@ -213,6 +262,11 @@ public final class ShadowgramSettings {
         self.defaults.set(values.hideIdOnCapture, forKey: Key.hideIdOnCapture)
         self.defaults.set(values.hideUsernameOnCapture, forKey: Key.hideUsernameOnCapture)
         self.defaults.set(values.privateChatIds.sorted().map { NSNumber(value: $0) }, forKey: Key.privateChatIds)
+        self.defaults.set(NSNumber(value: values.groupsFolderPlacement.rawValue), forKey: Key.groupsFolderPlacement)
+        self.defaults.set(NSNumber(value: values.autoReactionMode.rawValue), forKey: Key.autoReactionMode)
+        self.defaults.set(values.autoReaction, forKey: Key.autoReaction)
+        self.defaults.set(values.autoReactionAlwaysIds.sorted().map { NSNumber(value: $0) }, forKey: Key.autoReactionAlwaysIds)
+        self.defaults.set(values.autoReactionNeverIds.sorted().map { NSNumber(value: $0) }, forKey: Key.autoReactionNeverIds)
 
         self.valuesPromise.set(values)
     }

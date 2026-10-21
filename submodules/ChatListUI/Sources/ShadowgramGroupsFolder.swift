@@ -227,14 +227,45 @@ private func shadowgramUpdate(_ update: ChatListNodeViewUpdate, membership: Shad
     return ChatListNodeViewUpdate(list: list, type: forceGeneric ? .Generic : update.type, scrollPosition: forceGeneric ? nil : update.scrollPosition)
 }
 
-/// The root "All" list without the folder's groups, plus the folder entry.
+// MARK: - Folder as a tab
+
+/// Id of the client-side "Groups" tab (Extra Settings ▸ Groups Folder ▸ Separate Tab). Server
+/// folder ids are small (2...255), so this one never collides. The tab is never sent to the server:
+/// it is added to the tab list on the client, and a list with this filter id is the root list
+/// behind the folder's predicate.
+let shadowgramGroupsTabFilterId: Int32 = 1_000_001
+
+func shadowgramGroupsTabFilter(languageCode: String) -> ChatListFilter {
+    let title = ShadowgramStrings(languageCode: languageCode).groupsFolderTitle
+    return .filter(
+        id: shadowgramGroupsTabFilterId,
+        title: ChatFolderTitle(text: title, entities: [], enableAnimations: false),
+        emoticon: nil,
+        data: ChatListFilterData(isShared: false, hasSharedLinks: false, categories: [], excludeMuted: false, excludeRead: false, excludeArchived: true, includePeers: ChatListFilterIncludePeers(), excludePeers: [], color: nil)
+    )
+}
+
+/// Whether the groups folder currently shows as a tab.
+let shadowgramGroupsFolderIsTab: Signal<Bool, NoError> = ShadowgramSettings.shared.valuesSignal
+|> map { values -> Bool in
+    return values.groupsFolderEnabled && values.groupsFolderPlacement == .tab
+}
+|> distinctUntilChanged
+
+/// The root "All" list without the folder's groups, plus the folder entry (only when the folder
+/// sits next to the archive; as a tab it has an entry of its own).
 func shadowgramGroupsFolderRootView(account: Account, base: Signal<ChatListNodeViewUpdate, NoError>) -> Signal<ChatListNodeViewUpdate, NoError> {
-    return shadowgramGroupsFolderMembership(account: account)
-    |> mapToSignal { membership -> Signal<ChatListNodeViewUpdate, NoError> in
+    return combineLatest(shadowgramGroupsFolderMembership(account: account), shadowgramGroupsFolderIsTab)
+    |> mapToSignal { membership, isTab -> Signal<ChatListNodeViewUpdate, NoError> in
         guard let membership else {
             return base
         }
-        let summary = shadowgramGroupsFolderSummary(account: account, membership: membership)
+        let summary: Signal<EngineChatList.GroupItem?, NoError>
+        if isTab {
+            summary = .single(nil)
+        } else {
+            summary = shadowgramGroupsFolderSummary(account: account, membership: membership)
+        }
         return Signal { subscriber in
             // Latest list update and folder entry; a new folder entry alone re-emits the last
             // update as a generic one, so it never repeats a scroll request.

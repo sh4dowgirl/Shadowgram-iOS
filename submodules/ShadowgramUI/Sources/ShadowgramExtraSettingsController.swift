@@ -12,10 +12,12 @@ import ShadowgramSettings
 private final class ShadowgramExtraSettingsArguments {
     let update: ((inout ShadowgramSettingsValues) -> Void) -> Void
     let openByPeerIdPrompt: () -> Void
+    let openAutoReaction: () -> Void
 
-    init(update: @escaping ((inout ShadowgramSettingsValues) -> Void) -> Void, openByPeerIdPrompt: @escaping () -> Void) {
+    init(update: @escaping ((inout ShadowgramSettingsValues) -> Void) -> Void, openByPeerIdPrompt: @escaping () -> Void, openAutoReaction: @escaping () -> Void) {
         self.update = update
         self.openByPeerIdPrompt = openByPeerIdPrompt
+        self.openAutoReaction = openAutoReaction
     }
 }
 
@@ -27,6 +29,8 @@ private enum ShadowgramExtraSettingsSection: Int32 {
     case interface
     case messagesExtra
     case capture
+    case groupsPlacement
+    case autoReaction
 }
 
 private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
@@ -45,6 +49,8 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
     case groupsHeader
     case groupsFolder(Bool)
     case groupsMinMembers(Int32)
+    case groupsPlacementHeader
+    case groupsPlacement(ShadowgramGroupsFolderPlacement, Bool)
     case groupsFooter
 
     case interfaceHeader
@@ -59,6 +65,7 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
     case messagesExtraHeader
     case keepEditHistory(Bool)
     case keepEditHistoryFooter
+    case autoReaction(String)
 
     case captureHeader
     case hidePhoneOnCapture(Bool)
@@ -77,6 +84,10 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return ShadowgramExtraSettingsSection.ghost.rawValue
         case .groupsHeader, .groupsFolder, .groupsMinMembers, .groupsFooter:
             return ShadowgramExtraSettingsSection.groups.rawValue
+        case .groupsPlacementHeader, .groupsPlacement:
+            return ShadowgramExtraSettingsSection.groupsPlacement.rawValue
+        case .autoReaction:
+            return ShadowgramExtraSettingsSection.autoReaction.rawValue
         case .interfaceHeader, .showPeerIds, .showPeerIdsFooter, .openByPeerId, .openByPeerIdAction, .openByPeerIdFooter, .disableCameraSwipe, .disableCameraSwipeFooter:
             return ShadowgramExtraSettingsSection.interface.rawValue
         case .messagesExtraHeader, .keepEditHistory, .keepEditHistoryFooter:
@@ -148,11 +159,31 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return 28
         case .captureFooter:
             return 29
+        case .groupsPlacementHeader:
+            return 1100
+        case let .groupsPlacement(placement, _):
+            return 1101 + placement.rawValue
+        case .autoReaction:
+            return 2300
+        }
+    }
+
+    /// Display order; stable ids added later sort into their sections by this.
+    private var sortKey: Int32 {
+        switch self {
+        case .groupsPlacementHeader:
+            return 12 * 100 + 50
+        case let .groupsPlacement(placement, _):
+            return 12 * 100 + 51 + placement.rawValue
+        case .autoReaction:
+            return 23 * 100 + 50
+        default:
+            return self.stableId * 100
         }
     }
 
     static func <(lhs: ShadowgramExtraSettingsEntry, rhs: ShadowgramExtraSettingsEntry) -> Bool {
-        return lhs.stableId < rhs.stableId
+        return lhs.sortKey < rhs.sortKey
     }
 
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
@@ -193,6 +224,19 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return ShadowgramStepSliderItem(theme: presentationData.theme, systemStyle: .glass, values: shadowgramGroupsFolderMemberSteps, labels: shadowgramGroupsFolderMemberSteps.map { strings.memberCountLabel($0) }, value: value, sectionId: self.section, updated: { value in
                 arguments.update { $0.groupsFolderMinMembers = value }
             })
+        case .groupsPlacementHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.groupsFolderPlacementHeader, sectionId: self.section)
+        case let .groupsPlacement(placement, checked):
+            let title: String
+            switch placement {
+            case .archive:
+                title = strings.groupsFolderPlacementArchive
+            case .tab:
+                title = strings.groupsFolderPlacementTab
+            }
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: title, style: .left, checked: checked, zeroSeparatorInsets: false, sectionId: self.section, action: {
+                arguments.update { $0.groupsFolderPlacement = placement }
+            })
         case .groupsFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain(strings.groupsFolderFooter), sectionId: self.section)
         case .interfaceHeader:
@@ -227,6 +271,10 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             })
         case .keepEditHistoryFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain(strings.keepEditHistoryFooter), sectionId: self.section)
+        case let .autoReaction(summary):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: strings.autoReaction, label: summary, sectionId: self.section, style: .blocks, action: {
+                arguments.openAutoReaction()
+            })
         case .captureHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.captureHeader, sectionId: self.section)
         case let .hidePhoneOnCapture(value):
@@ -251,7 +299,7 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
     }
 }
 
-private func shadowgramExtraSettingsEntries(values: ShadowgramSettingsValues) -> [ShadowgramExtraSettingsEntry] {
+private func shadowgramExtraSettingsEntries(values: ShadowgramSettingsValues, strings: ShadowgramStrings) -> [ShadowgramExtraSettingsEntry] {
     var entries: [ShadowgramExtraSettingsEntry] = []
 
     entries.append(.messagesHeader)
@@ -272,6 +320,11 @@ private func shadowgramExtraSettingsEntries(values: ShadowgramSettingsValues) ->
         entries.append(.groupsMinMembers(values.groupsFolderMinMembers))
     }
     entries.append(.groupsFooter)
+    if values.groupsFolderEnabled {
+        entries.append(.groupsPlacementHeader)
+        entries.append(.groupsPlacement(.archive, values.groupsFolderPlacement == .archive))
+        entries.append(.groupsPlacement(.tab, values.groupsFolderPlacement == .tab))
+    }
 
     entries.append(.interfaceHeader)
     entries.append(.showPeerIds(values.showPeerIds))
@@ -287,6 +340,7 @@ private func shadowgramExtraSettingsEntries(values: ShadowgramSettingsValues) ->
     entries.append(.messagesExtraHeader)
     entries.append(.keepEditHistory(values.keepEditHistory))
     entries.append(.keepEditHistoryFooter)
+    entries.append(.autoReaction(shadowgramAutoReactionSummary(values: values, strings: strings)))
 
     entries.append(.captureHeader)
     entries.append(.hidePhoneOnCapture(values.hidePhoneOnCapture))
@@ -308,6 +362,11 @@ public func shadowgramExtraSettingsController(context: AccountContext) -> ViewCo
             return
         }
         shadowgramPresentOpenByPeerIdPrompt(context: context, from: controller)
+    }, openAutoReaction: { [weak context] in
+        guard let context, let controller = weakController else {
+            return
+        }
+        controller.push(shadowgramAutoReactionController(context: context))
     })
 
     let signal = combineLatest(queue: .mainQueue(),
@@ -317,7 +376,7 @@ public func shadowgramExtraSettingsController(context: AccountContext) -> ViewCo
     |> map { presentationData, values -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.extraSettingsTitle), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: shadowgramExtraSettingsEntries(values: values), style: .blocks, animateChanges: true)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: shadowgramExtraSettingsEntries(values: values, strings: strings), style: .blocks, animateChanges: true)
         return (controllerState, (listState, arguments))
     }
 

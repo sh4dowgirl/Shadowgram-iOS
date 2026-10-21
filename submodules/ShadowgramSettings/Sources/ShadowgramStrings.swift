@@ -86,3 +86,45 @@ extension ShadowgramStrings {
     public var markChatPrivate: String { return t("Сделать приватным", "Mark as Private") }
     public var unmarkChatPrivate: String { return t("Убрать из приватных", "Remove from Private") }
 }
+
+extension ShadowgramStrings {
+    public var autoReaction: String { return t("Авто-реакция", "Auto Reaction") }
+    public var autoReactionWhoHeader: String { return t("КОМУ СТАВИТЬ РЕАКЦИЮ", "WHO GETS THE REACTION") }
+    public var autoReactionEverybody: String { return t("Все", "Everybody") }
+    public var autoReactionContacts: String { return t("Мои контакты", "My Contacts") }
+    public var autoReactionNobody: String { return t("Никто", "Nobody") }
+    public var autoReactionOff: String { return t("Выкл", "Off") }
+    public var autoReactionWhoFooter: String { return t("На каждое новое сообщение от подходящего собеседника Shadowgram сам поставит реакцию. В группах и каналах реакция ставится, только если они добавлены в «Всегда ставить». Боты пропускаются.", "Shadowgram reacts to every new message from a matching sender. In groups and channels it reacts only if they are added to \"Always React\". Bots are skipped.") }
+    public var autoReactionReactionHeader: String { return t("РЕАКЦИЯ", "REACTION") }
+    public var autoReactionReaction: String { return t("Реакция", "Reaction") }
+    public var autoReactionExceptionsHeader: String { return t("ИСКЛЮЧЕНИЯ", "EXCEPTIONS") }
+    public var autoReactionAlways: String { return t("Всегда ставить", "Always React") }
+    public var autoReactionNever: String { return t("Никогда не ставить", "Never React") }
+    public var autoReactionAdd: String { return t("Добавить", "Add") }
+    public var autoReactionExceptionsFooter: String { return t("Исключения работают так же, как в настройках приватности: «Всегда ставить» добавляет людей и группы, «Никогда не ставить» убирает их, даже если они подходят под выбор выше.", "Exceptions work like privacy settings: \"Always React\" adds people and groups, \"Never React\" removes them even if they match the choice above.") }
+    public var autoReactionSearchTitle: String { return t("Добавить исключения", "Add Exceptions") }
+    public var autoReactionSearchPlaceholder: String { return t("Пользователи и группы", "Users and groups") }
+
+    public func autoReactionPeerCount(_ count: Int) -> String {
+        if count == 0 {
+            return t("Добавить", "Add")
+        }
+        if self.isRussian {
+            let mod10 = count % 10
+            let mod100 = count % 100
+            if mod10 == 1 && mod100 != 11 {
+                return "\(count) чат"
+            } else if (2 ... 4).contains(mod10) && !(12 ... 14).contains(mod100) {
+                return "\(count) чата"
+            } else {
+                return "\(count) чатов"
+            }
+        } else {
+            return count == 1 ? "1 chat" : "\(count) chats"
+        }
+    }
+
+    public var groupsFolderPlacementHeader: String { return t("ГДЕ ПОКАЗЫВАТЬ ПАПКУ", "WHERE TO SHOW THE FOLDER") }
+    public var groupsFolderPlacementArchive: String { return t("Рядом с архивом", "Next to the Archive") }
+    public var groupsFolderPlacementTab: String { return t("Отдельная вкладка", "Separate Tab") }
+}

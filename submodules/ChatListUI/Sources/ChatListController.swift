@@ -959,6 +959,12 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
     }
     
     func tabContextGesture(id: Int32?, sourceNode: ContextExtractedContentContainingNode?, sourceView: ContextExtractedContentContainingView?, gesture: ContextGesture?, keepInPlace: Bool, isDisabled: Bool) {
+        // Shadowgram: the client-side Groups tab is not a server folder, so it has nothing to edit,
+        // share or delete; it is turned off in Extra Settings.
+        if id == shadowgramGroupsTabFilterId {
+            gesture?.cancel()
+            return
+        }
         let context = self.context
         let filterPeersAreMuted: Signal<(areMuted: Bool, peerIds: [EnginePeer.Id])?, NoError> = self.context.engine.peers.currentChatListFilters()
         |> take(1)
@@ -4036,7 +4042,21 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
     
     private var initializedFilters = false
     private func reloadFilters(firstUpdate: (() -> Void)? = nil) {
-        let filterItems = chatListFilterItems(context: self.context)
+        // Shadowgram: the groups folder as its own tab, after the server folders. Only in the root
+        // chat list; "All" is added in front when the account has no folders of its own.
+        let languageCode = self.presentationData.strings.primaryComponent.languageCode
+        let filterItems = combineLatest(chatListFilterItems(context: self.context), shadowgramGroupsFolderIsTab)
+        |> map { countAndItems, isTab -> (Int, [(ChatListFilter, Int, Bool)]) in
+            guard isTab else {
+                return countAndItems
+            }
+            var items = countAndItems.1
+            if !items.contains(where: { if case .allChats = $0.0 { return true } else { return false } }) {
+                items.insert((.allChats, 0, false), at: 0)
+            }
+            items.append((shadowgramGroupsTabFilter(languageCode: languageCode), 0, false))
+            return (countAndItems.0, items)
+        }
         var notifiedFirstUpdate = false
         self.filterDisposable.set((combineLatest(queue: .mainQueue(),
             filterItems,

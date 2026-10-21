@@ -6439,6 +6439,9 @@ func replayFinalState(
         })
     }
     
+    // Shadowgram: automatic reaction on new incoming messages (Extra Settings ▸ Auto Reaction).
+    shadowgramApplyAutoReactions(transaction: transaction, accountPeerId: accountPeerId, messageIds: addedIncomingMessageIds)
+    
     return AccountReplayedFinalState(
         state: finalState,
         addedIncomingMessageIds: addedIncomingMessageIds,
