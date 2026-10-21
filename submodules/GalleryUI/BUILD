@@ -79,6 +79,7 @@ swift_library(
         "//submodules/TelegramUI/Components/GlassControls",
         "//submodules/TelegramUI/Components/VideoPlaybackControlsComponent",
         "//submodules/UIKitRuntimeUtils",
+        "//submodules/ShadowgramSettings:ShadowgramSettings",
     ],
     visibility = [
         "//visibility:public",

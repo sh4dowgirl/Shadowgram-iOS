@@ -72,6 +72,12 @@ public struct ShadowgramSettingsValues: Equatable {
     public var autoReactionAlwaysIds: Set<Int64>
     /// Users and groups that never get it (raw peer ids).
     public var autoReactionNeverIds: Set<Int64>
+    /// Show exact last-seen timestamps even when users hide them.
+    public var showExactLastSeen: Bool
+    /// Allow forwarding, copying and screenshots in chats with copy protection / secret chats.
+    public var bypassCopyProtection: Bool
+    /// View once-view media unlimited times without notifying the sender.
+    public var bypassViewOnce: Bool
 
     public static let defaultValues = ShadowgramSettingsValues(
         saveDeletedMessages: false,
@@ -96,10 +102,13 @@ public struct ShadowgramSettingsValues: Equatable {
         autoReactionMode: .nobody,
         autoReaction: "👍",
         autoReactionAlwaysIds: Set(),
-        autoReactionNeverIds: Set()
+        autoReactionNeverIds: Set(),
+        showExactLastSeen: false,
+        bypassCopyProtection: false,
+        bypassViewOnce: false
     )
 
-    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactionMode: ShadowgramAutoReactionMode, autoReaction: String, autoReactionAlwaysIds: Set<Int64>, autoReactionNeverIds: Set<Int64>) {
+    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactionMode: ShadowgramAutoReactionMode, autoReaction: String, autoReactionAlwaysIds: Set<Int64>, autoReactionNeverIds: Set<Int64>, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool) {
         self.saveDeletedMessages = saveDeletedMessages
         self.unlimitedAccounts = unlimitedAccounts
         self.ghostModeEnabled = ghostModeEnabled
@@ -123,6 +132,9 @@ public struct ShadowgramSettingsValues: Equatable {
         self.autoReaction = autoReaction
         self.autoReactionAlwaysIds = autoReactionAlwaysIds
         self.autoReactionNeverIds = autoReactionNeverIds
+        self.showExactLastSeen = showExactLastSeen
+        self.bypassCopyProtection = bypassCopyProtection
+        self.bypassViewOnce = bypassViewOnce
     }
 
     /// What the client actually sends: everything unless ghost mode is on and hides it.
@@ -173,6 +185,9 @@ public final class ShadowgramSettings {
         static let autoReaction = "shadowgram.autoReaction.reaction"
         static let autoReactionAlwaysIds = "shadowgram.autoReaction.always"
         static let autoReactionNeverIds = "shadowgram.autoReaction.never"
+        static let showExactLastSeen = "shadowgram.showExactLastSeen"
+        static let bypassCopyProtection = "shadowgram.bypassCopyProtection"
+        static let bypassViewOnce = "shadowgram.bypassViewOnce"
     }
 
     private let defaults: UserDefaults
@@ -216,7 +231,10 @@ public final class ShadowgramSettings {
             autoReactionMode: (defaults.object(forKey: Key.autoReactionMode) as? NSNumber).flatMap { ShadowgramAutoReactionMode(rawValue: $0.int32Value) } ?? defaultValues.autoReactionMode,
             autoReaction: (defaults.string(forKey: Key.autoReaction)).flatMap { $0.isEmpty ? nil : $0 } ?? defaultValues.autoReaction,
             autoReactionAlwaysIds: idSet(Key.autoReactionAlwaysIds),
-            autoReactionNeverIds: idSet(Key.autoReactionNeverIds)
+            autoReactionNeverIds: idSet(Key.autoReactionNeverIds),
+            showExactLastSeen: bool(Key.showExactLastSeen, defaultValues.showExactLastSeen),
+            bypassCopyProtection: bool(Key.bypassCopyProtection, defaultValues.bypassCopyProtection),
+            bypassViewOnce: bool(Key.bypassViewOnce, defaultValues.bypassViewOnce)
         )
         self.currentValues = values
         self.valuesPromise = ValuePromise(values, ignoreRepeated: true)
@@ -267,6 +285,9 @@ public final class ShadowgramSettings {
         self.defaults.set(values.autoReaction, forKey: Key.autoReaction)
         self.defaults.set(values.autoReactionAlwaysIds.sorted().map { NSNumber(value: $0) }, forKey: Key.autoReactionAlwaysIds)
         self.defaults.set(values.autoReactionNeverIds.sorted().map { NSNumber(value: $0) }, forKey: Key.autoReactionNeverIds)
+        self.defaults.set(values.showExactLastSeen, forKey: Key.showExactLastSeen)
+        self.defaults.set(values.bypassCopyProtection, forKey: Key.bypassCopyProtection)
+        self.defaults.set(values.bypassViewOnce, forKey: Key.bypassViewOnce)
 
         self.valuesPromise.set(values)
     }

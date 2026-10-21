@@ -2,6 +2,7 @@ import Foundation
 import TelegramCore
 import TelegramPresentationData
 import TextFormat
+import ShadowgramSettings
 
 public func stringForTimestamp(day: Int32, month: Int32, year: Int32, dateTimeFormat: PresentationDateTimeFormat) -> String {
     let separator = dateTimeFormat.dateSeparator
@@ -587,15 +588,15 @@ public func stringAndActivityForUserPresence(strings: PresentationStrings, dateT
                 var t: time_t = time_t(statusTimestamp)
                 var timeinfo: tm = tm()
                 localtime_r(&t, &timeinfo)
-                
+
                 var now: time_t = time_t(timestamp)
                 var timeinfoNow: tm = tm()
                 localtime_r(&now, &timeinfoNow)
-                
+
                 if timeinfo.tm_year != timeinfoNow.tm_year {
                     return (strings.LastSeen_AtDate(stringForTimestamp(day: timeinfo.tm_mday, month: timeinfo.tm_mon + 1, year: timeinfo.tm_year, dateTimeFormat: dateTimeFormat)).string, false)
                 }
-                
+
                 let dayDifference = timeinfo.tm_yday - timeinfoNow.tm_yday
                 if dayDifference == 0 || dayDifference == -1 {
                     let day: RelativeTimestampFormatDay
@@ -615,19 +616,54 @@ public func stringAndActivityForUserPresence(strings: PresentationStrings, dateT
                 }
             }
         }
-    case .recently:
+    case let .recently(isHidden):
         let activeUntil = presence.lastActivity + 30
         if activeUntil >= timestamp {
             return (strings.Presence_online, true)
+        } else if isHidden, ShadowgramSettings.shared.values.showExactLastSeen, presence.lastActivity > 0 {
+            return (shadowgramLastSeenString(strings: strings, dateTimeFormat: dateTimeFormat, timestamp: presence.lastActivity, relativeTo: timestamp), false)
         } else {
             return (strings.LastSeen_Lately, false)
         }
-    case .lastWeek:
+    case let .lastWeek(isHidden):
+        if isHidden, ShadowgramSettings.shared.values.showExactLastSeen, presence.lastActivity > 0 {
+            return (shadowgramLastSeenString(strings: strings, dateTimeFormat: dateTimeFormat, timestamp: presence.lastActivity, relativeTo: timestamp), false)
+        }
         return (strings.LastSeen_WithinAWeek, false)
-    case .lastMonth:
+    case let .lastMonth(isHidden):
+        if isHidden, ShadowgramSettings.shared.values.showExactLastSeen, presence.lastActivity > 0 {
+            return (shadowgramLastSeenString(strings: strings, dateTimeFormat: dateTimeFormat, timestamp: presence.lastActivity, relativeTo: timestamp), false)
+        }
         return (strings.LastSeen_WithinAMonth, false)
     case .longTimeAgo:
         return (strings.LastSeen_ALongTimeAgo, false)
+    }
+}
+
+private func shadowgramLastSeenString(strings: PresentationStrings, dateTimeFormat: PresentationDateTimeFormat, timestamp: Int32, relativeTo now: Int32) -> String {
+    var t: time_t = time_t(timestamp)
+    var timeinfo: tm = tm()
+    localtime_r(&t, &timeinfo)
+
+    var nowT: time_t = time_t(now)
+    var timeinfoNow: tm = tm()
+    localtime_r(&nowT, &timeinfoNow)
+
+    let timeString = stringForShortTimestamp(hours: timeinfo.tm_hour, minutes: timeinfo.tm_min, dateTimeFormat: dateTimeFormat)
+
+    if timeinfo.tm_year != timeinfoNow.tm_year {
+        let dateString = stringForTimestamp(day: timeinfo.tm_mday, month: timeinfo.tm_mon + 1, year: timeinfo.tm_year, dateTimeFormat: dateTimeFormat)
+        return strings.LastSeen_AtDate("\(dateString), \(timeString)").string
+    }
+
+    let dayDifference = timeinfo.tm_yday - timeinfoNow.tm_yday
+    if dayDifference == 0 {
+        return stringForUserPresence(strings: strings, day: .today, dateTimeFormat: dateTimeFormat, hours: timeinfo.tm_hour, minutes: timeinfo.tm_min)
+    } else if dayDifference == -1 {
+        return stringForUserPresence(strings: strings, day: .yesterday, dateTimeFormat: dateTimeFormat, hours: timeinfo.tm_hour, minutes: timeinfo.tm_min)
+    } else {
+        let dateString = stringForTimestamp(day: timeinfo.tm_mday, month: timeinfo.tm_mon + 1, dateTimeFormat: dateTimeFormat)
+        return strings.LastSeen_AtDate("\(dateString), \(timeString)").string
     }
 }
 

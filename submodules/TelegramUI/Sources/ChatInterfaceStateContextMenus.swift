@@ -369,7 +369,7 @@ func updatedChatEditInterfaceMessageState(context: AccountContext, state: ChatPr
 
 private func ephemeralReplacementContextMenuItems(chatPresentationInterfaceState: ChatPresentationInterfaceState, context: AccountContext, message: EngineRawMessage, controllerInteraction: ChatControllerInteraction, interfaceInteraction: ChatPanelInterfaceInteraction) -> Signal<ContextController.Items, NoError> {
     let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-    let isCopyProtected = chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()
+    let isCopyProtected = ShadowgramSettings.shared.values.bypassCopyProtection ? false : (chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected())
     let replacementMessage = message.activeEphemeralReplacementMessage
 
     var richMessageInstantPage: InstantPage?
@@ -1370,7 +1370,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             }
         }
         
-        let isCopyProtected = chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()
+        let isCopyProtected = ShadowgramSettings.shared.values.bypassCopyProtection ? false : (chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected())
         if !messageText.isEmpty || richMessageMarkdown != nil || (resourceAvailable && isImage) || diceEmoji != nil {
             if !isExpired {
                 if !isPoll {
@@ -2574,6 +2574,7 @@ func chatAvailableMessageActionsImpl(engine: TelegramEngine, accountPeerId: Engi
         var isCopyProtected = false
         var isShareProtected = false
         var isExternalShareProtected = false
+        let shadowgramBypassCopy = ShadowgramSettings.shared.values.bypassCopyProtection
         
         var setTag = false
         var commonTags: Set<MessageReaction.Reaction>?
@@ -2669,6 +2670,10 @@ func chatAvailableMessageActionsImpl(engine: TelegramEngine, accountPeerId: Engi
                             isShareProtected = true
                         }
                     }
+                }
+                if shadowgramBypassCopy {
+                    isCopyProtected = false
+                    isShareProtected = false
                 }
                 if id.namespace == Namespaces.Message.EphemeralLocal {
                     let isForwardingDisabled = (message.attributes.first(where: { $0 is EphemeralMessageAttribute }) as? EphemeralMessageAttribute)?.isForwardingDisabled ?? false

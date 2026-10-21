@@ -9,6 +9,7 @@ import TelegramCore
 import TelegramPresentationData
 import TelegramUIPreferences
 import TextFormat
+import ShadowgramSettings
 import AccountContext
 import TelegramNotices
 import TelegramUniversalVideoContent
@@ -1226,9 +1227,16 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
             }
         }
         
-        // Shadowgram: a chat marked Private from the chat list is hidden from screen capture too.
+        // Shadowgram: "Bypass Copy Protection" lifts the protection other people or the server put
+        // on a chat; a chat the user marked Private stays protected regardless.
         let isShadowgramPrivate = self.chatLocation.peerId.flatMap({ ShadowgramSettings.shared.values.privateChatIds.contains($0.toInt64()) }) ?? false
-        let isSecret = self.chatPresentationInterfaceState.copyProtectionEnabled || self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat || self.chatLocation.peerId?.isVerificationCodes == true || isShadowgramPrivate
+        let isStockSecret: Bool
+        if ShadowgramSettings.shared.values.bypassCopyProtection {
+            isStockSecret = false
+        } else {
+            isStockSecret = self.chatPresentationInterfaceState.copyProtectionEnabled || self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat || self.chatLocation.peerId?.isVerificationCodes == true
+        }
+        let isSecret = isStockSecret || isShadowgramPrivate
         // Debug builds leave stock protection off (as before); a Shadowgram Private chat is
         // protected in every build, so it can be checked on a debug build too.
         #if DEBUG

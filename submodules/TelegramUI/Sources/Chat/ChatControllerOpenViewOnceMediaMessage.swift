@@ -8,6 +8,7 @@ import SafariServices
 import MobileCoreServices
 import Intents
 import LegacyComponents
+import ShadowgramSettings
 import TelegramPresentationData
 import TelegramUIPreferences
 import DeviceAccess
@@ -121,7 +122,7 @@ import ChatMediaInputStickerGridItem
 
 extension ChatControllerImpl {
     func openViewOnceMediaMessage(_ message: EngineMessage) {
-        if self.screenCaptureManager?.isRecordingActive == true {
+        if !ShadowgramSettings.shared.values.bypassViewOnce, self.screenCaptureManager?.isRecordingActive == true {
             let controller = textAlertController(context: self.context, updatedPresentationData: self.updatedPresentationData, title: nil, text: self.presentationData.strings.Chat_PlayOnceMesasge_DisableScreenCapture, actions: [TextAlertAction(type: .defaultAction, title: self.presentationData.strings.Common_OK, action: {
             })])
             self.present(controller, in: .window(.root))

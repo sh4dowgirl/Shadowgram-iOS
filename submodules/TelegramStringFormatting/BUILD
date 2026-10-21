@@ -21,6 +21,7 @@ swift_library(
         "//submodules/TelegramUIPreferences:TelegramUIPreferences",
         "//submodules/TelegramPresentationData:TelegramPresentationData",
         "//submodules/AppBundle:AppBundle",
+        "//submodules/ShadowgramSettings:ShadowgramSettings",
     ],
     visibility = [
         "//visibility:public",

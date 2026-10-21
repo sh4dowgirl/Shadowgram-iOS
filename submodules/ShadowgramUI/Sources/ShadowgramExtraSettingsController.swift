@@ -31,6 +31,7 @@ private enum ShadowgramExtraSettingsSection: Int32 {
     case capture
     case groupsPlacement
     case autoReaction
+    case privacy
 }
 
 private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
@@ -74,6 +75,14 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
     case hideUsernameOnCapture(Bool)
     case captureFooter
 
+    case privacyHeader
+    case showExactLastSeen(Bool)
+    case showExactLastSeenFooter
+    case bypassCopyProtection(Bool)
+    case bypassCopyProtectionFooter
+    case bypassViewOnce(Bool)
+    case bypassViewOnceFooter
+
     var section: ItemListSectionId {
         switch self {
         case .messagesHeader, .saveDeletedMessages, .messagesFooter:
@@ -94,6 +103,8 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return ShadowgramExtraSettingsSection.messagesExtra.rawValue
         case .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter:
             return ShadowgramExtraSettingsSection.capture.rawValue
+        case .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter:
+            return ShadowgramExtraSettingsSection.privacy.rawValue
         }
     }
 
@@ -147,6 +158,20 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return 22
         case .keepEditHistoryFooter:
             return 23
+        case .privacyHeader:
+            return 30
+        case .showExactLastSeen:
+            return 31
+        case .showExactLastSeenFooter:
+            return 32
+        case .bypassCopyProtection:
+            return 33
+        case .bypassCopyProtectionFooter:
+            return 34
+        case .bypassViewOnce:
+            return 35
+        case .bypassViewOnceFooter:
+            return 36
         case .captureHeader:
             return 24
         case .hidePhoneOnCapture:
@@ -295,6 +320,26 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             })
         case .captureFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain(strings.captureFooter), sectionId: self.section)
+        case .privacyHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.privacyHeader, sectionId: self.section)
+        case let .showExactLastSeen(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.showExactLastSeen, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.showExactLastSeen = value }
+            })
+        case .showExactLastSeenFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.showExactLastSeenFooter), sectionId: self.section)
+        case let .bypassCopyProtection(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.bypassCopyProtection, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.bypassCopyProtection = value }
+            })
+        case .bypassCopyProtectionFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.bypassCopyProtectionFooter), sectionId: self.section)
+        case let .bypassViewOnce(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.bypassViewOnce, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.bypassViewOnce = value }
+            })
+        case .bypassViewOnceFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.bypassViewOnceFooter), sectionId: self.section)
         }
     }
 }
@@ -348,6 +393,14 @@ private func shadowgramExtraSettingsEntries(values: ShadowgramSettingsValues, st
     entries.append(.hideIdOnCapture(values.hideIdOnCapture))
     entries.append(.hideUsernameOnCapture(values.hideUsernameOnCapture))
     entries.append(.captureFooter)
+
+    entries.append(.privacyHeader)
+    entries.append(.showExactLastSeen(values.showExactLastSeen))
+    entries.append(.showExactLastSeenFooter)
+    entries.append(.bypassCopyProtection(values.bypassCopyProtection))
+    entries.append(.bypassCopyProtectionFooter)
+    entries.append(.bypassViewOnce(values.bypassViewOnce))
+    entries.append(.bypassViewOnceFooter)
 
     return entries
 }

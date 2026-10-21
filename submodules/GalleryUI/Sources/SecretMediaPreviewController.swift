@@ -8,6 +8,7 @@ import SwiftSignalKit
 import TelegramPresentationData
 import AccountContext
 import RadialStatusNode
+import ShadowgramSettings
 import ScreenCaptureDetection
 import AppBundle
 import LocalizedPeerData
@@ -417,7 +418,7 @@ public final class SecretMediaPreviewController: ViewController {
     override public func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         
-        if self.screenCaptureEventsDisposable == nil {
+        if self.screenCaptureEventsDisposable == nil, !ShadowgramSettings.shared.values.bypassViewOnce {
             self.screenCaptureEventsDisposable = (screenCaptureEvents()
             |> deliverOnMainQueue).start(next: { [weak self] _ in
                 if let strongSelf = self, strongSelf.traceVisibility() {
