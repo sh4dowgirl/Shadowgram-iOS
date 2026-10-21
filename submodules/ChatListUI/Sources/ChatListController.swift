@@ -62,6 +62,7 @@ import GlobalControlPanelsContext
 import AlertComponent
 import AlertHeaderComponent
 import AvatarComponent
+import ShadowgramSettings
 
 private final class ContextControllerContentSourceImpl: ContextControllerContentSource {
     let controller: ViewController
@@ -294,6 +295,8 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
         case let .chatList(groupId):
             if groupId == .root {
                 title = self.presentationData.strings.DialogList_Title
+            } else if groupId == .shadowgramGroups {
+                title = ShadowgramStrings(languageCode: self.presentationData.strings.primaryComponent.languageCode).groupsFolderTitle
             } else {
                 title = self.presentationData.strings.ChatList_ArchivedChatsTitle
             }
@@ -1571,6 +1574,17 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
 
         self.chatListDisplayNode.mainContainerNode.groupSelected = { [weak self] groupId in
             guard let self else {
+                return
+            }
+            
+            // Shadowgram groups folder: open it straight away, without the archive's tips.
+            if groupId == .shadowgramGroups {
+                self.chatListDisplayNode.mainContainerNode.currentItemNode.clearHighlightAnimated(true)
+                if let navigationController = self.navigationController as? NavigationController {
+                    let chatListController = ChatListControllerImpl(context: self.context, location: .chatList(groupId: groupId), controlsHistoryPreload: false, enableDebugActions: false)
+                    chatListController.navigationPresentation = .master
+                    navigationController.pushViewController(chatListController)
+                }
                 return
             }
             
@@ -4940,7 +4954,8 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                     self?.chatListDisplayNode.effectiveContainerNode.currentItemNode.setCurrentRemovingItemId(nil)
                 }
                 signal = self.context.engine.messages.togglePeersUnreadMarkInteractively(peerIds: Array(peerIds), setToValue: false)
-            } else if case let .chatList(groupId) = self.chatListDisplayNode.effectiveContainerNode.location {
+            } else if case let .chatList(groupId) = self.chatListDisplayNode.effectiveContainerNode.location, groupId != .shadowgramGroups {
+                // Shadowgram: "read all" is not offered in the groups folder (it would read the whole root list).
                 let filterPredicate: ChatListFilterPredicate?
                 if let filter = self.chatListDisplayNode.effectiveContainerNode.currentItemNode.chatListFilter, case let .filter(_, _, _, data) = filter {
                     filterPredicate = chatListFilterPredicate(filter: data, accountPeerId: self.context.account.peerId)
@@ -5233,7 +5248,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
             switch self.chatListDisplayNode.effectiveContainerNode.location {
             case let .chatList(groupId):
                 if !peerIds.isEmpty {
-                    if groupId == .root {
+                    if groupId != .archive {
                         self.donePressed()
                         self.archiveChats(peerIds: Array(peerIds))
                     } else {
@@ -7169,6 +7184,8 @@ private final class ChatListLocationContext {
         case let .chatList(groupId):
             if groupId == .root {
                 defaultTitle = presentationData.strings.DialogList_Title
+            } else if groupId == .shadowgramGroups {
+                defaultTitle = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode).groupsFolderTitle
             } else {
                 defaultTitle = presentationData.strings.ChatList_ArchivedChatsTitle
             }

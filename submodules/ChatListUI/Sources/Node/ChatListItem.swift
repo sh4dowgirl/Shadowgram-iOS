@@ -29,6 +29,7 @@ import MultilineTextComponent
 import MultilineTextWithEntitiesComponent
 import ShimmerEffect
 import GlassBackgroundComponent
+import ShadowgramSettings
 
 public enum ChatListItemContent {
     public final class ThreadInfo: Equatable {
@@ -782,7 +783,7 @@ private func revealOptions(strings: PresentationStrings, theme: PresentationThem
                 }
             } else {
                 if case let .chatList(groupId) = location {
-                    if case .root = groupId {
+                    if groupId != .archive {
                         canArchive = true
                     } else {
                         canUnarchive = true
@@ -1393,6 +1394,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
     private var communityAvatarBadgeBackgroundView: GlassBackgroundView?
     private var communityAvatarBadgeIconView: GlassBackgroundView.ContentImageView?
     public let avatarNode: AvatarNode
+    private var shadowgramFolderIconNode: ASImageNode?
     var avatarIconView: ComponentHostView<Empty>?
     var avatarIconComponent: EmojiStatusComponent?
     var avatarVideoNode: AvatarVideoNode?
@@ -1509,7 +1511,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                 case .loading:
                     return nil
                 case let .groupReference(groupReferenceData):
-                    var result = item.presentationData.strings.ChatList_ArchivedChatsTitle
+                    var result = shadowgramGroupReferenceTitle(item: item) ?? item.presentationData.strings.ChatList_ArchivedChatsTitle
                 let allCount = groupReferenceData.unreadCount
                     if allCount > 0 {
                         result += "\n\(item.presentationData.strings.VoiceOver_Chat_UnreadMessages(Int32(allCount)))"
@@ -1880,6 +1882,27 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                 }, completion: nil)
             }
             self.avatarNode.setPeer(context: item.context, theme: item.presentationData.theme, peer: peer, overrideImage: .archivedChatsIcon(hiddenByDefault: groupReferenceData.hiddenByDefault), emptyColor: item.presentationData.theme.list.mediaPlaceholderColor, synchronousLoad: synchronousLoads)
+        }
+        
+        // Shadowgram groups folder: its own icon drawn over the archive icon.
+        var isShadowgramGroupsFolder = false
+        if case let .groupReference(groupReferenceData) = item.content, groupReferenceData.groupId == .shadowgramGroups {
+            isShadowgramGroupsFolder = true
+        }
+        if isShadowgramGroupsFolder {
+            if self.shadowgramFolderIconNode == nil {
+                let iconNode = ASImageNode()
+                iconNode.isLayerBacked = true
+                iconNode.displaysAsynchronously = false
+                iconNode.displayWithoutProcessing = true
+                iconNode.image = shadowgramGroupsFolderAvatarImage
+                iconNode.frame = self.avatarNode.bounds
+                self.avatarNode.addSubnode(iconNode)
+                self.shadowgramFolderIconNode = iconNode
+            }
+        } else if let iconNode = self.shadowgramFolderIconNode {
+            iconNode.removeFromSupernode()
+            self.shadowgramFolderIconNode = nil
         }
         
         if item.interaction.activateChatPreview == nil {
@@ -3316,7 +3339,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     } else if let message = messages.last, case let .user(author) = message.author, displayAsMessage {
                         titleAttributedString = NSAttributedString(string: author.id == account.peerId ? item.presentationData.strings.DialogList_You : EnginePeer.user(author).displayTitle(strings: item.presentationData.strings, displayOrder: item.presentationData.nameDisplayOrder), font: titleFont, textColor: theme.titleColor)
                     } else if isPeerGroup {
-                        titleAttributedString = NSAttributedString(string: item.presentationData.strings.ChatList_ArchivedChatsTitle, font: titleFont, textColor: theme.titleColor)
+                        titleAttributedString = NSAttributedString(string: shadowgramGroupReferenceTitle(item: item) ?? item.presentationData.strings.ChatList_ArchivedChatsTitle, font: titleFont, textColor: theme.titleColor)
                     } else if itemPeer.chatMainPeer?.id == item.context.account.peerId {
                         if case .savedMessagesChats = item.chatListLocation {
                             titleAttributedString = NSAttributedString(string: item.presentationData.strings.DialogList_MyNotes, font: titleFont, textColor: theme.titleColor)
@@ -3340,7 +3363,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                         titleAttributedString = NSAttributedString(string: displayTitle, font: titleFont, textColor: textColor)
                     }
                 case .group:
-                    titleAttributedString = NSAttributedString(string: item.presentationData.strings.ChatList_ArchivedChatsTitle, font: titleFont, textColor: theme.titleColor)
+                    titleAttributedString = NSAttributedString(string: shadowgramGroupReferenceTitle(item: item) ?? item.presentationData.strings.ChatList_ArchivedChatsTitle, font: titleFont, textColor: theme.titleColor)
             }
             
             attributedText = renderInstantPagePreviewIcons(attributedText, font: textFont, textColor: theme.messageTextColor)
@@ -4289,6 +4312,9 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
 
                     transition.updatePosition(node: strongSelf.avatarNode, position: avatarFrame.offsetBy(dx: -avatarFrame.minX, dy: -avatarFrame.minY).center.offsetBy(dx: avatarScaleOffset, dy: 0.0))
                     transition.updateBounds(node: strongSelf.avatarNode, bounds: CGRect(origin: CGPoint(), size: avatarFrame.size))
+                    if let shadowgramFolderIconNode = strongSelf.shadowgramFolderIconNode {
+                        transition.updateFrame(node: shadowgramFolderIconNode, frame: CGRect(origin: CGPoint(), size: avatarFrame.size))
+                    }
                     transition.updateTransformScale(node: strongSelf.avatarNode, scale: avatarScale)
                     strongSelf.avatarNode.updateSize(size: avatarFrame.size)
                     strongSelf.updateVideoVisibility()
@@ -5942,3 +5968,32 @@ private class StarView: UIView {
         self.foreground.frame = self.bounds
     }
 }
+
+/// Shadowgram: the groups folder's title, or nil for any other entry.
+private func shadowgramGroupReferenceTitle(item: ChatListItem) -> String? {
+    if case let .groupReference(groupReferenceData) = item.content, groupReferenceData.groupId == .shadowgramGroups {
+        return ShadowgramStrings(languageCode: item.presentationData.strings.primaryComponent.languageCode).groupsFolderTitle
+    }
+    return nil
+}
+
+/// Shadowgram: the groups folder's avatar, the app gradient with three people.
+private let shadowgramGroupsFolderAvatarImage: UIImage = {
+    let size = CGSize(width: 60.0, height: 60.0)
+    let renderer = UIGraphicsImageRenderer(size: size)
+    return renderer.image { rendererContext in
+        let context = rendererContext.cgContext
+        let bounds = CGRect(origin: CGPoint(), size: size)
+        context.addEllipse(in: bounds)
+        context.clip()
+        let colors: [CGColor] = [UIColor(rgb: 0x8E7BEF).cgColor, UIColor(rgb: 0xAFB2F8).cgColor]
+        var locations: [CGFloat] = [0.0, 1.0]
+        if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors as CFArray, locations: &locations) {
+            context.drawLinearGradient(gradient, start: CGPoint(x: 0.0, y: 0.0), end: CGPoint(x: 0.0, y: size.height), options: CGGradientDrawingOptions())
+        }
+        if let symbol = UIImage(systemName: "person.3.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 21.0, weight: .semibold))?.withTintColor(.white, renderingMode: .alwaysOriginal) {
+            let symbolSize = symbol.size
+            symbol.draw(in: CGRect(x: (size.width - symbolSize.width) / 2.0, y: (size.height - symbolSize.height) / 2.0, width: symbolSize.width, height: symbolSize.height))
+        }
+    }
+}()

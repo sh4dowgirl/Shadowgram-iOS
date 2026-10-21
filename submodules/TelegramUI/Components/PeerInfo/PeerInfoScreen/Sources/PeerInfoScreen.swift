@@ -115,6 +115,8 @@ import EdgeEffect
 import Pasteboard
 import AccountPeerContextItem
 import UrlWhitelist
+import ShadowgramSettings
+import ShadowgramUI
 
 public enum PeerInfoAvatarEditingMode {
     case generic
@@ -191,6 +193,7 @@ enum PeerInfoSettingsSection {
     case stars
     case ton
     case wallet
+    case shadowgramExtra
 }
 
 enum PeerInfoReportType {
@@ -290,6 +293,7 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
     let sourceMessageId: MessageId?
     var canDeleteReaction = false
     var dataDisposable: Disposable?
+    var shadowgramSettingsDisposable: Disposable?
     
     let activeActionDisposable = MetaDisposable()
     let logoutConfirmationDisposable = MetaDisposable()
@@ -2030,6 +2034,8 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
                 }
             case .qrCode:
                 strongSelf.openQrCode()
+            case .ghost:
+                strongSelf.controller?.push(shadowgramGhostModeController(context: strongSelf.context))
             case .postStory:
                 var sourceFrame: CGRect?
                 if let source {
@@ -2435,6 +2441,21 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
             reactionSourceMessage = .single(nil)
         }
 
+        if self.isSettings {
+            // Shadowgram: show or hide the ghost button as soon as ghost mode is switched.
+            self.shadowgramSettingsDisposable = (ShadowgramSettings.shared.valuesSignal
+            |> map { values -> Bool in
+                return values.ghostModeEnabled
+            }
+            |> distinctUntilChanged
+            |> deliverOnMainQueue).start(next: { [weak self] _ in
+                guard let self, let (layout, navigationHeight) = self.validLayout else {
+                    return
+                }
+                self.containerLayoutUpdated(layout: layout, navigationHeight: navigationHeight, transition: .immediate, additive: false)
+            })
+        }
+
         self.dataDisposable = combineLatest(
             queue: Queue.mainQueue(),
             screenData,
@@ -2590,6 +2611,7 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
     
     deinit {
         self.dataDisposable?.dispose()
+        self.shadowgramSettingsDisposable?.dispose()
         self.hiddenMediaDisposable?.dispose()
         self.activeActionDisposable.dispose()
         self.logoutConfirmationDisposable.dispose()
@@ -5883,6 +5905,9 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
             } else {
                 if self.isSettings {
                     leftNavigationButtons.append(PeerInfoHeaderNavigationButtonSpec(key: .qrCode, isForExpandedView: false))
+                    if ShadowgramSettings.shared.values.ghostModeEnabled {
+                        leftNavigationButtons.append(PeerInfoHeaderNavigationButtonSpec(key: .ghost, isForExpandedView: false))
+                    }
                     rightNavigationButtons.append(PeerInfoHeaderNavigationButtonSpec(key: .search, isForExpandedView: false))
                     rightNavigationButtons.append(PeerInfoHeaderNavigationButtonSpec(key: .edit, isForExpandedView: false))
                 } else if self.isMyProfile {

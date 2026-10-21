@@ -6,6 +6,7 @@ import ContextUI
 import TelegramPresentationData
 import ManagedAnimationNode
 import Display
+import ShadowgramUI
 
 private enum MoreIconNodeState: Equatable {
     case more
@@ -263,6 +264,10 @@ final class PeerInfoHeaderNavigationButton: HighlightTrackingButtonNode {
                 text = ""
                 accessibilityText = presentationData.strings.PeerInfo_QRCode_Title
                 icon = PresentationResourcesRootController.navigationQrCodeIcon(presentationData.theme)
+            case .ghost:
+                text = ""
+                accessibilityText = "Ghost Mode"
+                icon = shadowgramGhostIconImage
             case .moreSearchSort:
                 text = ""
                 accessibilityText = ""
@@ -350,3 +355,6 @@ final class PeerInfoHeaderNavigationButton: HighlightTrackingButtonNode {
         return resultSize
     }
 }
+
+/// Shadowgram: the ghost-mode button's icon, drawn once.
+private let shadowgramGhostIconImage: UIImage? = shadowgramGhostNavigationIcon()

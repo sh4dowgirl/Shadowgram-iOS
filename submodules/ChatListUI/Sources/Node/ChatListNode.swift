@@ -1940,11 +1940,17 @@ public final class ChatListNode: ListViewImpl {
         } else {
             shouldLoadCanMessagePeer = false
         }
+        let applyShadowgramGroupsFolder: Bool
+        if case .chatList = mode {
+            applyShadowgramGroupsFolder = true
+        } else {
+            applyShadowgramGroupsFolder = false
+        }
         
         let chatListViewUpdate = self.chatListLocation.get()
         |> distinctUntilChanged
         |> mapToSignal { listLocation -> Signal<(ChatListNodeViewUpdate, ChatListFilter?), NoError> in
-            return chatListViewForLocation(chatListLocation: location, location: listLocation, account: context.account, shouldLoadCanMessagePeer: shouldLoadCanMessagePeer)
+            return chatListViewForLocation(chatListLocation: location, location: listLocation, account: context.account, shouldLoadCanMessagePeer: shouldLoadCanMessagePeer, applyShadowgramGroupsFolder: applyShadowgramGroupsFolder)
             |> map { update in
                 return (update, listLocation.filter)
             }

@@ -23,6 +23,7 @@ enum PeerInfoHeaderNavigationButtonKey {
     case more
     case sort
     case qrCode
+    case ghost
     case moreSearchSort
     case postStory
 }

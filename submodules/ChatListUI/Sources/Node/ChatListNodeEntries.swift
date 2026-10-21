@@ -923,7 +923,7 @@ func chatListNodeEntriesForView(view: EngineChatList, state: ChatListNodeState, 
             for groupReference in groupItems {
                 let messageIndex = EngineMessage.Index(id: EngineMessage.Id(peerId: EnginePeer.Id(0), namespace: 0, id: 0), timestamp: 1)
                 var mappedStoryState: ChatListNodeState.StoryState?
-                if let archiveStoryState = state.archiveStoryState {
+                if let archiveStoryState = state.archiveStoryState, groupReference.id == .archive {
                     mappedStoryState = archiveStoryState
                 }
                 result.append(.GroupReferenceEntry(ChatListNodeEntry.GroupReferenceEntryData(

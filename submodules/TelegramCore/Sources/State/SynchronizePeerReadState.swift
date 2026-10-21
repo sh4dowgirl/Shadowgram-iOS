@@ -262,6 +262,10 @@ private func pushPeerReadState(network: Network, postbox: Postbox, stateManager:
         if maxIncomingReadIndex.timestamp <= 0 {
             return .single(readState)
         }
+        // Shadowgram ghost mode: keep the read local, tell the other side nothing.
+        if !shadowgramSendsReadReceipts() {
+            return .single(readState)
+        }
         return inputSecretChat(postbox: postbox, peerId: peerId)
         |> mapToSignal { inputPeer -> Signal<PeerReadState, PeerReadStateValidationError> in
             // A rejected push must not be retried: the operation is only cleared once it
@@ -291,6 +295,9 @@ private func pushPeerReadState(network: Network, postbox: Postbox, stateManager:
                     }
                     |> mapToSignal { _ -> Signal<Void, NoError> in
                         return .complete()
+                    }
+                    if !shadowgramSendsReadReceipts() {
+                        pushSignal = .complete()
                     }
                     if markedUnread {
                         pushSignal = pushSignal
@@ -329,6 +336,9 @@ private func pushPeerReadState(network: Network, postbox: Postbox, stateManager:
                             }
                         }
                         return .complete()
+                    }
+                    if !shadowgramSendsReadReceipts() {
+                        pushSignal = .complete()
                     }
 
                     if markedUnread {

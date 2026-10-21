@@ -17,6 +17,7 @@ import PremiumUI
 import PasswordSetupUI
 import StorageUsageScreen
 import AlertComponent
+import ShadowgramSettings
 
 private struct DeleteAccountOptionsArguments {
     let changePhoneNumber: () -> Void
@@ -215,7 +216,7 @@ public func deleteAccountOptionsController(context: AccountContext, navigationCo
                 }
             }
 
-            if count >= maximumAvailableAccounts {
+            if !ShadowgramSettings.shared.values.unlimitedAccounts && count >= maximumAvailableAccounts {
                 var replaceImpl: ((ViewController) -> Void)?
                 let controller = PremiumLimitScreen(context: context, subject: .accounts, count: Int32(count), action: {
                     let controller = PremiumIntroScreen(context: context, source: .accounts)
@@ -422,7 +423,7 @@ public func deleteAccountOptionsController(context: AccountContext, navigationCo
                 break
         }
         
-        let canAddAccounts = accountsAndPeers.1.count + 1 < maximumNumberOfAccounts
+        let canAddAccounts = ShadowgramSettings.shared.values.unlimitedAccounts || accountsAndPeers.1.count + 1 < maximumNumberOfAccounts
 
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(presentationData.strings.DeleteAccount_AlternativeOptionsTitle), leftNavigationButton: leftNavigationButton, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
         let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: deleteAccountOptionsEntries(presentationData: presentationData, canAddAccounts: canAddAccounts, hasTwoStepAuth: hasTwoStepAuth, hasPasscode: hasPasscode), style: .blocks)

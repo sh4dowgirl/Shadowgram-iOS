@@ -30,6 +30,7 @@ import QuickReactionSetupController
 import AvatarEditorScreen
 import PeerSelectionScreen
 import DeviceModel
+import ShadowgramSettings
 
 enum SettingsSearchableItemIcon {
     case profile
@@ -4267,7 +4268,7 @@ func settingsSearchableItems(
     let canAddAccount = activeAccountsAndPeers(context: context)
     |> take(1)
     |> map { accountsAndPeers -> Bool in
-        return accountsAndPeers.1.count + 1 < maximumNumberOfAccounts
+        return ShadowgramSettings.shared.values.unlimitedAccounts || accountsAndPeers.1.count + 1 < maximumNumberOfAccounts
     }
     
     let notificationSettings = context.engine.data.subscribe(TelegramEngine.EngineData.Item.Configuration.ApplicationSpecificPreference(key: PreferencesKeys.globalNotifications))

@@ -779,6 +779,7 @@ public final class ChatMessageAttachedContentNode: ASDisplayNode {
                                 replyCount: dateReplies,
                                 starsCount: starsCount,
                                 isPinned: message.tags.contains(.pinned) && !associatedData.isInPinnedListMode && !isReplyThread,
+                                isShadowgramDeleted: message.shadowgramIsDeleted,
                                 hasAutoremove: message.isSelfExpiring,
                                 canViewReactionList: canViewMessageReactionList(message: EngineMessage(message)),
                                 animationCache: controllerInteraction.presentationContext.animationCache,

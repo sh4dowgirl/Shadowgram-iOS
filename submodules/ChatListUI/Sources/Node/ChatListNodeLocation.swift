@@ -195,13 +195,41 @@ public func chatListFilterPredicate(filter: ChatListFilterData, accountPeerId: E
     })
 }
 
-public func chatListViewForLocation(chatListLocation: ChatListControllerLocation, location: ChatListNodeLocation, account: Account, shouldLoadCanMessagePeer: Bool) -> Signal<ChatListNodeViewUpdate, NoError> {
+/// `applyShadowgramGroupsFolder`: true only for a real chat list (not a peer picker or a search),
+/// where the root list should lose the folder's groups and show the folder entry instead.
+public func chatListViewForLocation(chatListLocation: ChatListControllerLocation, location: ChatListNodeLocation, account: Account, shouldLoadCanMessagePeer: Bool, applyShadowgramGroupsFolder: Bool = false) -> Signal<ChatListNodeViewUpdate, NoError> {
+    // Shadowgram groups folder: the folder screen is the root list behind the folder's predicate,
+    // and the plain root list ("All", no filter) loses the folder's groups and gains its entry.
+    if case let .chatList(groupId) = chatListLocation {
+        if groupId == .shadowgramGroups {
+            return shadowgramGroupsFolderMembership(account: account)
+            |> mapToSignal { membership -> Signal<ChatListNodeViewUpdate, NoError> in
+                let predicate: ChatListFilterPredicate
+                if let membership {
+                    predicate = membership.predicate
+                } else {
+                    predicate = ChatListFilterPredicate(includePeerIds: Set(), excludePeerIds: Set(), pinnedPeerIds: [], messageTagSummary: nil, includeAdditionalPeerGroupIds: [], include: { _, _, _, _, _ in
+                        return false
+                    })
+                }
+                return chatListViewForLocationImpl(chatListLocation: chatListLocation, location: location, account: account, shouldLoadCanMessagePeer: shouldLoadCanMessagePeer, overrideFilterPredicate: predicate)
+            }
+        } else if applyShadowgramGroupsFolder && groupId == .root && location.filter == nil {
+            return shadowgramGroupsFolderRootView(account: account, base: chatListViewForLocationImpl(chatListLocation: chatListLocation, location: location, account: account, shouldLoadCanMessagePeer: shouldLoadCanMessagePeer, overrideFilterPredicate: nil))
+        }
+    }
+    return chatListViewForLocationImpl(chatListLocation: chatListLocation, location: location, account: account, shouldLoadCanMessagePeer: shouldLoadCanMessagePeer, overrideFilterPredicate: nil)
+}
+
+private func chatListViewForLocationImpl(chatListLocation: ChatListControllerLocation, location: ChatListNodeLocation, account: Account, shouldLoadCanMessagePeer: Bool, overrideFilterPredicate: ChatListFilterPredicate?) -> Signal<ChatListNodeViewUpdate, NoError> {
     let accountPeerId = account.peerId
     
     switch chatListLocation {
     case let .chatList(groupId):
         let filterPredicate: ChatListFilterPredicate?
-        if let filter = location.filter, case let .filter(_, _, _, data) = filter {
+        if let overrideFilterPredicate {
+            filterPredicate = overrideFilterPredicate
+        } else if let filter = location.filter, case let .filter(_, _, _, data) = filter {
             filterPredicate = chatListFilterPredicate(filter: data, accountPeerId: account.peerId)
         } else {
             filterPredicate = nil

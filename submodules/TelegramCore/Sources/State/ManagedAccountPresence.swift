@@ -3,6 +3,7 @@ import TelegramApi
 import Postbox
 import SwiftSignalKit
 import MtProtoKit
+import ShadowgramSettings
 
 private typealias SignalKitTimer = SwiftSignalKit.Timer
 
@@ -22,7 +23,17 @@ private final class AccountPresenceManagerImpl {
         self.queue = queue
         self.network = network
         
-        self.shouldKeepOnlinePresenceDisposable = (shouldKeepOnlinePresence
+        // Shadowgram ghost mode: with online status hidden the account always reports offline,
+        // and switching it off while online sends an explicit offline right away.
+        let sendsOnlineStatus = ShadowgramSettings.shared.valuesSignal
+        |> map { values -> Bool in
+            return values.effectiveSendOnlineStatus
+        }
+        |> distinctUntilChanged
+        self.shouldKeepOnlinePresenceDisposable = (combineLatest(shouldKeepOnlinePresence, sendsOnlineStatus)
+        |> map { shouldKeepOnline, sendsOnlineStatus -> Bool in
+            return shouldKeepOnline && sendsOnlineStatus
+        }
         |> distinctUntilChanged
         |> deliverOn(self.queue)).start(next: { [weak self] value in
             guard let `self` = self else {

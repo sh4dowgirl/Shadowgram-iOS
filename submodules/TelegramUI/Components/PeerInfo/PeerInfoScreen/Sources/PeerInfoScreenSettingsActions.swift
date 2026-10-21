@@ -17,6 +17,8 @@ import PasswordSetupUI
 import InstantPageCache
 import WalletContext
 import UndoUI
+import ShadowgramUI
+import ShadowgramSettings
 
 extension PeerInfoScreenNode {
     func openSettings(section: PeerInfoSettingsSection) {
@@ -238,7 +240,7 @@ extension PeerInfoScreenNode {
                     }
                 }
                 
-                if count >= maximumAvailableAccounts {
+                if !ShadowgramSettings.shared.values.unlimitedAccounts && count >= maximumAvailableAccounts {
                     var replaceImpl: ((ViewController) -> Void)?
                     let controller = PremiumLimitScreen(context: strongSelf.context, subject: .accounts, count: Int32(count), action: {
                         let controller = PremiumIntroScreen(context: strongSelf.context, source: .accounts)
@@ -307,6 +309,8 @@ extension PeerInfoScreenNode {
                 return
             }
             push(self.context.sharedContext.makeWalletScreen(context: self.context))
+        case .shadowgramExtra:
+            push(shadowgramExtraSettingsController(context: self.context))
         }
     }
 

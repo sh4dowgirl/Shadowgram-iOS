@@ -28,7 +28,9 @@ func archiveContextMenuItems(context: AccountContext, group: EngineChatList.Grou
     |> map { [weak chatListController] unreadChatListPeerIds, chatArchiveSettingsPreference -> [ContextMenuItem] in
         var items: [ContextMenuItem] = []
         
-        if !unreadChatListPeerIds.isEmpty {
+        // Shadowgram: the groups folder is a view of the root list, so "mark all as read" would
+        // read every chat there; it is not offered on the folder.
+        if !unreadChatListPeerIds.isEmpty && group != .shadowgramGroups {
             items.append(.action(ContextMenuActionItem(text: strings.ChatList_Context_MarkAllAsRead, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/MarkAsRead"), color: theme.contextMenu.primaryColor) }, action: { _, f in
                 let _ = (context.engine.messages.markAllChatsAsReadInteractively(items: [(groupId: group, filterPredicate: nil)])
                 |> deliverOnMainQueue).startStandalone(completed: {

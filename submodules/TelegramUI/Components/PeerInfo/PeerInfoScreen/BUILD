@@ -181,6 +181,8 @@ swift_library(
         "//submodules/TelegramUI/Components/AlertComponent/AlertTransferHeaderComponent",
         "//submodules/TelegramUI/Components/HorizontalTabsComponent",
         "//submodules/TelegramUI/Components/PeerInfo/AccountPeerContextItem",
+        "//submodules/ShadowgramSettings:ShadowgramSettings",
+        "//submodules/ShadowgramUI:ShadowgramUI",
     ],
     visibility = [
         "//visibility:public",

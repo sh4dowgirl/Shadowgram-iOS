@@ -4,6 +4,9 @@ public final class EngineChatList: Equatable {
     public enum Group {
         case root
         case archive
+        /// Shadowgram's groups folder: large groups moved out of the root list. It is a client-side
+        /// view of the root group, so Postbox never stores anything under it.
+        case shadowgramGroups
     }
 
     public typealias MessageTagSummaryInfo = ChatListMessageTagSummaryInfo
@@ -476,6 +479,8 @@ public extension EngineChatList.Group {
             return .root
         case .archive:
             return Namespaces.PeerGroup.archive
+        case .shadowgramGroups:
+            return .root
         }
     }
 }

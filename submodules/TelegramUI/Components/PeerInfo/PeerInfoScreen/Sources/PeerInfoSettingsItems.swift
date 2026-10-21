@@ -13,6 +13,7 @@ import DeviceAccess
 import TelegramStringFormatting
 import PeerNameColorItem
 import WalletContext
+import ShadowgramUI
 
 enum SettingsSection: Int, CaseIterable {
     case edit
@@ -24,6 +25,7 @@ enum SettingsSection: Int, CaseIterable {
     case apps
     case shortcuts
     case advanced
+    case shadowgram
     case payment
     case extra
     case support
@@ -273,6 +275,11 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
     let languageName = presentationData.strings.primaryComponent.localizedName
     items[.advanced]!.append(PeerInfoScreenDisclosureItem(id: 4, label: .text(languageName.isEmpty ? presentationData.strings.Localization_LanguageName : languageName), text: presentationData.strings.Settings_AppLanguage, icon: PresentationResourcesSettings.language, action: {
         interaction.openSettings(.language)
+    }))
+    
+    // Shadowgram: "Extra Settings", right above Telegram Premium.
+    items[.shadowgram]!.append(PeerInfoScreenDisclosureItem(id: 0, text: "Extra Settings", icon: shadowgramExtraSettingsIcon, action: {
+        interaction.openSettings(.shadowgramExtra)
     }))
     
     let premiumConfiguration = PremiumConfiguration.with(appConfiguration: context.currentAppConfiguration.with { $0 })
