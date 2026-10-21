@@ -51,3 +51,25 @@ public struct ShadowgramStrings {
         }
     }
 }
+
+extension ShadowgramStrings {
+    public var interfaceHeader: String { return t("ИНТЕРФЕЙС", "INTERFACE") }
+    public var showPeerIds: String { return t("Показывать ID пользователей", "Show User IDs") }
+    public var showPeerIdsFooter: String { return t("Числовой ID появится в профилях пользователей, групп и каналов. По нажатию копируется.", "A numeric ID shows up in user, group and channel profiles. Tap it to copy.") }
+    public var openByPeerId: String { return t("Открывать по ID из поиска", "Open by ID from Search") }
+    public var openByPeerIdFooter: String { return t("Если в поиск ввести число, Shadowgram попробует открыть пользователя или чат с этим ID. Сервер отдаёт только тех, кого вы уже видели раньше.", "If you type a number into search, Shadowgram tries to open the user or chat with that ID. The server only returns peers you have already seen.") }
+    public var disableCameraSwipe: String { return t("Отключить камеру слева по свайпу", "Disable left swipe camera") }
+    public var disableCameraSwipeFooter: String { return t("Экран камеры в списке чатов больше не будет открываться смахиванием влево.", "The camera screen in the chat list will not open when you swipe left.") }
+
+    public var messagesExtraHeader: String { return t("СООБЩЕНИЯ", "MESSAGES") }
+    public var keepEditHistory: String { return t("Сохранять историю правок", "Keep Edit History") }
+    public var keepEditHistoryFooter: String { return t("У отредактированных собеседником сообщений появится пункт «История правок» в меню по долгому нажатию.", "Edited messages gain an \"Edit History\" item in the long-press menu, with the earlier versions kept on this device.") }
+}
+
+extension ShadowgramStrings {
+    public var openByPeerIdAction: String { return t("Открыть чат по ID…", "Open Chat by ID…") }
+    public var openByPeerIdPrompt: String { return t("Введите числовой ID пользователя или чата. Чат можно открыть только если этот ID уже встречался этому аккаунту (общий чат, контакт, упоминание).", "Enter the numeric ID of a user or chat. A chat can be opened only if this ID has already been seen by this account (a shared chat, contact or mention).") }
+    public var openByPeerIdOk: String { return t("Открыть", "Open") }
+    public var openByPeerIdCancel: String { return t("Отмена", "Cancel") }
+    public var openByPeerIdNotFound: String { return t("Чат с таким ID не найден на этом аккаунте.", "No chat with this ID was found on this account.") }
+}

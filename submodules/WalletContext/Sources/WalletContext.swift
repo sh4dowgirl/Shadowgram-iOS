@@ -559,7 +559,11 @@ public struct WalletConfiguration: Equatable, Sendable {
     }
 
     public static func with(appConfiguration: AppConfiguration) -> WalletConfiguration {
-        let isAvailable = appConfiguration.data?["wallet_available"] as? Bool ?? self.defaultValue.isAvailable
+        // Shadowgram: the built-in TON wallet stays off whatever the server says. App Store
+        // guideline 3.1.5(a) allows crypto wallets only from organizations, and Shadowgram is
+        // published by an individual. Stars, gifts and collectibles bought with Stars do not
+        // depend on this switch.
+        let isAvailable = false
         var explorerUrl = self.defaultValue.explorerUrl
         if let value = appConfiguration.data?["ton_blockchain_explorer_url"] as? String {
             explorerUrl = value

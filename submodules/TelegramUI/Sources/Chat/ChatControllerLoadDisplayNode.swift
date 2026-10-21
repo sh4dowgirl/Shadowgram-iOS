@@ -6,6 +6,7 @@ import Display
 import AsyncDisplayKit
 import TelegramCore
 import SafariServices
+import ShadowgramSettings
 import MobileCoreServices
 import Intents
 import LegacyComponents
@@ -1681,6 +1682,26 @@ extension ChatControllerImpl {
             }
             
             guard !strongSelf.presentAccountFrozenInfoIfNeeded(delay: true) else {
+                completion(.immediate, {})
+                return
+            }
+            
+            // Shadowgram: a message someone else deleted has no server-side counterpart, so a
+            // reply with its id would be refused. Fall back to prefixing the composer with a
+            // Markdown-style quote of the text and let the user send a normal message.
+            if let messageId = messageId, let message = strongSelf.chatDisplayNode.historyNode.messageInCurrentHistoryView(messageId)?._asMessage(), message.shadowgramIsDeleted {
+                let text = message.text
+                if !text.isEmpty {
+                    let quoted = text.split(separator: "\n", omittingEmptySubsequences: false).map { "> \($0)" }.joined(separator: "\n") + "\n"
+                    strongSelf.updateChatPresentationInterfaceState(animated: true, interactive: true, { state in
+                        return state.updatedInterfaceState { interfaceState in
+                            let current = interfaceState.composeInputState.inputText.string
+                            let combined = quoted + current
+                            return interfaceState.withUpdatedComposeInputState(ChatTextInputState(inputText: NSAttributedString(string: combined)))
+                        }
+                    })
+                    strongSelf.chatDisplayNode.ensureInputViewFocused()
+                }
                 completion(.immediate, {})
                 return
             }

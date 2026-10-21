@@ -7,7 +7,10 @@ public struct MediaInputSettings: Codable, Equatable {
     public let pauseMusicOnRecording: Bool
     
     public static var defaultSettings: MediaInputSettings {
-        return MediaInputSettings(enableRaiseToSpeak: true, pauseMusicOnRecording: true)
+        // Shadowgram: pause music while recording stays off by default. A new "_sg" storage key
+        // migrates every existing install to this new default on first launch, after which the
+        // user's own choice is remembered.
+        return MediaInputSettings(enableRaiseToSpeak: true, pauseMusicOnRecording: false)
     }
     
     public init(enableRaiseToSpeak: Bool, pauseMusicOnRecording: Bool) {
@@ -19,14 +22,14 @@ public struct MediaInputSettings: Codable, Equatable {
         let container = try decoder.container(keyedBy: StringCodingKey.self)
 
         self.enableRaiseToSpeak = (try container.decode(Int32.self, forKey: "enableRaiseToSpeak")) != 0
-        self.pauseMusicOnRecording = (try container.decodeIfPresent(Int32.self, forKey: "pauseMusicOnRecording_v2") ?? 1) != 0
+        self.pauseMusicOnRecording = (try container.decodeIfPresent(Int32.self, forKey: "pauseMusicOnRecording_sg") ?? 0) != 0
     }
     
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: StringCodingKey.self)
 
         try container.encode((self.enableRaiseToSpeak ? 1 : 0) as Int32, forKey: "enableRaiseToSpeak")
-        try container.encode((self.pauseMusicOnRecording ? 1 : 0) as Int32, forKey: "pauseMusicOnRecording_v2")
+        try container.encode((self.pauseMusicOnRecording ? 1 : 0) as Int32, forKey: "pauseMusicOnRecording_sg")
     }
     
     public static func ==(lhs: MediaInputSettings, rhs: MediaInputSettings) -> Bool {

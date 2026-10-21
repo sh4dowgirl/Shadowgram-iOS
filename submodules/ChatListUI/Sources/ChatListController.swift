@@ -2987,6 +2987,12 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
     
     private weak var storyCameraTooltip: TooltipScreen?
     fileprivate func openStoryCamera(fromList: Bool, gesturePullOffset: CGFloat? = nil) {
+        // Shadowgram: "Disable left swipe camera" in Extra Settings. All in-list story camera
+        // openings вЂ” the pull-down of the stories header, taps on the account without stories вЂ”
+        // go through here with fromList: true, so dropping them here covers the whole surface.
+        if fromList && ShadowgramSettings.shared.values.disableCameraSwipe {
+            return
+        }
         guard !self.context.isFrozen else {
             let controller = self.context.sharedContext.makeAccountFreezeInfoScreen(context: self.context)
             self.push(controller)

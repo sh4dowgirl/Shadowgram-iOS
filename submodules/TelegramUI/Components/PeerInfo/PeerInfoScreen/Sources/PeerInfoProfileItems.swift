@@ -16,6 +16,8 @@ import WebUI
 import AvatarNode
 import PeerNameColorItem
 import BoostLevelIconComponent
+import ShadowgramSettings
+import ShadowgramUI
 
 private let enabledPublicBioEntities: EnabledEntityTypes = [.allUrl, .mention, .hashtag]
 private let enabledPrivateBioEntities: EnabledEntityTypes = [.internalUrl, .mention, .hashtag]
@@ -97,6 +99,9 @@ func infoItems(
     }
     
     if case let .user(user) = data.peer {
+        if ShadowgramSettings.shared.values.showPeerIds {
+            items[currentPeerInfoSection]!.append(shadowgramPeerIdInfoItem(peerId: user.id, section: currentPeerInfoSection, interaction: interaction, presentationData: presentationData))
+        }
         let ItemCallList = 1000
         let ItemPersonalChannelHeader = 2000
         let ItemPersonalChannel = 2001
@@ -551,6 +556,9 @@ func infoItems(
             }
         }
     } else if case let .channel(channel) = data.peer {
+        if ShadowgramSettings.shared.values.showPeerIds {
+            items[currentPeerInfoSection]!.append(shadowgramPeerIdInfoItem(peerId: channel.id, section: currentPeerInfoSection, interaction: interaction, presentationData: presentationData))
+        }
         let ItemUsername = 1
         let ItemUsernameInfo = 2
         let ItemAbout = 3
@@ -823,6 +831,9 @@ func infoItems(
             }
         }
     } else if case let .legacyGroup(group) = data.peer {
+        if ShadowgramSettings.shared.values.showPeerIds {
+            items[currentPeerInfoSection]!.append(shadowgramPeerIdInfoItem(peerId: group.id, section: currentPeerInfoSection, interaction: interaction, presentationData: presentationData))
+        }
         if let cachedData = data.cachedData as? CachedGroupData {
             let aboutText: String?
             if group.isFake {
@@ -1864,4 +1875,26 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
         }
     }
     return result
+}
+
+// Shadowgram: a labelled row with the peer's numeric ID. Tap copies it and shows a toast.
+private let shadowgramPeerIdItemBase: AnyHashable = AnyHashable("shadowgram.peerId")
+
+private func shadowgramPeerIdInfoItem(peerId: EnginePeer.Id, section: InfoSection, interaction: PeerInfoInteraction, presentationData: PresentationData) -> PeerInfoScreenItem {
+    // Treating `_` the label keeps the row aligned with the username/phone rows above it, which
+    // use short string labels too.
+    let value = "\(peerId.id._internalGetInt64Value())"
+    return PeerInfoScreenLabeledValueItem(
+        id: shadowgramPeerIdItemBase,
+        label: "ID",
+        text: value,
+        textColor: .accent,
+        action: { _, _ in
+            UIPasteboard.general.string = value
+            interaction.shadowgramPeerIdCopied?()
+        },
+        requestLayout: { animated in
+            interaction.requestLayout(animated)
+        }
+    )
 }

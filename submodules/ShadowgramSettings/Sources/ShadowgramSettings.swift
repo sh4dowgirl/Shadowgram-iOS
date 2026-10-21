@@ -22,6 +22,15 @@ public struct ShadowgramSettingsValues: Equatable {
     public var groupsFolderEnabled: Bool
     /// Minimum member count for a group to go into the folder.
     public var groupsFolderMinMembers: Int32
+    /// Show numeric user, group and channel IDs in profiles.
+    public var showPeerIds: Bool
+    /// Let the chat list search open a user/chat by numeric ID.
+    public var openByPeerId: Bool
+    /// Keep the previous text of a message when the sender edits it, so the whole edit history can be
+    /// opened from the long-press menu.
+    public var keepEditHistory: Bool
+    /// Replace the left-swipe camera panel in the main chat list with a plain left swipe.
+    public var disableCameraSwipe: Bool
 
     public static let defaultValues = ShadowgramSettingsValues(
         saveDeletedMessages: false,
@@ -31,10 +40,14 @@ public struct ShadowgramSettingsValues: Equatable {
         sendTyping: true,
         sendOnlineStatus: true,
         groupsFolderEnabled: false,
-        groupsFolderMinMembers: 100
+        groupsFolderMinMembers: 100,
+        showPeerIds: false,
+        openByPeerId: false,
+        keepEditHistory: false,
+        disableCameraSwipe: false
     )
 
-    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32) {
+    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool) {
         self.saveDeletedMessages = saveDeletedMessages
         self.unlimitedAccounts = unlimitedAccounts
         self.ghostModeEnabled = ghostModeEnabled
@@ -43,6 +56,10 @@ public struct ShadowgramSettingsValues: Equatable {
         self.sendOnlineStatus = sendOnlineStatus
         self.groupsFolderEnabled = groupsFolderEnabled
         self.groupsFolderMinMembers = groupsFolderMinMembers
+        self.showPeerIds = showPeerIds
+        self.openByPeerId = openByPeerId
+        self.keepEditHistory = keepEditHistory
+        self.disableCameraSwipe = disableCameraSwipe
     }
 
     /// What the client actually sends: everything unless ghost mode is on and hides it.
@@ -74,6 +91,10 @@ public final class ShadowgramSettings {
         static let sendOnlineStatus = "shadowgram.ghost.sendOnlineStatus"
         static let groupsFolderEnabled = "shadowgram.groupsFolder.enabled"
         static let groupsFolderMinMembers = "shadowgram.groupsFolder.minMembers"
+        static let showPeerIds = "shadowgram.showPeerIds"
+        static let openByPeerId = "shadowgram.openByPeerId"
+        static let keepEditHistory = "shadowgram.keepEditHistory"
+        static let disableCameraSwipe = "shadowgram.disableCameraSwipe"
     }
 
     private let defaults: UserDefaults
@@ -99,7 +120,11 @@ public final class ShadowgramSettings {
             sendTyping: bool(Key.sendTyping, defaultValues.sendTyping),
             sendOnlineStatus: bool(Key.sendOnlineStatus, defaultValues.sendOnlineStatus),
             groupsFolderEnabled: bool(Key.groupsFolderEnabled, defaultValues.groupsFolderEnabled),
-            groupsFolderMinMembers: max(0, minMembers)
+            groupsFolderMinMembers: max(0, minMembers),
+            showPeerIds: bool(Key.showPeerIds, defaultValues.showPeerIds),
+            openByPeerId: bool(Key.openByPeerId, defaultValues.openByPeerId),
+            keepEditHistory: bool(Key.keepEditHistory, defaultValues.keepEditHistory),
+            disableCameraSwipe: bool(Key.disableCameraSwipe, defaultValues.disableCameraSwipe)
         )
         self.currentValues = values
         self.valuesPromise = ValuePromise(values, ignoreRepeated: true)
@@ -135,6 +160,10 @@ public final class ShadowgramSettings {
         self.defaults.set(values.sendOnlineStatus, forKey: Key.sendOnlineStatus)
         self.defaults.set(values.groupsFolderEnabled, forKey: Key.groupsFolderEnabled)
         self.defaults.set(NSNumber(value: values.groupsFolderMinMembers), forKey: Key.groupsFolderMinMembers)
+        self.defaults.set(values.showPeerIds, forKey: Key.showPeerIds)
+        self.defaults.set(values.openByPeerId, forKey: Key.openByPeerId)
+        self.defaults.set(values.keepEditHistory, forKey: Key.keepEditHistory)
+        self.defaults.set(values.disableCameraSwipe, forKey: Key.disableCameraSwipe)
 
         self.valuesPromise.set(values)
     }

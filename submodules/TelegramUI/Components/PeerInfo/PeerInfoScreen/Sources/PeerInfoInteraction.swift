@@ -8,6 +8,8 @@ import AccountContext
 import StatisticsUI
 
 final class PeerInfoInteraction {
+    // Shadowgram: optional toast when the user taps the ID row. Set from PeerInfoScreen.
+    var shadowgramPeerIdCopied: (() -> Void)?
     let openChat: (EnginePeer.Id?) -> Void
     let openUsername: (String, Bool, Promise<Bool>?) -> Void
     let openPhone: (String, ASDisplayNode, ContextGesture?, Promise<Bool>?) -> Void
