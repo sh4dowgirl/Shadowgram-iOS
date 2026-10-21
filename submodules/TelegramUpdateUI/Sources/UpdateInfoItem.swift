@@ -253,9 +253,9 @@ class UpdateInfoItemNode: ListViewItemNode {
                         var bordered = true
                         if let appIcon = item.appIcon {
                             switch appIcon.name {
-                                case "BlueFilled":
+                                case "BlueFilledIcon":
                                     bordered = false
-                                case "BlackFilled":
+                                case "BlackFilledIcon":
                                     bordered = false
                                 default:
                                     break

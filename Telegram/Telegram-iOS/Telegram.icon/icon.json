@@ -1,5 +1,10 @@
 {
-  "fill" : "system-light",
+  "fill" : {
+    "linear-gradient" : [
+      "srgb:0.55686,0.48235,0.93725,1.00000",
+      "srgb:0.68627,0.69804,0.97255,1.00000"
+    ]
+  },
   "groups" : [
     {
       "blend-mode" : "normal",
@@ -51,26 +56,26 @@
             {
               "value" : {
                 "linear-gradient" : [
-                  "display-p3:0.21569,0.68627,0.89020,1.00000",
-                  "srgb:0.11373,0.57647,0.82353,1.00000"
+                  "srgb:0.55686,0.48235,0.93725,1.00000",
+                  "srgb:0.68627,0.69804,0.97255,1.00000"
                 ]
               }
             },
             {
               "appearance" : "dark",
               "value" : {
-                "automatic-gradient" : "srgb:0.00000,0.47843,1.00000,1.00000"
+                "automatic-gradient" : "srgb:0.55686,0.48235,0.93725,1.00000"
               }
             }
           ],
           "glass" : true,
           "hidden-specializations" : [
             {
-              "value" : false
+              "value" : true
             },
             {
               "idiom" : "watchOS",
-              "value" : false
+              "value" : true
             }
           ],
           "image-name" : "Oval.svg",
