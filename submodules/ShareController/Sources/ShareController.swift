@@ -340,6 +340,11 @@ public final class ShareController: ViewController {
     private let immediateExternalShare: Bool
     private let subject: ShareControllerSubject
     private let presetText: String?
+    /// Shadowgram: the preview of a shared t.me link, loaded while the sheet is open and attached to
+    /// the sent message, so a call or invite link shows its card right away instead of after the
+    /// server has answered (the composer does the same with its link preview).
+    private var shadowgramUrlPreview: (accountPeerId: EnginePeer.Id, url: String, webpage: TelegramMediaWebpage)?
+    private let shadowgramUrlPreviewDisposable = MetaDisposable()
     private let switchableAccounts: [ShareControllerSwitchableAccount]
     private let immediatePeerId: PeerId?
     private let segmentedValues: [ShareControllerSegmentedValue]?
@@ -434,6 +439,17 @@ public final class ShareController: ViewController {
         
         self.statusBar.statusBarStyle = .Ignore
         self.automaticallyControlPresentationContextLayout = false
+        
+        if case let .url(url) = subject, shadowgramPrefetchesPreview(url: url), let appContext = currentContext as? ShareControllerAppAccountContext {
+            let accountPeerId = appContext.accountPeerId
+            self.shadowgramUrlPreviewDisposable.set((webpagePreview(account: appContext.context.account, urls: [url])
+            |> deliverOnMainQueue).start(next: { [weak self] result in
+                guard let self, case let .result(value) = result, let value, case .Loaded = value.webpage.content else {
+                    return
+                }
+                self.shadowgramUrlPreview = (accountPeerId, url, value.webpage)
+            }))
+        }
         
         switch subject {
             case let .url(text):
@@ -597,6 +613,7 @@ public final class ShareController: ViewController {
     }
     
     deinit {
+        self.shadowgramUrlPreviewDisposable.dispose()
         self.peersDisposable.dispose()
         self.readyDisposable.dispose()
         self.accountActiveDisposable.dispose()
@@ -1963,13 +1980,22 @@ public final class ShareController: ViewController {
                         threadId = topicId
                     }
                     
+                    // Shadowgram: attach the preview loaded while the sheet was open (see
+                    // `shadowgramUrlPreview`); secret chats keep the plain link.
+                    var previewMediaReference: AnyMediaReference?
+                    var previewAttributes: [MessageAttribute] = []
+                    if let preview = strongSelf.shadowgramUrlPreview, preview.url == url, preview.accountPeerId == currentContext.accountPeerId, peerId.namespace != Namespaces.Peer.SecretChat {
+                        previewMediaReference = .standalone(media: preview.webpage)
+                        previewAttributes.append(WebpagePreviewMessageAttribute(leadingPreview: false, forceLargeMedia: nil, isManuallyAdded: false, isSafe: false))
+                    }
+                    
                     var messages: [EnqueueMessage] = []
                     if !text.isEmpty {
-                        messages.append(.message(text: url + "\n\n" + text, attributes: [], inlineStickers: [:], mediaReference: nil, threadId: threadId, replyToMessageId: replyToMessageId.flatMap {
+                        messages.append(.message(text: url + "\n\n" + text, attributes: previewAttributes, inlineStickers: [:], mediaReference: previewMediaReference, threadId: threadId, replyToMessageId: replyToMessageId.flatMap {
                             EngineMessageReplySubject(messageId: $0, quote: nil, innerSubject: nil)
                         }, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: []))
                     } else {
-                        messages.append(.message(text: url, attributes: [], inlineStickers: [:], mediaReference: nil, threadId: threadId, replyToMessageId: replyToMessageId.flatMap { EngineMessageReplySubject(messageId: $0, quote: nil, innerSubject: nil) }, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: []))
+                        messages.append(.message(text: url, attributes: previewAttributes, inlineStickers: [:], mediaReference: previewMediaReference, threadId: threadId, replyToMessageId: replyToMessageId.flatMap { EngineMessageReplySubject(messageId: $0, quote: nil, innerSubject: nil) }, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: []))
                     }
                     messages = transformMessages(messages, showNames: showNames, silently: silently, sendPaidMessageStars: requiresStars[peerId])
                     shareSignals.append(enqueueMessages(account: currentContext.context.account, peerId: peerId, messages: messages))
@@ -2708,4 +2734,13 @@ private func restrictedSendingContentsText(peer: EnginePeer, presentationData: P
     }
     
     return presentationData.strings.Chat_SendAllowedContentPeerText(peer.compactDisplayTitle, itemListString).string
+}
+
+/// Shadowgram: links whose preview the share sheet loads ahead of sending: Telegram's own links
+/// (calls, invites, channels, ...), whose cards come from the server.
+private func shadowgramPrefetchesPreview(url: String) -> Bool {
+    guard let parsed = URL(string: url), let host = parsed.host?.lowercased() else {
+        return false
+    }
+    return host == "t.me" || host == "telegram.me" || host.hasSuffix(".t.me")
 }
