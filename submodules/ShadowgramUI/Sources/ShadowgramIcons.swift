@@ -40,7 +40,8 @@ public func shadowgramGhostNavigationIcon() -> UIImage? {
     }
 }
 
-/// Draws a crescent moon into `rect` (UIKit coordinates): a full disc with an offset disc cut out.
+/// Draws a crescent moon into `rect` (UIKit coordinates): a full disc with a disc cut out at the
+/// top left, so the filled part sits at the bottom right.
 private func drawMoon(in rect: CGRect, color: UIColor, context: CGContext) {
     let unit = rect.width / 24.0
     func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
@@ -48,10 +49,10 @@ private func drawMoon(in rect: CGRect, color: UIColor, context: CGContext) {
     }
 
     context.setFillColor(color.cgColor)
-    UIBezierPath(arcCenter: p(11.0, 13.0), radius: 8.5 * unit, startAngle: 0.0, endAngle: CGFloat.pi * 2.0, clockwise: true).fill()
+    UIBezierPath(arcCenter: p(13.0, 13.0), radius: 8.5 * unit, startAngle: 0.0, endAngle: CGFloat.pi * 2.0, clockwise: true).fill()
 
     context.setBlendMode(.clear)
-    UIBezierPath(arcCenter: p(16.2, 8.2), radius: 7.2 * unit, startAngle: 0.0, endAngle: CGFloat.pi * 2.0, clockwise: true).fill()
+    UIBezierPath(arcCenter: p(7.8, 8.2), radius: 7.2 * unit, startAngle: 0.0, endAngle: CGFloat.pi * 2.0, clockwise: true).fill()
     context.setBlendMode(.normal)
 }
 
