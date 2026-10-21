@@ -837,7 +837,10 @@ private final class NotificationServiceHandler {
         
         Logger.shared.log("NotificationService \(episode)", "Logging settings: (logToFile: \(loggingSettings.logToFile))")
         
-        Logger.shared.logToFile = loggingSettings.logToFile
+        // Shadowgram: the extension always writes its (short, redacted) log, so a notification that
+        // falls back to the server's "You have a new message" can be diagnosed without first finding
+        // the debug switch. Debug ▸ Send Notification Logs collects it.
+        Logger.shared.logToFile = true
         Logger.shared.logToConsole = loggingSettings.logToConsole
         Logger.shared.redactSensitiveData = loggingSettings.redactSensitiveData
 
@@ -857,6 +860,8 @@ private final class NotificationServiceHandler {
             isLockedMessage = nil
             isLockedStoryMessage = nil
         }
+        // Shadowgram: a locked app hides the text on purpose; say so, so it is not taken for a failure.
+        Logger.shared.log("NotificationService \(episode)", "App is locked: \(isLockedMessage != nil)")
         
         let incomingCallMessage: String
         if let notificationsPresentationData = try? Data(contentsOf: URL(fileURLWithPath: notificationsPresentationDataPath(rootPath: rootPath))), let notificationsPresentationDataValue = try? JSONDecoder().decode(NotificationsPresentationData.self, from: notificationsPresentationData) {
@@ -929,7 +934,20 @@ private final class NotificationServiceHandler {
             }
 
             guard let strongSelf = self, let recordId = recordId else {
-                Logger.shared.log("NotificationService \(episode)", "Couldn't find a matching decryption key")
+                // Shadowgram: which key the push was encrypted with, and which keys the accounts on
+                // this device know, to tell a stale push registration from a missing key.
+                var knownKeyIds: [String] = []
+                for (index, listRecord) in records.records.enumerated() {
+                    var keyIdString = "none"
+                    for attribute in listRecord.attributes {
+                        if case let .backupData(backupData) = attribute, let notificationEncryptionKeyId = backupData.data?.notificationEncryptionKeyId {
+                            keyIdString = notificationEncryptionKeyId.base64EncodedString()
+                        }
+                    }
+                    knownKeyIds.append("\(index)\(listRecord.id == records.currentRecord?.id ? " (current)" : ""): \(keyIdString)")
+                }
+                let payloadKeyId = notificationPayloadKeyId(data: payloadData)?.base64EncodedString() ?? "unreadable"
+                Logger.shared.log("NotificationService \(episode)", "Couldn't find a matching decryption key (payload key \(payloadKeyId), accounts: \(knownKeyIds.joined(separator: ", ")))")
 
                 let content = NotificationContent(isLockedMessage: nil)
                 updateCurrentContent(content)
