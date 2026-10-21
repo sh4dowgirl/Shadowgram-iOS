@@ -21,6 +21,26 @@ private final class AccountPresenceManagerImpl {
         case offline
     }
     
+    /// What the switches ask for: whether the app is in front and whether ghost mode hides online.
+    private struct PresenceTarget: Equatable {
+        let shouldKeepOnline: Bool
+        let sendsOnlineStatus: Bool
+        
+        var isGhost: Bool {
+            return !self.sendsOnlineStatus
+        }
+        
+        var mode: Mode {
+            if !self.shouldKeepOnline {
+                return .offline
+            } else if self.sendsOnlineStatus {
+                return .online
+            } else {
+                return .ghostForeground
+            }
+        }
+    }
+    
     private let queue: Queue
     private let network: Network
     let isPerformingUpdate = ValuePromise<Bool>(false, ignoreRepeated: true)
@@ -35,39 +55,36 @@ private final class AccountPresenceManagerImpl {
         self.queue = queue
         self.network = network
         
-        let sendsOnlineStatus = ShadowgramSettings.shared.valuesSignal
+        // Split into explicitly typed steps: as one chain the type checker gave up on it.
+        let sendsOnlineStatus: Signal<Bool, NoError> = ShadowgramSettings.shared.valuesSignal
         |> map { values -> Bool in
             return values.effectiveSendOnlineStatus
         }
         |> distinctUntilChanged
-        self.shouldKeepOnlinePresenceDisposable = (combineLatest(shouldKeepOnlinePresence, sendsOnlineStatus)
-        |> map { shouldKeepOnline, sendsOnlineStatus -> (Mode, Bool) in
-            if !shouldKeepOnline {
-                return (.offline, !sendsOnlineStatus)
-            } else if sendsOnlineStatus {
-                return (.online, false)
-            } else {
-                return (.ghostForeground, true)
-            }
+        let combined: Signal<(Bool, Bool), NoError> = combineLatest(shouldKeepOnlinePresence, sendsOnlineStatus)
+        let target: Signal<PresenceTarget, NoError> = combined
+        |> map { values -> PresenceTarget in
+            return PresenceTarget(shouldKeepOnline: values.0, sendsOnlineStatus: values.1)
         }
-        |> distinctUntilChanged(isEqual: { lhs, rhs in
-            return lhs.0 == rhs.0 && lhs.1 == rhs.1
+        |> distinctUntilChanged
+        let delivered: Signal<PresenceTarget, NoError> = target |> deliverOn(queue)
+        self.shouldKeepOnlinePresenceDisposable = delivered.start(next: { [weak self] target in
+            self?.apply(target)
         })
-        |> deliverOn(self.queue)).start(next: { [weak self] mode, isGhost in
-            guard let self else {
-                return
-            }
-            let previousMode = self.mode
-            if previousMode == mode {
-                return
-            }
-            self.mode = mode
-            if mode == .offline && previousMode == nil && !isGhost {
-                // Stock behaviour: nothing to report at launch in the background.
-                return
-            }
-            self.updatePresence(mode)
-        })
+    }
+    
+    private func apply(_ target: PresenceTarget) {
+        let mode = target.mode
+        let previousMode = self.mode
+        if previousMode == mode {
+            return
+        }
+        self.mode = mode
+        if mode == .offline && previousMode == nil && !target.isGhost {
+            // Stock behaviour: nothing to report at launch in the background.
+            return
+        }
+        self.updatePresence(mode)
     }
     
     deinit {

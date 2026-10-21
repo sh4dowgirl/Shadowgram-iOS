@@ -105,10 +105,12 @@ public final class ShadowgramPrivateChatCaptureGuard {
     public init(layers: @escaping () -> [CALayer]) {
         self.layers = layers
         self.privateChatIds = ShadowgramSettings.shared.values.privateChatIds
-        self.disposable = (ShadowgramSettings.shared.valuesSignal
-        |> map { $0.privateChatIds }
+        let privateChatIdsSignal: Signal<Set<Int64>, NoError> = ShadowgramSettings.shared.valuesSignal
+        |> map { values -> Set<Int64> in
+            return values.privateChatIds
+        }
         |> distinctUntilChanged
-        |> deliverOnMainQueue).start(next: { [weak self] privateChatIds in
+        self.disposable = (privateChatIdsSignal |> deliverOnMainQueue).start(next: { [weak self] privateChatIds in
             guard let self else {
                 return
             }
