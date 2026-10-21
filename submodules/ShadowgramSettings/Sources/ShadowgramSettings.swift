@@ -18,6 +18,9 @@ public struct ShadowgramSettingsValues: Equatable {
     public var sendTyping: Bool
     /// Ghost mode: report the account as online.
     public var sendOnlineStatus: Bool
+    /// Ghost mode: tell the server which stories were viewed. When off, stories are marked seen on
+    /// this device only and the author does not see the view.
+    public var sendStoryViews: Bool
     /// Move large groups out of "All" into a folder under the archive.
     public var groupsFolderEnabled: Bool
     /// Minimum member count for a group to go into the folder.
@@ -39,6 +42,7 @@ public struct ShadowgramSettingsValues: Equatable {
         sendReadReceipts: true,
         sendTyping: true,
         sendOnlineStatus: true,
+        sendStoryViews: true,
         groupsFolderEnabled: false,
         groupsFolderMinMembers: 100,
         showPeerIds: false,
@@ -47,13 +51,14 @@ public struct ShadowgramSettingsValues: Equatable {
         disableCameraSwipe: false
     )
 
-    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool) {
+    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool) {
         self.saveDeletedMessages = saveDeletedMessages
         self.unlimitedAccounts = unlimitedAccounts
         self.ghostModeEnabled = ghostModeEnabled
         self.sendReadReceipts = sendReadReceipts
         self.sendTyping = sendTyping
         self.sendOnlineStatus = sendOnlineStatus
+        self.sendStoryViews = sendStoryViews
         self.groupsFolderEnabled = groupsFolderEnabled
         self.groupsFolderMinMembers = groupsFolderMinMembers
         self.showPeerIds = showPeerIds
@@ -74,6 +79,10 @@ public struct ShadowgramSettingsValues: Equatable {
     public var effectiveSendOnlineStatus: Bool {
         return !self.ghostModeEnabled || self.sendOnlineStatus
     }
+
+    public var effectiveSendStoryViews: Bool {
+        return !self.ghostModeEnabled || self.sendStoryViews
+    }
 }
 
 /// Steps offered by the groups-folder slider.
@@ -89,6 +98,7 @@ public final class ShadowgramSettings {
         static let sendReadReceipts = "shadowgram.ghost.sendReadReceipts"
         static let sendTyping = "shadowgram.ghost.sendTyping"
         static let sendOnlineStatus = "shadowgram.ghost.sendOnlineStatus"
+        static let sendStoryViews = "shadowgram.ghost.sendStoryViews"
         static let groupsFolderEnabled = "shadowgram.groupsFolder.enabled"
         static let groupsFolderMinMembers = "shadowgram.groupsFolder.minMembers"
         static let showPeerIds = "shadowgram.showPeerIds"
@@ -119,6 +129,7 @@ public final class ShadowgramSettings {
             sendReadReceipts: bool(Key.sendReadReceipts, defaultValues.sendReadReceipts),
             sendTyping: bool(Key.sendTyping, defaultValues.sendTyping),
             sendOnlineStatus: bool(Key.sendOnlineStatus, defaultValues.sendOnlineStatus),
+            sendStoryViews: bool(Key.sendStoryViews, defaultValues.sendStoryViews),
             groupsFolderEnabled: bool(Key.groupsFolderEnabled, defaultValues.groupsFolderEnabled),
             groupsFolderMinMembers: max(0, minMembers),
             showPeerIds: bool(Key.showPeerIds, defaultValues.showPeerIds),
@@ -158,6 +169,7 @@ public final class ShadowgramSettings {
         self.defaults.set(values.sendReadReceipts, forKey: Key.sendReadReceipts)
         self.defaults.set(values.sendTyping, forKey: Key.sendTyping)
         self.defaults.set(values.sendOnlineStatus, forKey: Key.sendOnlineStatus)
+        self.defaults.set(values.sendStoryViews, forKey: Key.sendStoryViews)
         self.defaults.set(values.groupsFolderEnabled, forKey: Key.groupsFolderEnabled)
         self.defaults.set(NSNumber(value: values.groupsFolderMinMembers), forKey: Key.groupsFolderMinMembers)
         self.defaults.set(values.showPeerIds, forKey: Key.showPeerIds)

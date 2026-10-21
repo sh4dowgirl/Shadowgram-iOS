@@ -31,6 +31,15 @@
           "name" : "Plane",
           "position-specializations" : [
             {
+              "value" : {
+                "scale" : 1.45,
+                "translation-in-points" : [
+                  15,
+                  0
+                ]
+              }
+            },
+            {
               "idiom" : "watchOS",
               "value" : {
                 "scale" : 1.35,

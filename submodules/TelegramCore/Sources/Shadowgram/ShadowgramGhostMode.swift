@@ -13,3 +13,8 @@ func shadowgramSendsReadReceipts() -> Bool {
 func shadowgramSendsTyping() -> Bool {
     return ShadowgramSettings.shared.values.effectiveSendTyping
 }
+
+/// False while ghost mode hides story views: stories are then marked seen on this device only.
+func shadowgramSendsStoryViews() -> Bool {
+    return ShadowgramSettings.shared.values.effectiveSendStoryViews
+}

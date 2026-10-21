@@ -31,7 +31,8 @@ public struct ShadowgramStrings {
     public var sendReadReceipts: String { return t("Прочтение сообщений", "Read Receipts") }
     public var sendTyping: String { return t("«Печатает…»", "\"Typing…\"") }
     public var sendOnlineStatus: String { return t("Онлайн-статус", "Online Status") }
-    public var ghostModeFooter: String { return t("Выключенный пункт ничего не отправляет собеседникам. Без прочтения чаты отмечаются прочитанными только на этом устройстве. Без онлайн-статуса вы видны оффлайн, но отправка сообщения всё равно обновляет время последнего визита.", "A switched-off item sends nothing to others. Without read receipts, chats are marked read on this device only. Without online status you appear offline, but sending a message still updates your last seen time.") }
+    public var sendStoryViews: String { return t("Отправка просмотра историй", "Story Views") }
+    public var ghostModeFooter: String { return t("Выключенный пункт ничего не отправляет собеседникам. Без прочтения чаты отмечаются прочитанными только на этом устройстве. Без онлайн-статуса вы видны оффлайн, но отправка сообщения всё равно обновляет время последнего визита. Без отправки просмотра истории отмечаются просмотренными только на этом устройстве, и автор не увидит вас среди зрителей.", "A switched-off item sends nothing to others. Without read receipts, chats are marked read on this device only. Without online status you appear offline, but sending a message still updates your last seen time. Without story views, stories are marked seen on this device only and the author does not see you among the viewers.") }
 
     public var groupsFolderHeader: String { return t("ПАПКА С ГРУППАМИ", "GROUPS FOLDER") }
     public var groupsFolder: String { return t("Папка с группами", "Groups Folder") }

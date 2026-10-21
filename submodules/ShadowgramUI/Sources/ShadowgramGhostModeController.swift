@@ -25,6 +25,7 @@ private enum ShadowgramGhostModeEntry: ItemListNodeEntry {
     case readReceipts(Bool)
     case typing(Bool)
     case onlineStatus(Bool)
+    case storyViews(Bool)
     case footer
 
     var section: ItemListSectionId {
@@ -39,8 +40,10 @@ private enum ShadowgramGhostModeEntry: ItemListNodeEntry {
             return 1
         case .onlineStatus:
             return 2
-        case .footer:
+        case .storyViews:
             return 3
+        case .footer:
+            return 4
         }
     }
 
@@ -63,6 +66,10 @@ private enum ShadowgramGhostModeEntry: ItemListNodeEntry {
         case let .onlineStatus(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.sendOnlineStatus, value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { $0.sendOnlineStatus = value }
+            })
+        case let .storyViews(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.sendStoryViews, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.sendStoryViews = value }
             })
         case .footer:
             return ItemListTextItem(presentationData: presentationData, text: .plain(strings.ghostModeFooter), sectionId: self.section)
@@ -94,6 +101,7 @@ public func shadowgramGhostModeController(context: AccountContext) -> ViewContro
             .readReceipts(values.sendReadReceipts),
             .typing(values.sendTyping),
             .onlineStatus(values.sendOnlineStatus),
+            .storyViews(values.sendStoryViews),
             .footer
         ]
         let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: entries, style: .blocks, animateChanges: true)

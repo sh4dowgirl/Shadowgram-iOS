@@ -2079,6 +2079,10 @@ func _internal_markStoryAsSeen(account: Account, peerId: PeerId, id: Int32, asPi
             guard let inputPeer = inputPeer else {
                 return .complete()
             }
+            // Shadowgram ghost mode: the view is not reported.
+            if !shadowgramSendsStoryViews() {
+                return .complete()
+            }
             
             #if DEBUG && false
             if "".isEmpty {
@@ -2102,7 +2106,11 @@ func _internal_markStoryAsSeen(account: Account, peerId: PeerId, id: Int32, asPi
             
             #if DEBUG && false
             #else
-            _internal_addSynchronizeViewStoriesOperation(peerId: peerId, storyId: id, transaction: transaction)
+            // Shadowgram ghost mode: the story is marked seen locally only (above), nothing is queued
+            // for the server.
+            if shadowgramSendsStoryViews() {
+                _internal_addSynchronizeViewStoriesOperation(peerId: peerId, storyId: id, transaction: transaction)
+            }
             #endif
             
             return transaction.getPeer(peerId).flatMap(apiInputUser)
