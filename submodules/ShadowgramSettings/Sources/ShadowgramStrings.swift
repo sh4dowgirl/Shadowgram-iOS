@@ -64,6 +64,14 @@ extension ShadowgramStrings {
     public var messagesExtraHeader: String { return t("СООБЩЕНИЯ", "MESSAGES") }
     public var keepEditHistory: String { return t("Сохранять историю правок", "Keep Edit History") }
     public var keepEditHistoryFooter: String { return t("У отредактированных собеседником сообщений появится пункт «История правок» в меню по долгому нажатию.", "Edited messages gain an \"Edit History\" item in the long-press menu, with the earlier versions kept on this device.") }
+
+    public var privacyHeader: String { return t("ПРИВАТНОСТЬ И ОГРАНИЧЕНИЯ", "PRIVACY & RESTRICTIONS") }
+    public var showExactLastSeen: String { return t("Точное время в сети", "Exact Last Seen") }
+    public var showExactLastSeenFooter: String { return t("Показывает точное время последнего визита пользователя, даже если он скрыл его в настройках приватности. Работает только при наличии данных, которые Telegram передаёт для сортировки контактов.", "Shows the exact last seen time even when a user hides it in privacy settings. Works only when data is available — Telegram transmits it for contact sorting.") }
+    public var bypassCopyProtection: String { return t("Снять защиту от копирования", "Bypass Copy Protection") }
+    public var bypassCopyProtectionFooter: String { return t("Разрешает пересылку, копирование текста, скриншоты и запись экрана в чатах с включённой защитой контента и в секретных чатах.", "Allows forwarding, text copying, screenshots and screen recording in chats with content protection and in secret chats.") }
+    public var bypassViewOnce: String { return t("Одноразовые медиа без ограничений", "Unlimited View-Once Media") }
+    public var bypassViewOnceFooter: String { return t("Одноразовые фото и видео можно просматривать сколько угодно раз. Отправитель не получит уведомления о просмотре, скриншоты и запись экрана тоже не будут ограничены.", "View-once photos and videos can be viewed unlimited times. The sender won't be notified, and screenshots and screen recording won't be restricted.") }
 }
 
 extension ShadowgramStrings {

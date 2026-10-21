@@ -6,6 +6,7 @@ import Display
 import AsyncDisplayKit
 import TelegramCore
 import SafariServices
+import ShadowgramSettings
 import UniformTypeIdentifiers
 import Intents
 import LegacyComponents
@@ -7790,7 +7791,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     // display node reparented and its layout updated, so viewDidAppear never runs for it.
     private func setupScreenCaptureDetectionIfNeeded() {
         if case let .peer(peerId) = self.chatLocation, self.screenCaptureManager == nil {
-            if peerId.namespace == Namespaces.Peer.SecretChat {
+            if peerId.namespace == Namespaces.Peer.SecretChat, !ShadowgramSettings.shared.values.bypassCopyProtection {
                 self.screenCaptureManager = ScreenCaptureDetectionManager(check: { [weak self] in
                     // Returning false keeps the screen-recording poll alive until the chat is actually
                     // visible in the foreground, so a recording started behind a covering screen or while
@@ -7820,12 +7821,12 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                         return false
                     }
                 })
-            } else if peerId.namespace == Namespaces.Peer.CloudUser {
+            } else if peerId.namespace == Namespaces.Peer.CloudUser, !ShadowgramSettings.shared.values.bypassViewOnce {
                 self.screenCaptureManager = ScreenCaptureDetectionManager(check: { [weak self] in
                     guard let self else {
                         return false
                     }
-                    
+
                     let _ = (self.context.sharedContext.mediaManager.globalMediaPlayerState
                     |> take(1)
                     |> deliverOnMainQueue).startStandalone(next: { [weak self] playlistStateAndType in

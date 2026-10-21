@@ -26,6 +26,7 @@ private enum ShadowgramExtraSettingsSection: Int32 {
     case groups
     case interface
     case messagesExtra
+    case privacy
 }
 
 private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
@@ -59,6 +60,14 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
     case keepEditHistory(Bool)
     case keepEditHistoryFooter
 
+    case privacyHeader
+    case showExactLastSeen(Bool)
+    case showExactLastSeenFooter
+    case bypassCopyProtection(Bool)
+    case bypassCopyProtectionFooter
+    case bypassViewOnce(Bool)
+    case bypassViewOnceFooter
+
     var section: ItemListSectionId {
         switch self {
         case .messagesHeader, .saveDeletedMessages, .messagesFooter:
@@ -73,6 +82,8 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return ShadowgramExtraSettingsSection.interface.rawValue
         case .messagesExtraHeader, .keepEditHistory, .keepEditHistoryFooter:
             return ShadowgramExtraSettingsSection.messagesExtra.rawValue
+        case .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter:
+            return ShadowgramExtraSettingsSection.privacy.rawValue
         }
     }
 
@@ -126,6 +137,20 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return 22
         case .keepEditHistoryFooter:
             return 23
+        case .privacyHeader:
+            return 24
+        case .showExactLastSeen:
+            return 25
+        case .showExactLastSeenFooter:
+            return 26
+        case .bypassCopyProtection:
+            return 27
+        case .bypassCopyProtectionFooter:
+            return 28
+        case .bypassViewOnce:
+            return 29
+        case .bypassViewOnceFooter:
+            return 30
         }
     }
 
@@ -205,6 +230,26 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             })
         case .keepEditHistoryFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain(strings.keepEditHistoryFooter), sectionId: self.section)
+        case .privacyHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.privacyHeader, sectionId: self.section)
+        case let .showExactLastSeen(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.showExactLastSeen, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.showExactLastSeen = value }
+            })
+        case .showExactLastSeenFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.showExactLastSeenFooter), sectionId: self.section)
+        case let .bypassCopyProtection(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.bypassCopyProtection, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.bypassCopyProtection = value }
+            })
+        case .bypassCopyProtectionFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.bypassCopyProtectionFooter), sectionId: self.section)
+        case let .bypassViewOnce(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.bypassViewOnce, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.bypassViewOnce = value }
+            })
+        case .bypassViewOnceFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.bypassViewOnceFooter), sectionId: self.section)
         }
     }
 }
@@ -245,6 +290,14 @@ private func shadowgramExtraSettingsEntries(values: ShadowgramSettingsValues) ->
     entries.append(.messagesExtraHeader)
     entries.append(.keepEditHistory(values.keepEditHistory))
     entries.append(.keepEditHistoryFooter)
+
+    entries.append(.privacyHeader)
+    entries.append(.showExactLastSeen(values.showExactLastSeen))
+    entries.append(.showExactLastSeenFooter)
+    entries.append(.bypassCopyProtection(values.bypassCopyProtection))
+    entries.append(.bypassCopyProtectionFooter)
+    entries.append(.bypassViewOnce(values.bypassViewOnce))
+    entries.append(.bypassViewOnceFooter)
 
     return entries
 }

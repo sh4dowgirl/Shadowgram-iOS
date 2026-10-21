@@ -31,6 +31,12 @@ public struct ShadowgramSettingsValues: Equatable {
     public var keepEditHistory: Bool
     /// Replace the left-swipe camera panel in the main chat list with a plain left swipe.
     public var disableCameraSwipe: Bool
+    /// Show exact last-seen timestamps even when users hide them.
+    public var showExactLastSeen: Bool
+    /// Allow forwarding, copying and screenshots in chats with copy protection / secret chats.
+    public var bypassCopyProtection: Bool
+    /// View once-view media unlimited times without notifying the sender.
+    public var bypassViewOnce: Bool
 
     public static let defaultValues = ShadowgramSettingsValues(
         saveDeletedMessages: false,
@@ -44,10 +50,13 @@ public struct ShadowgramSettingsValues: Equatable {
         showPeerIds: false,
         openByPeerId: false,
         keepEditHistory: false,
-        disableCameraSwipe: false
+        disableCameraSwipe: false,
+        showExactLastSeen: false,
+        bypassCopyProtection: false,
+        bypassViewOnce: false
     )
 
-    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool) {
+    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool) {
         self.saveDeletedMessages = saveDeletedMessages
         self.unlimitedAccounts = unlimitedAccounts
         self.ghostModeEnabled = ghostModeEnabled
@@ -60,6 +69,9 @@ public struct ShadowgramSettingsValues: Equatable {
         self.openByPeerId = openByPeerId
         self.keepEditHistory = keepEditHistory
         self.disableCameraSwipe = disableCameraSwipe
+        self.showExactLastSeen = showExactLastSeen
+        self.bypassCopyProtection = bypassCopyProtection
+        self.bypassViewOnce = bypassViewOnce
     }
 
     /// What the client actually sends: everything unless ghost mode is on and hides it.
@@ -95,6 +107,9 @@ public final class ShadowgramSettings {
         static let openByPeerId = "shadowgram.openByPeerId"
         static let keepEditHistory = "shadowgram.keepEditHistory"
         static let disableCameraSwipe = "shadowgram.disableCameraSwipe"
+        static let showExactLastSeen = "shadowgram.showExactLastSeen"
+        static let bypassCopyProtection = "shadowgram.bypassCopyProtection"
+        static let bypassViewOnce = "shadowgram.bypassViewOnce"
     }
 
     private let defaults: UserDefaults
@@ -124,7 +139,10 @@ public final class ShadowgramSettings {
             showPeerIds: bool(Key.showPeerIds, defaultValues.showPeerIds),
             openByPeerId: bool(Key.openByPeerId, defaultValues.openByPeerId),
             keepEditHistory: bool(Key.keepEditHistory, defaultValues.keepEditHistory),
-            disableCameraSwipe: bool(Key.disableCameraSwipe, defaultValues.disableCameraSwipe)
+            disableCameraSwipe: bool(Key.disableCameraSwipe, defaultValues.disableCameraSwipe),
+            showExactLastSeen: bool(Key.showExactLastSeen, defaultValues.showExactLastSeen),
+            bypassCopyProtection: bool(Key.bypassCopyProtection, defaultValues.bypassCopyProtection),
+            bypassViewOnce: bool(Key.bypassViewOnce, defaultValues.bypassViewOnce)
         )
         self.currentValues = values
         self.valuesPromise = ValuePromise(values, ignoreRepeated: true)
@@ -164,6 +182,9 @@ public final class ShadowgramSettings {
         self.defaults.set(values.openByPeerId, forKey: Key.openByPeerId)
         self.defaults.set(values.keepEditHistory, forKey: Key.keepEditHistory)
         self.defaults.set(values.disableCameraSwipe, forKey: Key.disableCameraSwipe)
+        self.defaults.set(values.showExactLastSeen, forKey: Key.showExactLastSeen)
+        self.defaults.set(values.bypassCopyProtection, forKey: Key.bypassCopyProtection)
+        self.defaults.set(values.bypassViewOnce, forKey: Key.bypassViewOnce)
 
         self.valuesPromise.set(values)
     }

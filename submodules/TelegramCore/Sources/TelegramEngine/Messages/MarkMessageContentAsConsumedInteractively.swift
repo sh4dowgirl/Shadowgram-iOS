@@ -2,43 +2,51 @@ import Foundation
 import Postbox
 import TelegramApi
 import SwiftSignalKit
+import ShadowgramSettings
 
 func _internal_markMessageContentAsConsumedInteractively(postbox: Postbox, messageId: MessageId) -> Signal<Void, NoError> {
     return postbox.transaction { transaction -> Void in
         if let message = transaction.getMessage(messageId), message.flags.contains(.Incoming) {
+            let isViewOnce = message.minAutoremoveOrClearTimeout == viewOnceTimeout
+            let shadowgramBypassViewOnce = isViewOnce && ShadowgramSettings.shared.values.bypassViewOnce
+
             var updateMessage = false
             var updatedAttributes = message.attributes
-            
+
             for i in 0 ..< updatedAttributes.count {
                 if let attribute = updatedAttributes[i] as? ConsumableContentMessageAttribute {
                     if !attribute.consumed {
-                        updatedAttributes[i] = ConsumableContentMessageAttribute(consumed: true)
-                        updateMessage = true
-                        
-                        if message.id.peerId.namespace == Namespaces.Peer.SecretChat {
-                            if let state = transaction.getPeerChatState(message.id.peerId) as? SecretChatState {
-                                var layer: SecretChatLayer?
-                                switch state.embeddedState {
-                                    case .terminated, .handshake:
-                                        break
-                                    case .basicLayer:
-                                        layer = .layer8
-                                    case let .sequenceBasedLayer(sequenceState):
-                                        layer = sequenceState.layerNegotiationState.activeLayer.secretChatLayer
-                                }
-                                if let layer = layer {
-                                    var globallyUniqueIds: [Int64] = []
-                                    if let globallyUniqueId = message.globallyUniqueId {
-                                        globallyUniqueIds.append(globallyUniqueId)
-                                        let updatedState = addSecretChatOutgoingOperation(transaction: transaction, peerId: message.id.peerId, operation: SecretChatOutgoingOperationContents.readMessagesContent(layer: layer, actionGloballyUniqueId: Int64.random(in: Int64.min ... Int64.max), globallyUniqueIds: globallyUniqueIds), state: state)
-                                        if updatedState != state {
-                                            transaction.setPeerChatState(message.id.peerId, state: updatedState)
+                        if shadowgramBypassViewOnce {
+                            updateMessage = false
+                        } else {
+                            updatedAttributes[i] = ConsumableContentMessageAttribute(consumed: true)
+                            updateMessage = true
+
+                            if message.id.peerId.namespace == Namespaces.Peer.SecretChat {
+                                if let state = transaction.getPeerChatState(message.id.peerId) as? SecretChatState {
+                                    var layer: SecretChatLayer?
+                                    switch state.embeddedState {
+                                        case .terminated, .handshake:
+                                            break
+                                        case .basicLayer:
+                                            layer = .layer8
+                                        case let .sequenceBasedLayer(sequenceState):
+                                            layer = sequenceState.layerNegotiationState.activeLayer.secretChatLayer
+                                    }
+                                    if let layer = layer {
+                                        var globallyUniqueIds: [Int64] = []
+                                        if let globallyUniqueId = message.globallyUniqueId {
+                                            globallyUniqueIds.append(globallyUniqueId)
+                                            let updatedState = addSecretChatOutgoingOperation(transaction: transaction, peerId: message.id.peerId, operation: SecretChatOutgoingOperationContents.readMessagesContent(layer: layer, actionGloballyUniqueId: Int64.random(in: Int64.min ... Int64.max), globallyUniqueIds: globallyUniqueIds), state: state)
+                                            if updatedState != state {
+                                                transaction.setPeerChatState(message.id.peerId, state: updatedState)
+                                            }
                                         }
                                     }
                                 }
+                            } else {
+                                addSynchronizeConsumeMessageContentsOperation(transaction: transaction, messageIds: [message.id])
                             }
-                        } else {
-                            addSynchronizeConsumeMessageContentsOperation(transaction: transaction, messageIds: [message.id])
                         }
                     }
                 } else if let attribute = updatedAttributes[i] as? ConsumablePersonalMentionMessageAttribute, !attribute.consumed {
@@ -46,74 +54,76 @@ func _internal_markMessageContentAsConsumedInteractively(postbox: Postbox, messa
                     updatedAttributes[i] = ConsumablePersonalMentionMessageAttribute(consumed: attribute.consumed, pending: true)
                 }
             }
-            
-            let timestamp = Int32(CFAbsoluteTimeGetCurrent() + NSTimeIntervalSince1970)
-            for i in 0 ..< updatedAttributes.count {
-                if let attribute = updatedAttributes[i] as? AutoremoveTimeoutMessageAttribute {
-                    if attribute.countdownBeginTime == nil || attribute.countdownBeginTime == 0 {
-                        var timeout = attribute.timeout
-                        if let duration = message.secretMediaDuration {
-                            timeout = max(timeout, Int32(duration))
-                        }
-                        updatedAttributes[i] = AutoremoveTimeoutMessageAttribute(timeout: timeout, countdownBeginTime: timestamp)
-                        updateMessage = true
-                        
-                        if messageId.peerId.namespace == Namespaces.Peer.SecretChat {
-                            var layer: SecretChatLayer?
-                            let state = transaction.getPeerChatState(message.id.peerId) as? SecretChatState
-                            if let state = state {
-                                switch state.embeddedState {
-                                    case .terminated, .handshake:
-                                        break
-                                    case .basicLayer:
-                                        layer = .layer8
-                                    case let .sequenceBasedLayer(sequenceState):
-                                        layer = sequenceState.layerNegotiationState.activeLayer.secretChatLayer
+
+            if !shadowgramBypassViewOnce {
+                let timestamp = Int32(CFAbsoluteTimeGetCurrent() + NSTimeIntervalSince1970)
+                for i in 0 ..< updatedAttributes.count {
+                    if let attribute = updatedAttributes[i] as? AutoremoveTimeoutMessageAttribute {
+                        if attribute.countdownBeginTime == nil || attribute.countdownBeginTime == 0 {
+                            var timeout = attribute.timeout
+                            if let duration = message.secretMediaDuration {
+                                timeout = max(timeout, Int32(duration))
+                            }
+                            updatedAttributes[i] = AutoremoveTimeoutMessageAttribute(timeout: timeout, countdownBeginTime: timestamp)
+                            updateMessage = true
+
+                            if messageId.peerId.namespace == Namespaces.Peer.SecretChat {
+                                var layer: SecretChatLayer?
+                                let state = transaction.getPeerChatState(message.id.peerId) as? SecretChatState
+                                if let state = state {
+                                    switch state.embeddedState {
+                                        case .terminated, .handshake:
+                                            break
+                                        case .basicLayer:
+                                            layer = .layer8
+                                        case let .sequenceBasedLayer(sequenceState):
+                                            layer = sequenceState.layerNegotiationState.activeLayer.secretChatLayer
+                                    }
+                                }
+
+                                if let state = state, let layer = layer, let globallyUniqueId = message.globallyUniqueId {
+                                    let updatedState = addSecretChatOutgoingOperation(transaction: transaction, peerId: messageId.peerId, operation: .readMessagesContent(layer: layer, actionGloballyUniqueId: Int64.random(in: Int64.min ... Int64.max), globallyUniqueIds: [globallyUniqueId]), state: state)
+                                    if updatedState != state {
+                                        transaction.setPeerChatState(messageId.peerId, state: updatedState)
+                                    }
                                 }
                             }
-                            
-                            if let state = state, let layer = layer, let globallyUniqueId = message.globallyUniqueId {
-                                let updatedState = addSecretChatOutgoingOperation(transaction: transaction, peerId: messageId.peerId, operation: .readMessagesContent(layer: layer, actionGloballyUniqueId: Int64.random(in: Int64.min ... Int64.max), globallyUniqueIds: [globallyUniqueId]), state: state)
-                                if updatedState != state {
-                                    transaction.setPeerChatState(messageId.peerId, state: updatedState)
-                                }
-                            }
                         }
-                    }
-                } else if let attribute = updatedAttributes[i] as? AutoclearTimeoutMessageAttribute {
-                    if attribute.countdownBeginTime == nil || attribute.countdownBeginTime == 0 {
-                        var timeout = attribute.timeout
-                        if let duration = message.secretMediaDuration, timeout != viewOnceTimeout {
-                            timeout = max(timeout, Int32(duration))
-                        }
-                        updatedAttributes[i] = AutoclearTimeoutMessageAttribute(timeout: timeout, countdownBeginTime: timestamp)
-                        updateMessage = true
-                        
-                        if messageId.peerId.namespace == Namespaces.Peer.SecretChat {
-                            var layer: SecretChatLayer?
-                            let state = transaction.getPeerChatState(message.id.peerId) as? SecretChatState
-                            if let state = state {
-                                switch state.embeddedState {
-                                    case .terminated, .handshake:
-                                        break
-                                    case .basicLayer:
-                                        layer = .layer8
-                                    case let .sequenceBasedLayer(sequenceState):
-                                        layer = sequenceState.layerNegotiationState.activeLayer.secretChatLayer
-                                }
+                    } else if let attribute = updatedAttributes[i] as? AutoclearTimeoutMessageAttribute {
+                        if attribute.countdownBeginTime == nil || attribute.countdownBeginTime == 0 {
+                            var timeout = attribute.timeout
+                            if let duration = message.secretMediaDuration, timeout != viewOnceTimeout {
+                                timeout = max(timeout, Int32(duration))
                             }
-                            
-                            if let state = state, let layer = layer, let globallyUniqueId = message.globallyUniqueId {
-                                let updatedState = addSecretChatOutgoingOperation(transaction: transaction, peerId: messageId.peerId, operation: .readMessagesContent(layer: layer, actionGloballyUniqueId: Int64.random(in: Int64.min ... Int64.max), globallyUniqueIds: [globallyUniqueId]), state: state)
-                                if updatedState != state {
-                                    transaction.setPeerChatState(messageId.peerId, state: updatedState)
+                            updatedAttributes[i] = AutoclearTimeoutMessageAttribute(timeout: timeout, countdownBeginTime: timestamp)
+                            updateMessage = true
+
+                            if messageId.peerId.namespace == Namespaces.Peer.SecretChat {
+                                var layer: SecretChatLayer?
+                                let state = transaction.getPeerChatState(message.id.peerId) as? SecretChatState
+                                if let state = state {
+                                    switch state.embeddedState {
+                                        case .terminated, .handshake:
+                                            break
+                                        case .basicLayer:
+                                            layer = .layer8
+                                        case let .sequenceBasedLayer(sequenceState):
+                                            layer = sequenceState.layerNegotiationState.activeLayer.secretChatLayer
+                                    }
+                                }
+
+                                if let state = state, let layer = layer, let globallyUniqueId = message.globallyUniqueId {
+                                    let updatedState = addSecretChatOutgoingOperation(transaction: transaction, peerId: messageId.peerId, operation: .readMessagesContent(layer: layer, actionGloballyUniqueId: Int64.random(in: Int64.min ... Int64.max), globallyUniqueIds: [globallyUniqueId]), state: state)
+                                    if updatedState != state {
+                                        transaction.setPeerChatState(messageId.peerId, state: updatedState)
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-            
+
             if updateMessage {
                 transaction.updateMessage(message.id, update: { currentMessage in
                     var storeForwardInfo: StoreMessageForwardInfo?
