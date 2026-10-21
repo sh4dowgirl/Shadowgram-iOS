@@ -558,7 +558,11 @@ official_communication_notifications_fragment = """
 <key>com.apple.developer.usernotifications.communication</key>
 <true/>
 """
-communication_notifications_fragment = official_communication_notifications_fragment if telegram_bundle_id in official_bundle_ids else ""
+# Shadowgram: for every bundle id, not only the official ones. Without it iOS ignores the sender
+# (INSendMessageIntent) the notification service attaches, so notifications show no avatar. The App
+# ID needs the "Communication Notifications" capability, and its provisioning profile must be
+# generated after it was turned on, or the signed app will not install.
+communication_notifications_fragment = official_communication_notifications_fragment
 
 official_notification_filtering_fragment = """
 <key>com.apple.developer.usernotifications.filtering</key>
