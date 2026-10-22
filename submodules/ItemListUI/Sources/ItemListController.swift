@@ -122,6 +122,10 @@ open class ItemListController: ViewController, KeyShortcutResponder, Presentable
     private var segmentedTitleView: ItemListControllerSegmentedTitleView?
     private var tabsNavigationContentNode: ItemListControllerTabsContentNode?
     
+    // The bar's buttons as built from the state.
+    private var fullLeftBarButtonItem: UIBarButtonItem?
+    private var fullRightBarButtonItems: [UIBarButtonItem] = []
+    
     private var presentationData: ItemListPresentationData
     private let hideNavigationBarBackground: Bool
     
@@ -283,7 +287,7 @@ open class ItemListController: ViewController, KeyShortcutResponder, Presentable
         self.presentationData = presentationData
         self.hideNavigationBarBackground = hideNavigationBarBackground
         
-        super.init(navigationBarPresentationData: NavigationBarPresentationData(theme: NavigationBarTheme(rootControllerTheme: presentationData.theme, hideBackground: hideNavigationBarBackground, hideSeparator: hideNavigationBarBackground, style: .glass), strings: NavigationBarStrings(presentationStrings: presentationData.strings)))
+        super.init(navigationBarPresentationData: NavigationBarPresentationData(theme: NavigationBarTheme(rootControllerTheme: presentationData.theme), strings: NavigationBarStrings(presentationStrings: presentationData.strings)))
         
         self.isOpaqueWhenInOverlay = true
         self.blocksBackgroundWhenInOverlay = true
@@ -395,7 +399,6 @@ open class ItemListController: ViewController, KeyShortcutResponder, Presentable
                                     if let validLayout = strongSelf.validLayout {
                                         strongSelf.updateNavigationBarLayout(validLayout, transition: .immediate)
                                     }
-                                    strongSelf.navigationBar?.updateBackgroundAlpha(1.0, transition: .immediate)
                                 }
                                 if strongSelf.isNodeLoaded {
                                     strongSelf.controllerNode.panTransitionFractionChanged = { [weak self] transitionFraction in
@@ -456,13 +459,13 @@ open class ItemListController: ViewController, KeyShortcutResponder, Presentable
                                     })
                             }
                             strongSelf.leftNavigationButtonTitleAndStyle = (leftNavigationButton.content, leftNavigationButton.style)
-                            strongSelf.navigationItem.setLeftBarButton(item, animated: false)
+                            strongSelf.fullLeftBarButtonItem = item
                             item.isEnabled = leftNavigationButton.enabled
                         } else {
                             strongSelf.leftNavigationButtonTitleAndStyle = nil
-                            strongSelf.navigationItem.setLeftBarButton(nil, animated: false)
+                            strongSelf.fullLeftBarButtonItem = nil
                         }
-                    } else if let barButtonItem = strongSelf.navigationItem.leftBarButtonItem, let leftNavigationButton = controllerState.leftNavigationButton, leftNavigationButton.enabled != barButtonItem.isEnabled {
+                    } else if let barButtonItem = strongSelf.fullLeftBarButtonItem, let leftNavigationButton = controllerState.leftNavigationButton, leftNavigationButton.enabled != barButtonItem.isEnabled {
                         barButtonItem.isEnabled = leftNavigationButton.enabled
                     }
                     
@@ -532,7 +535,7 @@ open class ItemListController: ViewController, KeyShortcutResponder, Presentable
                             items.append(item)
                             index += 1
                         }
-                        strongSelf.navigationItem.setRightBarButtonItems(items, animated: false)
+                        strongSelf.fullRightBarButtonItems = items
                         index = 0
                         for (_, _, enabled) in rightNavigationButtonTitleAndStyle {
                             items[index].isEnabled = enabled
@@ -540,7 +543,9 @@ open class ItemListController: ViewController, KeyShortcutResponder, Presentable
                         }
                     } else {
                         for i in 0 ..< rightNavigationButtonTitleAndStyle.count {
-                            strongSelf.navigationItem.rightBarButtonItems?[i].isEnabled = rightNavigationButtonTitleAndStyle[i].2
+                            if i < strongSelf.fullRightBarButtonItems.count {
+                                strongSelf.fullRightBarButtonItems[i].isEnabled = rightNavigationButtonTitleAndStyle[i].2
+                            }
                         }
                     }
                     
@@ -557,7 +562,7 @@ open class ItemListController: ViewController, KeyShortcutResponder, Presentable
                     if strongSelf.presentationData != controllerState.presentationData || isFirstTime {
                         strongSelf.presentationData = controllerState.presentationData
                         
-                        strongSelf.navigationBar?.updatePresentationData(NavigationBarPresentationData(theme: NavigationBarTheme(rootControllerTheme: strongSelf.presentationData.theme, hideBackground: strongSelf.hideNavigationBarBackground, hideSeparator: strongSelf.hideNavigationBarBackground, edgeEffectColor: state.0.style == .blocks ? strongSelf.presentationData.theme.list.blocksBackgroundColor : strongSelf.presentationData.theme.list.plainBackgroundColor, style: .glass), strings: NavigationBarStrings(presentationStrings: strongSelf.presentationData.strings)), transition: .immediate)
+                        strongSelf.navigationBar?.updatePresentationData(NavigationBarPresentationData(theme: NavigationBarTheme(rootControllerTheme: strongSelf.presentationData.theme, edgeEffectColor: state.0.style == .blocks ? strongSelf.presentationData.theme.list.blocksBackgroundColor : strongSelf.presentationData.theme.list.plainBackgroundColor), strings: NavigationBarStrings(presentationStrings: strongSelf.presentationData.strings)), transition: .immediate)
                         strongSelf.statusBar.updateStatusBarStyle(strongSelf.presentationData.theme.rootController.statusBarStyle.style, animated: true)
                         
                         strongSelf.segmentedTitleView?.theme = controllerState.presentationData.theme
@@ -566,14 +571,16 @@ open class ItemListController: ViewController, KeyShortcutResponder, Presentable
                             titleView.updateTheme(theme: controllerState.presentationData.theme)
                         }
                         
-                        var items = strongSelf.navigationItem.rightBarButtonItems ?? []
+                        var items = strongSelf.fullRightBarButtonItems
                         for i in 0 ..< strongSelf.rightNavigationButtonTitleAndStyle.count {
                             if case .activity = strongSelf.rightNavigationButtonTitleAndStyle[i].1 {
                                 items[i] = UIBarButtonItem(customDisplayNode: ProgressNavigationButtonNode(color: controllerState.presentationData.theme.rootController.navigationBar.controlColor))!
                             }
                         }
-                        strongSelf.navigationItem.setRightBarButtonItems(items, animated: false)
+                        strongSelf.fullRightBarButtonItems = items
                     }
+                    
+                    strongSelf.applyNavigationButtons(animated: !isFirstTime)
                 }
             }
         }
@@ -605,10 +612,11 @@ open class ItemListController: ViewController, KeyShortcutResponder, Presentable
     }
     
     override open func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
-        super.containerLayoutUpdated(layout, transition: transition)
-        
         self.validLayout = layout
         
+        super.containerLayoutUpdated(layout, transition: transition)
+        
+        self.controllerNode.navigationBarSideColumn = self.navigationBarSideColumnExtent(layout: layout)
         self.controllerNode.containerLayoutUpdated(layout, navigationBarHeight: self.cleanNavigationHeight, transition: transition, additionalInsets: self.additionalInsets)
     }
 
@@ -622,6 +630,18 @@ open class ItemListController: ViewController, KeyShortcutResponder, Presentable
     
     @objc func secondaryRightNavigationButtonPressed() {
         self.navigationButtonActions.secondaryRight?()
+    }
+    
+    /// Gives the bar the buttons built from the state. Changes after the first state animate (Edit <-> Done, a
+    /// Cancel replacing the back button), as UIKit's edit button does: the bar runs iOS 27's capsule animation.
+    private final func applyNavigationButtons(animated: Bool) {
+        if self.navigationItem.leftBarButtonItem !== self.fullLeftBarButtonItem {
+            self.navigationItem.setLeftBarButton(self.fullLeftBarButtonItem, animated: animated)
+        }
+        let currentRightItems = self.navigationItem.rightBarButtonItems ?? []
+        if currentRightItems.count != self.fullRightBarButtonItems.count || zip(currentRightItems, self.fullRightBarButtonItems).contains(where: { $0 !== $1 }) {
+            self.navigationItem.setRightBarButtonItems(self.fullRightBarButtonItems, animated: animated)
+        }
     }
     
     override open func viewDidAppear(_ animated: Bool) {
