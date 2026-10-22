@@ -21,10 +21,10 @@ env:
 
 jobs:
   build:
-    # macos-26 нужен потому, что versions.json требует Xcode 26.6, он есть в этом образе.
+    # xcode-27 нужен потому, что versions.json требует Xcode 27.1, он есть в этом образе (только arm64).
     # Если не хватит памяти или диска, задайте в Settings -> Variables переменную
-    # RUNNER_LABEL = macos-26-xlarge (платный, более мощный runner).
-    runs-on: ${{ vars.RUNNER_LABEL || 'macos-26' }}
+    # RUNNER_LABEL = xcode-27-xlarge (платный, более мощный runner).
+    runs-on: ${{ vars.RUNNER_LABEL || 'xcode-27' }}
     timeout-minutes: 360
     env:
       HAS_ARTIFACT_PASSPHRASE: ${{ secrets.ARTIFACT_PASSPHRASE != '' }}
