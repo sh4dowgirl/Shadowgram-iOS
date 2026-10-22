@@ -17,6 +17,7 @@ swift_library(
         "//submodules/Display",
         "//submodules/ComponentFlow",
         "//submodules/TelegramCore",
+        "//submodules/ShadowgramSettings:ShadowgramSettings",
         "//submodules/TelegramPresentationData",
         "//submodules/TelegramUIPreferences",
         "//submodules/MediaPlayer:UniversalMediaPlayer",

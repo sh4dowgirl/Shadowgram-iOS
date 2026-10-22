@@ -150,6 +150,22 @@ func shadowgramDeletedMessageQuote(_ message: Message) -> (text: String, entitie
     return (text, entities)
 }
 
+/// The quote links the sender's name to `t.me/<username>`, and the server would turn that link into a
+/// link preview under the message. Merges `disableLinkPreviews` into the attributes so it does not.
+private func shadowgramDisablingLinkPreview(_ attributes: [MessageAttribute]) -> [MessageAttribute] {
+    var flags: OutgoingContentInfoFlags = [.disableLinkPreviews]
+    var result: [MessageAttribute] = []
+    for attribute in attributes {
+        if let attribute = attribute as? OutgoingContentInfoMessageAttribute {
+            flags.formUnion(attribute.flags)
+        } else {
+            result.append(attribute)
+        }
+    }
+    result.append(OutgoingContentInfoMessageAttribute(flags: flags))
+    return result
+}
+
 func shadowgramForwardCopyOfDeletedMessage(sourceMessage: Message, peerId: PeerId, threadId: Int64?, forwardAttributes: [MessageAttribute], localGroupingKey: Int64?) -> EnqueueMessage? {
     var mediaReference: AnyMediaReference?
     for media in sourceMessage.media {
@@ -166,6 +182,10 @@ func shadowgramForwardCopyOfDeletedMessage(sourceMessage: Message, peerId: PeerI
             continue
         }
         attributes.append(attribute)
+    }
+    if mediaReference == nil {
+        // A caption under media never gets a link preview, so only plain text needs the flag.
+        attributes = shadowgramDisablingLinkPreview(attributes)
     }
 
     let replyToMessageId = threadId.flatMap { EngineMessageReplySubject(messageId: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: Int32(clamping: $0)), quote: nil, innerSubject: nil) }
@@ -198,6 +218,9 @@ func shadowgramReplacingReplyToDeletedMessage(transaction: Transaction, peerId: 
         entities.append(MessageTextEntity(range: (entity.range.lowerBound + offset) ..< (entity.range.upperBound + offset), type: entity.type))
     }
     updatedAttributes.append(TextEntitiesMessageAttribute(entities: entities))
+    if mediaReference == nil {
+        updatedAttributes = shadowgramDisablingLinkPreview(updatedAttributes)
+    }
 
     let threadReply = threadId.flatMap { EngineMessageReplySubject(messageId: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: Int32(clamping: $0)), quote: nil, innerSubject: nil) }
     return .message(text: prefix + text, attributes: updatedAttributes, inlineStickers: inlineStickers, mediaReference: mediaReference, threadId: threadId, replyToMessageId: threadReply, replyToStoryId: replyToStoryId, localGroupingKey: localGroupingKey, correlationId: correlationId, bubbleUpEmojiOrStickersets: bubbleUpEmojiOrStickersets)

@@ -55,7 +55,6 @@ enum InfoSection: Int, CaseIterable {
     case peerMembers
     case channelMonoforum
     case botAffiliateProgram
-    case shadowgramPeerId
 }
 
 func infoItems(
@@ -909,7 +908,7 @@ func infoItems(
     if ShadowgramSettings.shared.values.showPeerIds, let peer = data.peer {
         switch peer {
         case .user, .channel, .legacyGroup:
-            items[.shadowgramPeerId]!.append(shadowgramPeerIdInfoItem(peerId: peer.id, interaction: interaction))
+            items[.peerInfo]!.append(shadowgramPeerIdInfoItem(peerId: peer.id, interaction: interaction))
         case .community, .secretChat:
             break
         }
@@ -1881,15 +1880,25 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
     return result
 }
 
-// Shadowgram: a labelled row with the peer's numeric ID. Tap copies it and shows a toast.
+// Shadowgram: the peer's numeric ID, shown in the same box as the username, phone and bio: a small
+// "ID" label with the value under it, left-aligned. Tap copies it and shows a toast.
 private let shadowgramPeerIdItemBase: AnyHashable = AnyHashable("shadowgram.peerId")
 
 private func shadowgramPeerIdInfoItem(peerId: EnginePeer.Id, interaction: PeerInfoInteraction) -> PeerInfoScreenItem {
     let value = "\(peerId.id._internalGetInt64Value())"
-    let item = PeerInfoScreenDisclosureItem(id: shadowgramPeerIdItemBase, label: .coloredText(value, .accent), text: "ID", hasArrow: false, action: {
-        UIPasteboard.general.string = value
-        interaction.shadowgramPeerIdCopied?()
-    })
+    let item = PeerInfoScreenLabeledValueItem(
+        id: shadowgramPeerIdItemBase,
+        label: "ID",
+        text: value,
+        textColor: .accent,
+        action: { _, _ in
+            UIPasteboard.general.string = value
+            interaction.shadowgramPeerIdCopied?()
+        },
+        requestLayout: { animated in
+            interaction.requestLayout(animated)
+        }
+    )
     item.shadowgramCaptureKinds = [.id]
     return item
 }

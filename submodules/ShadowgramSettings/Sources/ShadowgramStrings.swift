@@ -101,7 +101,7 @@ extension ShadowgramStrings {
     public var autoReactionUsersHeader: String { return t("ПОЛЬЗОВАТЕЛИ", "USERS") }
     public var autoReactionAddUser: String { return t("Добавить пользователя", "Add User") }
     public var autoReactionSelectUser: String { return t("Выберите пользователя", "Select User") }
-    public var autoReactionFooter: String { return t("На каждое новое сообщение от этих пользователей Shadowgram сам поставит выбранную реакцию: в личном чате и в группах, где такая реакция разрешена. Нажмите на пользователя, чтобы сменить реакцию, смахните влево, чтобы убрать. Реакции из своих эмодзи работают только с Telegram Premium.", "Shadowgram puts the chosen reaction on every new message from these users: in your private chat and in groups that allow that reaction. Tap a user to change the reaction, swipe left to remove them. Custom emoji reactions require Telegram Premium.") }
+    public var autoReactionFooter: String { return t("На каждое новое сообщение от этих пользователей Shadowgram сам поставит выбранную реакцию: в личном чате и, если включён переключатель «В группах», в группах, где такая реакция разрешена. Нажмите на пользователя, чтобы сменить реакцию, смахните влево, чтобы убрать. Реакции из своих эмодзи работают только с Telegram Premium.", "Shadowgram puts the chosen reaction on every new message from these users: in your private chat and, if In Groups is on, in groups that allow that reaction. Tap a user to change the reaction, swipe left to remove them. Custom emoji reactions require Telegram Premium.") }
 
     public func autoReactionUserCount(_ count: Int) -> String {
         if self.isRussian {
@@ -182,4 +182,18 @@ extension ShadowgramStrings {
     public var hideAds: String { return t("Скрыть рекламу", "Hide Ads") }
     public var unlockExtraFolders: String { return t("Папки сверх лимита", "Folders Over the Limit") }
     public var premiumUnlocksFooter: String { return t("Открывает функции Telegram Premium, которые работают на устройстве. Перевод всего чата включается в Настройки ▸ Язык. Папки сверх лимита можно открывать, но новые создать нельзя: это проверяет сервер.", "Unlocks Telegram Premium features that work on the device. Turn on entire chat translation in Settings ▸ Language. Folders over the limit can be opened, but new ones can't be created: the server checks that.") }
+}
+
+extension ShadowgramStrings {
+    public var messageBlockedUsers: String { return t("Писать заблокированным", "Message Blocked Users") }
+    public var messageBlockedUsersFooter: String { return t("В чате с заблокированным вами пользователем вместо кнопки «Разблокировать» остаётся поле ввода, и сообщения можно отправлять, не снимая блокировку. Блокировка при этом сохраняется.", "In a chat with a user you have blocked, the message input stays instead of the Unblock button, so you can send messages without unblocking. The block itself stays in place.") }
+
+    public var autoReactionInGroups: String { return t("В группах", "In Groups") }
+    public var autoReactionInGroupsFooter: String { return t("Если включено, реакция ставится на сообщения выбранных пользователей и в группах (где такая реакция разрешена). Если выключено — только в личных чатах.", "When on, the reaction is also put on messages from the chosen users in groups (where that reaction is allowed). When off, only in private chats.") }
+
+    public var ghostModeToggleAll: String { return t("Переключить все", "Toggle All") }
+    public var sendReadReceiptsInfo: String { return t("Собеседник не увидит, что вы прочитали его сообщения. Чат отмечается прочитанным только на этом устройстве.", "Others won't see that you read their messages. The chat is marked read on this device only.") }
+    public var sendTypingInfo: String { return t("Собеседник не увидит, что вы печатаете, записываете голосовое или выбираете файл.", "Others won't see that you are typing, recording a voice message or choosing a file.") }
+    public var sendOnlineStatusInfo: String { return t("Вы выглядите офлайн, пока приложение открыто. Отправка сообщения всё равно обновляет время последнего визита.", "You appear offline while the app is open. Sending a message still updates your last seen time.") }
+    public var sendStoryViewsInfo: String { return t("Автор истории не увидит вас среди зрителей. История отмечается просмотренной только на этом устройстве.", "The author won't see you among the viewers. The story is marked seen on this device only.") }
 }

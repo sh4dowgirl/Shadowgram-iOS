@@ -76,3 +76,26 @@ public let shadowgramExtraSettingsIcon: UIImage = {
         context.endTransparencyLayer()
     }
 }()
+
+/// The ⏻ power glyph (an open ring with a bar through the gap), drawn here because the system font has
+/// no reliable glyph for U+23FB. Template-tinted by the caller.
+public func shadowgramPowerIcon(color: UIColor) -> UIImage {
+    let size = CGSize(width: 24.0, height: 24.0)
+    let renderer = UIGraphicsImageRenderer(size: size)
+    return renderer.image { rendererContext in
+        let context = rendererContext.cgContext
+        context.setStrokeColor(color.cgColor)
+        context.setLineWidth(2.0)
+        context.setLineCap(.round)
+
+        let center = CGPoint(x: 12.0, y: 13.0)
+        let ring = UIBezierPath(arcCenter: center, radius: 7.5, startAngle: -CGFloat.pi / 2.0 + 0.62, endAngle: -CGFloat.pi / 2.0 - 0.62 + CGFloat.pi * 2.0, clockwise: true)
+        ring.lineWidth = 2.0
+        ring.lineCapStyle = .round
+        ring.stroke()
+
+        context.move(to: CGPoint(x: 12.0, y: 3.5))
+        context.addLine(to: CGPoint(x: 12.0, y: 12.0))
+        context.strokePath()
+    }
+}

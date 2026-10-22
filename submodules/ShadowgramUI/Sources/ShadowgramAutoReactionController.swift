@@ -20,13 +20,15 @@ private final class ShadowgramAutoReactionArguments {
     let openUser: (EnginePeer.Id) -> Void
     let removeUser: (EnginePeer.Id) -> Void
     let setPeerIdWithRevealedOptions: (EnginePeer.Id?, EnginePeer.Id?) -> Void
+    let setInGroups: (Bool) -> Void
 
-    init(context: AccountContext, addUser: @escaping () -> Void, openUser: @escaping (EnginePeer.Id) -> Void, removeUser: @escaping (EnginePeer.Id) -> Void, setPeerIdWithRevealedOptions: @escaping (EnginePeer.Id?, EnginePeer.Id?) -> Void) {
+    init(context: AccountContext, addUser: @escaping () -> Void, openUser: @escaping (EnginePeer.Id) -> Void, removeUser: @escaping (EnginePeer.Id) -> Void, setPeerIdWithRevealedOptions: @escaping (EnginePeer.Id?, EnginePeer.Id?) -> Void, setInGroups: @escaping (Bool) -> Void) {
         self.context = context
         self.addUser = addUser
         self.openUser = openUser
         self.removeUser = removeUser
         self.setPeerIdWithRevealedOptions = setPeerIdWithRevealedOptions
+        self.setInGroups = setInGroups
     }
 }
 
@@ -48,6 +50,8 @@ private struct ShadowgramAutoReactionState: Equatable {
 }
 
 private enum ShadowgramAutoReactionEntryId: Hashable {
+    case groupsSwitch
+    case groupsFooter
     case header
     case addUser
     case user(EnginePeer.Id)
@@ -55,17 +59,28 @@ private enum ShadowgramAutoReactionEntryId: Hashable {
 }
 
 private enum ShadowgramAutoReactionEntry: ItemListNodeEntry {
+    case groupsSwitch(Bool)
+    case groupsFooter
     case header
     case addUser
     case user(index: Int32, peer: EnginePeer, reaction: ShadowgramAutoReactionValue, editing: ItemListPeerItemEditing)
     case footer
 
     var section: ItemListSectionId {
-        return 0
+        switch self {
+        case .groupsSwitch, .groupsFooter:
+            return 0
+        default:
+            return 1
+        }
     }
 
     var stableId: ShadowgramAutoReactionEntryId {
         switch self {
+        case .groupsSwitch:
+            return .groupsSwitch
+        case .groupsFooter:
+            return .groupsFooter
         case .header:
             return .header
         case .addUser:
@@ -79,6 +94,10 @@ private enum ShadowgramAutoReactionEntry: ItemListNodeEntry {
 
     private var sortIndex: Int32 {
         switch self {
+        case .groupsSwitch:
+            return -2
+        case .groupsFooter:
+            return -1
         case .header:
             return 0
         case .addUser:
@@ -98,6 +117,12 @@ private enum ShadowgramAutoReactionEntry: ItemListNodeEntry {
         let arguments = arguments as! ShadowgramAutoReactionArguments
         let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
         switch self {
+        case let .groupsSwitch(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.autoReactionInGroups, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.setInGroups(value)
+            })
+        case .groupsFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.autoReactionInGroupsFooter), sectionId: self.section)
         case .header:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.autoReactionUsersHeader, sectionId: self.section)
         case .addUser:
@@ -130,8 +155,10 @@ private enum ShadowgramAutoReactionEntry: ItemListNodeEntry {
     }
 }
 
-private func shadowgramAutoReactionEntries(presentationData: PresentationData, state: ShadowgramAutoReactionState, autoReactions: [Int64: ShadowgramAutoReactionValue], peers: [EnginePeer]) -> [ShadowgramAutoReactionEntry] {
+private func shadowgramAutoReactionEntries(presentationData: PresentationData, state: ShadowgramAutoReactionState, autoReactions: [Int64: ShadowgramAutoReactionValue], peers: [EnginePeer], inGroups: Bool) -> [ShadowgramAutoReactionEntry] {
     var entries: [ShadowgramAutoReactionEntry] = []
+    entries.append(.groupsSwitch(inGroups))
+    entries.append(.groupsFooter)
     entries.append(.header)
     entries.append(.addUser)
     let sortedPeers = peers.sorted { lhs, rhs in
@@ -291,6 +318,8 @@ public func shadowgramAutoReactionController(context: AccountContext) -> ViewCon
                 return state
             }
         }
+    }, setInGroups: { value in
+        ShadowgramSettings.shared.update { $0.autoReactionsInGroups = value }
     })
 
     let peers: Signal<([Int64: ShadowgramAutoReactionValue], [EnginePeer]), NoError> = ShadowgramSettings.shared.valuesSignal
@@ -313,15 +342,20 @@ public func shadowgramAutoReactionController(context: AccountContext) -> ViewCon
         }
     }
 
+    let inGroups: Signal<Bool, NoError> = ShadowgramSettings.shared.valuesSignal
+    |> map { $0.autoReactionsInGroups }
+    |> distinctUntilChanged
+
     let signal = combineLatest(queue: .mainQueue(),
         context.sharedContext.presentationData,
         statePromise.get(),
-        peers
+        peers,
+        inGroups
     )
-    |> map { presentationData, state, peers -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    |> map { presentationData, state, peers, inGroups -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.autoReaction), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: shadowgramAutoReactionEntries(presentationData: presentationData, state: state, autoReactions: peers.0, peers: peers.1), style: .blocks, animateChanges: true)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: shadowgramAutoReactionEntries(presentationData: presentationData, state: state, autoReactions: peers.0, peers: peers.1, inGroups: inGroups), style: .blocks, animateChanges: true)
         return (controllerState, (listState, arguments))
     }
 

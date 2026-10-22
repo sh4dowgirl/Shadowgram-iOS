@@ -1863,7 +1863,16 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             }
             
             if let subject = item.associatedData.subject, case let .customChatContents(contents) = subject, case .hashTagSearch = contents.kind {
-                hasAvatar = true
+                if contents is ShadowgramEditHistoryChatContentsMarker {
+                    // The avatar header exists only for incoming messages of groups and channels with an author.
+                    var isBroadcast = false
+                    if let channel = firstMessage.peers[firstMessage.id.peerId] as? TelegramChannel, case .broadcast = channel.info {
+                        isBroadcast = true
+                    }
+                    hasAvatar = incoming && firstMessage.id.peerId.isGroupOrChannel && !isBroadcast && firstMessage.author != nil
+                } else {
+                    hasAvatar = true
+                }
             }
         }
         
@@ -1902,7 +1911,10 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         var needsShareButton = false
         var needsSummarizeButton = false
     
-        if incoming, case let .customChatContents(contents) = item.associatedData.subject, case .hashTagSearch = contents.kind {
+        if let subject = item.associatedData.subject, case let .customChatContents(contents) = subject, contents is ShadowgramEditHistoryChatContentsMarker {
+            // A version of an edited message has no counterpart in the chat to open.
+            needsShareButton = false
+        } else if incoming, case let .customChatContents(contents) = item.associatedData.subject, case .hashTagSearch = contents.kind {
             needsShareButton = true
         } else if case .pinnedMessages = item.associatedData.subject {
             needsShareButton = true

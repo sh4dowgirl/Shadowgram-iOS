@@ -64,38 +64,51 @@ public func shadowgramForwardSelfDestructingMedia(context: AccountContext, messa
     }
     let regularMedia = shadowgramRegularMediaCopy(mediaBox: context.account.postbox.mediaBox, media: media)
 
-    let currentPresentationData = context.sharedContext.currentPresentationData.with { $0 }
-    let forceTheme: PresentationTheme? = currentPresentationData.theme.overallDarkAppearance ? nil : defaultDarkColorPresentationTheme
+    // The same peer picker that a regular forward opens, instead of the share sheet. A view-once
+    // message cannot be forwarded by the server, so the picked chats get the media as a regular message.
+    let controller = context.sharedContext.makePeerSelectionController(PeerSelectionControllerParams(context: context, filter: [.onlyWriteable, .excludeDisabled, .doNotSearchMessages], hasFilters: true, multipleSelection: true, forwardedMessageIds: [message.id], selectForumThreads: true))
+    controller.multiplePeersSelected = { [weak controller] peers, peerMap, messageText, _, _, _ in
+        controller?.dismiss()
 
-    let shareController = context.sharedContext.makeShareController(context: context, params: ShareControllerParams(subject: .media(.standalone(media: regularMedia), nil), externalShare: false, forceTheme: forceTheme, completed: { peerIds in
-        let _ = (context.engine.data.get(
-            EngineDataList(
-                peerIds.map(TelegramEngine.EngineData.Item.Peer.Peer.init)
-            )
-        )
-        |> deliverOnMainQueue).start(next: { peerList in
-            let peers = peerList.compactMap { $0 }
-            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-            let text: String
-            var savedMessages = false
-            if peerIds.count == 1, let peerId = peerIds.first, peerId == context.account.peerId {
-                text = presentationData.strings.Conversation_ForwardTooltip_SavedMessages_One
-                savedMessages = true
-            } else if peers.count == 1, let peer = peers.first {
-                let peerName = peer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder).replacingOccurrences(of: "**", with: "")
-                text = presentationData.strings.Conversation_ForwardTooltip_Chat_One(peerName).string
-            } else if peers.count == 2, let firstPeer = peers.first, let secondPeer = peers.last {
-                let firstPeerName = firstPeer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder).replacingOccurrences(of: "**", with: "")
-                let secondPeerName = secondPeer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder).replacingOccurrences(of: "**", with: "")
-                text = presentationData.strings.Conversation_ForwardTooltip_TwoChats_One(firstPeerName, secondPeerName).string
-            } else if let peer = peers.first {
-                let peerName = peer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder).replacingOccurrences(of: "**", with: "")
-                text = presentationData.strings.Conversation_ForwardTooltip_ManyChats_One(peerName, "\(peers.count - 1)").string
-            } else {
-                return
+        let caption = messageText.string
+        for peer in peers {
+            var messages: [EnqueueMessage] = []
+            messages.append(.message(text: "", attributes: [], inlineStickers: [:], mediaReference: .standalone(media: regularMedia), threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: []))
+            if !caption.isEmpty {
+                messages.append(.message(text: caption, attributes: [], inlineStickers: [:], mediaReference: nil, threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: []))
             }
-            present(UndoOverlayController(presentationData: presentationData, content: .forward(savedMessages: savedMessages, text: text), elevatedLayout: true, animateInAsReplacement: true, action: { _ in return false }))
-        })
-    }))
-    present(shareController)
+            let _ = enqueueMessages(account: context.account, peerId: peer.id, messages: messages).start()
+        }
+
+        var displayPeers: [EnginePeer] = []
+        for peer in peers {
+            if case let .secretChat(secretPeer) = peer, let regularPeer = peerMap[secretPeer.regularPeerId] {
+                displayPeers.append(regularPeer)
+            } else {
+                displayPeers.append(peer)
+            }
+        }
+
+        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+        func name(_ peer: EnginePeer) -> String {
+            let title = peer.id == context.account.peerId ? presentationData.strings.DialogList_SavedMessages : peer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
+            return title.replacingOccurrences(of: "**", with: "")
+        }
+        let text: String
+        var savedMessages = false
+        if displayPeers.count == 1, let peer = displayPeers.first, peer.id == context.account.peerId {
+            text = presentationData.strings.Conversation_ForwardTooltip_SavedMessages_One
+            savedMessages = true
+        } else if displayPeers.count == 1, let peer = displayPeers.first {
+            text = presentationData.strings.Conversation_ForwardTooltip_Chat_One(name(peer)).string
+        } else if displayPeers.count == 2, let first = displayPeers.first, let second = displayPeers.last {
+            text = presentationData.strings.Conversation_ForwardTooltip_TwoChats_One(name(first), name(second)).string
+        } else if let peer = displayPeers.first {
+            text = presentationData.strings.Conversation_ForwardTooltip_ManyChats_One(name(peer), "\(displayPeers.count - 1)").string
+        } else {
+            return
+        }
+        present(UndoOverlayController(presentationData: presentationData, content: .forward(savedMessages: savedMessages, text: text), elevatedLayout: false, animateInAsReplacement: true, action: { _ in return false }))
+    }
+    present(controller)
 }

@@ -28,6 +28,7 @@ import InvisibleInkDustNode
 import ChatControllerInteraction
 import StoryContainerScreen
 import ChatMessageDateAndStatusNode
+import ShadowgramSettings
 import ChatHistoryEntry
 import ChatMessageItemCommon
 import WallpaperPreviewMedia
@@ -924,6 +925,8 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
             var nativeSize: CGSize
             
             let isSecretMedia = message.containsSecretMedia
+            // Shadowgram: with Unlimited View-Once Media the preview is neither blurred nor covered by the dust shader.
+            let shadowgramRevealsViewOnce = isSecretMedia && message.minAutoremoveOrClearTimeout == viewOnceTimeout && ShadowgramSettings.shared.values.bypassViewOnce
             var secretBeginTimeAndTimeout: (Double, Double)?
             if isSecretMedia {
                 if let attribute = message.autoclearAttribute {
@@ -1486,7 +1489,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                             if hasCurrentAnimatedStickerNode {
                                 replaceAnimatedStickerNode = true
                             }
-                            if isSecretMedia {
+                            if isSecretMedia && !shadowgramRevealsViewOnce {
                                 updateImageSignal = { synchronousLoad, _ in
                                     return chatSecretPhoto(account: context.account, userLocation: .peer(message.id.peerId), photoReference: .message(message: MessageReference(message), media: image), ignoreFullSize: true)
                                 }
@@ -1646,7 +1649,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                                 }
                             }
                             
-                            if isSecretMedia {
+                            if isSecretMedia && !shadowgramRevealsViewOnce {
                                 updateImageSignal = { synchronousLoad, _ in
                                     return chatSecretMessageVideo(account: context.account, userLocation: .peer(message.id.peerId), videoReference: .message(message: MessageReference(message), media: file))
                                 }
@@ -2565,6 +2568,8 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
         
         var secretBeginTimeAndTimeout: (Double?, Double)?
         let isSecretMedia = message.containsSecretMedia
+        // Shadowgram: with Unlimited View-Once Media the preview is neither blurred nor covered by the dust shader.
+        let shadowgramRevealsViewOnce = isSecretMedia && message.minAutoremoveOrClearTimeout == viewOnceTimeout && ShadowgramSettings.shared.values.bypassViewOnce
         if isSecretMedia {
             if let attribute = message.autoclearAttribute {
                 if let countdownBeginTime = attribute.countdownBeginTime {
@@ -3077,7 +3082,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
             displaySpoiler = true
         } else if message.attributes.contains(where: { $0 is MediaSpoilerMessageAttribute }) {
             displaySpoiler = true
-        } else if isSecretMedia {
+        } else if isSecretMedia && !shadowgramRevealsViewOnce {
             displaySpoiler = true
         } else if message.isSensitiveContent(platform: "ios") {
             if !self.showSensitiveContent {

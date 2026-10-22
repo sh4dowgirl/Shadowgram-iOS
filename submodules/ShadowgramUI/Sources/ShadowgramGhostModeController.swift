@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import Display
+import AsyncDisplayKit
 import SwiftSignalKit
 import TelegramCore
 import TelegramPresentationData
@@ -17,33 +18,48 @@ private final class ShadowgramGhostModeArguments {
     }
 }
 
-private enum ShadowgramGhostModeSection: Int32 {
-    case switches
-}
-
 private enum ShadowgramGhostModeEntry: ItemListNodeEntry {
     case readReceipts(Bool)
+    case readReceiptsInfo
     case typing(Bool)
+    case typingInfo
     case onlineStatus(Bool)
+    case onlineStatusInfo
     case storyViews(Bool)
-    case footer
+    case storyViewsInfo
 
+    /// Every function is its own section, so its explanation sits right under its switch.
     var section: ItemListSectionId {
-        return ShadowgramGhostModeSection.switches.rawValue
+        switch self {
+        case .readReceipts, .readReceiptsInfo:
+            return 0
+        case .typing, .typingInfo:
+            return 1
+        case .onlineStatus, .onlineStatusInfo:
+            return 2
+        case .storyViews, .storyViewsInfo:
+            return 3
+        }
     }
 
     var stableId: Int32 {
         switch self {
         case .readReceipts:
             return 0
-        case .typing:
+        case .readReceiptsInfo:
             return 1
-        case .onlineStatus:
+        case .typing:
             return 2
-        case .storyViews:
+        case .typingInfo:
             return 3
-        case .footer:
+        case .onlineStatus:
             return 4
+        case .onlineStatusInfo:
+            return 5
+        case .storyViews:
+            return 6
+        case .storyViewsInfo:
+            return 7
         }
     }
 
@@ -59,20 +75,26 @@ private enum ShadowgramGhostModeEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.sendReadReceipts, value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { $0.sendReadReceipts = value }
             })
+        case .readReceiptsInfo:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.sendReadReceiptsInfo), sectionId: self.section)
         case let .typing(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.sendTyping, value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { $0.sendTyping = value }
             })
+        case .typingInfo:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.sendTypingInfo), sectionId: self.section)
         case let .onlineStatus(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.sendOnlineStatus, value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { $0.sendOnlineStatus = value }
             })
+        case .onlineStatusInfo:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.sendOnlineStatusInfo), sectionId: self.section)
         case let .storyViews(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.sendStoryViews, value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { $0.sendStoryViews = value }
             })
-        case .footer:
-            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.ghostModeFooter), sectionId: self.section)
+        case .storyViewsInfo:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.sendStoryViewsInfo), sectionId: self.section)
         }
     }
 }
@@ -96,13 +118,32 @@ public func shadowgramGhostModeController(context: AccountContext) -> ViewContro
         let closeButton = ItemListNavigationButton(content: .text(strings.close), style: .regular, enabled: true, action: {
             dismissImpl?()
         })
-        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.ghostMode), leftNavigationButton: closeButton, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
+        // ⏻ flips every function at once: all on if any is off, otherwise all off.
+        let powerNode = ASImageNode()
+        powerNode.displaysAsynchronously = false
+        powerNode.image = shadowgramPowerIcon(color: presentationData.theme.rootController.navigationBar.accentTextColor)
+        powerNode.contentMode = .center
+        powerNode.frame = CGRect(origin: CGPoint(), size: CGSize(width: 24.0, height: 24.0))
+        let powerButton = ItemListNavigationButton(content: .node(powerNode), style: .regular, enabled: true, action: {
+            ShadowgramSettings.shared.update { values in
+                let allOn = values.sendReadReceipts && values.sendTyping && values.sendOnlineStatus && values.sendStoryViews
+                let newValue = !allOn
+                values.sendReadReceipts = newValue
+                values.sendTyping = newValue
+                values.sendOnlineStatus = newValue
+                values.sendStoryViews = newValue
+            }
+        })
+        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.ghostMode), leftNavigationButton: closeButton, rightNavigationButton: powerButton, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
         let entries: [ShadowgramGhostModeEntry] = [
             .readReceipts(values.sendReadReceipts),
+            .readReceiptsInfo,
             .typing(values.sendTyping),
+            .typingInfo,
             .onlineStatus(values.sendOnlineStatus),
+            .onlineStatusInfo,
             .storyViews(values.sendStoryViews),
-            .footer
+            .storyViewsInfo
         ]
         let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: entries, style: .blocks, animateChanges: true)
         return (controllerState, (listState, arguments))

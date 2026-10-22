@@ -1,0 +1,828 @@
+diff --git a/submodules/AccountContext/Sources/ChatController.swift b/submodules/AccountContext/Sources/ChatController.swift
+index 32aa13e6..b247d58f 100644
+--- a/submodules/AccountContext/Sources/ChatController.swift
++++ b/submodules/AccountContext/Sources/ChatController.swift
+@@ -1342,6 +1342,12 @@ public enum ChatCustomContentsKind: Equatable {
+     case welcomeMessages
+ }
+ 
++/// Shadowgram: adopted by the read-only chat that shows one version of an edited message. Such a chat
++/// reuses the hashtag-search kind, but its message has no counterpart on the server to jump to and
++/// no avatar column is wanted for it unless the avatar is really drawn.
++public protocol ShadowgramEditHistoryChatContentsMarker: AnyObject {
++}
++
+ public protocol ChatCustomContentsProtocol: AnyObject {
+     var kind: ChatCustomContentsKind { get }
+     var historyView: Signal<(EngineRawMessageHistoryView, EngineViewUpdateType), NoError> { get }
+diff --git a/submodules/GalleryUI/Sources/ShadowgramSelfDestructingMedia.swift b/submodules/GalleryUI/Sources/ShadowgramSelfDestructingMedia.swift
+index 144d47c4..fa6ae54c 100644
+--- a/submodules/GalleryUI/Sources/ShadowgramSelfDestructingMedia.swift
++++ b/submodules/GalleryUI/Sources/ShadowgramSelfDestructingMedia.swift
+@@ -64,38 +64,51 @@ public func shadowgramForwardSelfDestructingMedia(context: AccountContext, messa
+     }
+     let regularMedia = shadowgramRegularMediaCopy(mediaBox: context.account.postbox.mediaBox, media: media)
+ 
+-    let currentPresentationData = context.sharedContext.currentPresentationData.with { $0 }
+-    let forceTheme: PresentationTheme? = currentPresentationData.theme.overallDarkAppearance ? nil : defaultDarkColorPresentationTheme
++    // The same peer picker that a regular forward opens, instead of the share sheet. A view-once
++    // message cannot be forwarded by the server, so the picked chats get the media as a regular message.
++    let controller = context.sharedContext.makePeerSelectionController(PeerSelectionControllerParams(context: context, filter: [.onlyWriteable, .excludeDisabled, .doNotSearchMessages], hasFilters: true, multipleSelection: true, forwardedMessageIds: [message.id], selectForumThreads: true))
++    controller.multiplePeersSelected = { [weak controller] peers, peerMap, messageText, _, _, _ in
++        controller?.dismiss()
+ 
+-    let shareController = context.sharedContext.makeShareController(context: context, params: ShareControllerParams(subject: .media(.standalone(media: regularMedia), nil), externalShare: false, forceTheme: forceTheme, completed: { peerIds in
+-        let _ = (context.engine.data.get(
+-            EngineDataList(
+-                peerIds.map(TelegramEngine.EngineData.Item.Peer.Peer.init)
+-            )
+-        )
+-        |> deliverOnMainQueue).start(next: { peerList in
+-            let peers = peerList.compactMap { $0 }
+-            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+-            let text: String
+-            var savedMessages = false
+-            if peerIds.count == 1, let peerId = peerIds.first, peerId == context.account.peerId {
+-                text = presentationData.strings.Conversation_ForwardTooltip_SavedMessages_One
+-                savedMessages = true
+-            } else if peers.count == 1, let peer = peers.first {
+-                let peerName = peer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder).replacingOccurrences(of: "**", with: "")
+-                text = presentationData.strings.Conversation_ForwardTooltip_Chat_One(peerName).string
+-            } else if peers.count == 2, let firstPeer = peers.first, let secondPeer = peers.last {
+-                let firstPeerName = firstPeer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder).replacingOccurrences(of: "**", with: "")
+-                let secondPeerName = secondPeer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder).replacingOccurrences(of: "**", with: "")
+-                text = presentationData.strings.Conversation_ForwardTooltip_TwoChats_One(firstPeerName, secondPeerName).string
+-            } else if let peer = peers.first {
+-                let peerName = peer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder).replacingOccurrences(of: "**", with: "")
+-                text = presentationData.strings.Conversation_ForwardTooltip_ManyChats_One(peerName, "\(peers.count - 1)").string
++        let caption = messageText.string
++        for peer in peers {
++            var messages: [EnqueueMessage] = []
++            messages.append(.message(text: "", attributes: [], inlineStickers: [:], mediaReference: .standalone(media: regularMedia), threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: []))
++            if !caption.isEmpty {
++                messages.append(.message(text: caption, attributes: [], inlineStickers: [:], mediaReference: nil, threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: []))
++            }
++            let _ = enqueueMessages(account: context.account, peerId: peer.id, messages: messages).start()
++        }
++
++        var displayPeers: [EnginePeer] = []
++        for peer in peers {
++            if case let .secretChat(secretPeer) = peer, let regularPeer = peerMap[secretPeer.regularPeerId] {
++                displayPeers.append(regularPeer)
+             } else {
+-                return
++                displayPeers.append(peer)
+             }
+-            present(UndoOverlayController(presentationData: presentationData, content: .forward(savedMessages: savedMessages, text: text), elevatedLayout: true, animateInAsReplacement: true, action: { _ in return false }))
+-        })
+-    }))
+-    present(shareController)
++        }
++
++        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
++        func name(_ peer: EnginePeer) -> String {
++            let title = peer.id == context.account.peerId ? presentationData.strings.DialogList_SavedMessages : peer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
++            return title.replacingOccurrences(of: "**", with: "")
++        }
++        let text: String
++        var savedMessages = false
++        if displayPeers.count == 1, let peer = displayPeers.first, peer.id == context.account.peerId {
++            text = presentationData.strings.Conversation_ForwardTooltip_SavedMessages_One
++            savedMessages = true
++        } else if displayPeers.count == 1, let peer = displayPeers.first {
++            text = presentationData.strings.Conversation_ForwardTooltip_Chat_One(name(peer)).string
++        } else if displayPeers.count == 2, let first = displayPeers.first, let second = displayPeers.last {
++            text = presentationData.strings.Conversation_ForwardTooltip_TwoChats_One(name(first), name(second)).string
++        } else if let peer = displayPeers.first {
++            text = presentationData.strings.Conversation_ForwardTooltip_ManyChats_One(name(peer), "\(displayPeers.count - 1)").string
++        } else {
++            return
++        }
++        present(UndoOverlayController(presentationData: presentationData, content: .forward(savedMessages: savedMessages, text: text), elevatedLayout: false, animateInAsReplacement: true, action: { _ in return false }))
++    }
++    present(controller)
+ }
+diff --git a/submodules/ShadowgramSettings/Sources/ShadowgramSettings.swift b/submodules/ShadowgramSettings/Sources/ShadowgramSettings.swift
+index 75175f58..632b5a36 100644
+--- a/submodules/ShadowgramSettings/Sources/ShadowgramSettings.swift
++++ b/submodules/ShadowgramSettings/Sources/ShadowgramSettings.swift
+@@ -105,6 +105,11 @@ public struct ShadowgramSettingsValues: Equatable {
+     public var unlockChatTranslation: Bool
+     public var hideAds: Bool
+     public var unlockExtraFolders: Bool
++    /// Keep the message input in chats with users that this account has blocked, instead of the
++    /// "Unblock" button, so messages can be sent without unblocking first.
++    public var messageBlockedUsers: Bool
++    /// Auto reactions also apply to messages from the chosen users in groups, not only in private chats.
++    public var autoReactionsInGroups: Bool
+ 
+     public static let defaultValues = ShadowgramSettingsValues(
+         saveDeletedMessages: false,
+@@ -138,10 +143,12 @@ public struct ShadowgramSettingsValues: Equatable {
+         unlockMediaSaving: false,
+         unlockChatTranslation: false,
+         hideAds: false,
+-        unlockExtraFolders: false
++        unlockExtraFolders: false,
++        messageBlockedUsers: false,
++        autoReactionsInGroups: true
+     )
+ 
+-    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactions: [Int64: ShadowgramAutoReactionValue], chatListOldestFirst: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool, roundVideoCamera: ShadowgramRoundVideoCamera, pictureInPictureOnBackground: Bool, forwardSelfDestructingMedia: Bool, unlockStoryTools: Bool, unlockMediaSaving: Bool, unlockChatTranslation: Bool, hideAds: Bool, unlockExtraFolders: Bool) {
++    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactions: [Int64: ShadowgramAutoReactionValue], chatListOldestFirst: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool, roundVideoCamera: ShadowgramRoundVideoCamera, pictureInPictureOnBackground: Bool, forwardSelfDestructingMedia: Bool, unlockStoryTools: Bool, unlockMediaSaving: Bool, unlockChatTranslation: Bool, hideAds: Bool, unlockExtraFolders: Bool, messageBlockedUsers: Bool, autoReactionsInGroups: Bool) {
+         self.saveDeletedMessages = saveDeletedMessages
+         self.unlimitedAccounts = unlimitedAccounts
+         self.ghostModeEnabled = ghostModeEnabled
+@@ -174,6 +181,8 @@ public struct ShadowgramSettingsValues: Equatable {
+         self.unlockChatTranslation = unlockChatTranslation
+         self.hideAds = hideAds
+         self.unlockExtraFolders = unlockExtraFolders
++        self.messageBlockedUsers = messageBlockedUsers
++        self.autoReactionsInGroups = autoReactionsInGroups
+     }
+ 
+     /// What the client actually sends: everything unless ghost mode is on and hides it.
+@@ -242,6 +251,8 @@ public final class ShadowgramSettings {
+         static let unlockChatTranslation = "shadowgram.premium.chatTranslation"
+         static let hideAds = "shadowgram.premium.hideAds"
+         static let unlockExtraFolders = "shadowgram.premium.extraFolders"
++        static let messageBlockedUsers = "shadowgram.messageBlockedUsers"
++        static let autoReactionsInGroups = "shadowgram.autoReaction.inGroups"
+     }
+ 
+     private let defaults: UserDefaults
+@@ -300,7 +311,9 @@ public final class ShadowgramSettings {
+             unlockMediaSaving: bool(Key.unlockMediaSaving, defaultValues.unlockMediaSaving),
+             unlockChatTranslation: bool(Key.unlockChatTranslation, defaultValues.unlockChatTranslation),
+             hideAds: bool(Key.hideAds, defaultValues.hideAds),
+-            unlockExtraFolders: bool(Key.unlockExtraFolders, defaultValues.unlockExtraFolders)
++            unlockExtraFolders: bool(Key.unlockExtraFolders, defaultValues.unlockExtraFolders),
++            messageBlockedUsers: bool(Key.messageBlockedUsers, defaultValues.messageBlockedUsers),
++            autoReactionsInGroups: bool(Key.autoReactionsInGroups, defaultValues.autoReactionsInGroups)
+         )
+         self.currentValues = values
+         self.valuesPromise = ValuePromise(values, ignoreRepeated: true)
+@@ -364,6 +377,8 @@ public final class ShadowgramSettings {
+         self.defaults.set(values.unlockChatTranslation, forKey: Key.unlockChatTranslation)
+         self.defaults.set(values.hideAds, forKey: Key.hideAds)
+         self.defaults.set(values.unlockExtraFolders, forKey: Key.unlockExtraFolders)
++        self.defaults.set(values.messageBlockedUsers, forKey: Key.messageBlockedUsers)
++        self.defaults.set(values.autoReactionsInGroups, forKey: Key.autoReactionsInGroups)
+ 
+         self.valuesPromise.set(values)
+     }
+diff --git a/submodules/ShadowgramSettings/Sources/ShadowgramStrings.swift b/submodules/ShadowgramSettings/Sources/ShadowgramStrings.swift
+index d243b401..3190a56b 100644
+--- a/submodules/ShadowgramSettings/Sources/ShadowgramStrings.swift
++++ b/submodules/ShadowgramSettings/Sources/ShadowgramStrings.swift
+@@ -101,7 +101,7 @@ extension ShadowgramStrings {
+     public var autoReactionUsersHeader: String { return t("ПОЛЬЗОВАТЕЛИ", "USERS") }
+     public var autoReactionAddUser: String { return t("Добавить пользователя", "Add User") }
+     public var autoReactionSelectUser: String { return t("Выберите пользователя", "Select User") }
+-    public var autoReactionFooter: String { return t("На каждое новое сообщение от этих пользователей Shadowgram сам поставит выбранную реакцию: в личном чате и в группах, где такая реакция разрешена. Нажмите на пользователя, чтобы сменить реакцию, смахните влево, чтобы убрать. Реакции из своих эмодзи работают только с Telegram Premium.", "Shadowgram puts the chosen reaction on every new message from these users: in your private chat and in groups that allow that reaction. Tap a user to change the reaction, swipe left to remove them. Custom emoji reactions require Telegram Premium.") }
++    public var autoReactionFooter: String { return t("На каждое новое сообщение от этих пользователей Shadowgram сам поставит выбранную реакцию: в личном чате и, если включён переключатель «В группах», в группах, где такая реакция разрешена. Нажмите на пользователя, чтобы сменить реакцию, смахните влево, чтобы убрать. Реакции из своих эмодзи работают только с Telegram Premium.", "Shadowgram puts the chosen reaction on every new message from these users: in your private chat and, if In Groups is on, in groups that allow that reaction. Tap a user to change the reaction, swipe left to remove them. Custom emoji reactions require Telegram Premium.") }
+ 
+     public func autoReactionUserCount(_ count: Int) -> String {
+         if self.isRussian {
+@@ -183,3 +183,17 @@ extension ShadowgramStrings {
+     public var unlockExtraFolders: String { return t("Папки сверх лимита", "Folders Over the Limit") }
+     public var premiumUnlocksFooter: String { return t("Открывает функции Telegram Premium, которые работают на устройстве. Перевод всего чата включается в Настройки ▸ Язык. Папки сверх лимита можно открывать, но новые создать нельзя: это проверяет сервер.", "Unlocks Telegram Premium features that work on the device. Turn on entire chat translation in Settings ▸ Language. Folders over the limit can be opened, but new ones can't be created: the server checks that.") }
+ }
++
++extension ShadowgramStrings {
++    public var messageBlockedUsers: String { return t("Писать заблокированным", "Message Blocked Users") }
++    public var messageBlockedUsersFooter: String { return t("В чате с заблокированным вами пользователем вместо кнопки «Разблокировать» остаётся поле ввода, и сообщения можно отправлять, не снимая блокировку. Блокировка при этом сохраняется.", "In a chat with a user you have blocked, the message input stays instead of the Unblock button, so you can send messages without unblocking. The block itself stays in place.") }
++
++    public var autoReactionInGroups: String { return t("В группах", "In Groups") }
++    public var autoReactionInGroupsFooter: String { return t("Если включено, реакция ставится на сообщения выбранных пользователей и в группах (где такая реакция разрешена). Если выключено — только в личных чатах.", "When on, the reaction is also put on messages from the chosen users in groups (where that reaction is allowed). When off, only in private chats.") }
++
++    public var ghostModeToggleAll: String { return t("Переключить все", "Toggle All") }
++    public var sendReadReceiptsInfo: String { return t("Собеседник не увидит, что вы прочитали его сообщения. Чат отмечается прочитанным только на этом устройстве.", "Others won't see that you read their messages. The chat is marked read on this device only.") }
++    public var sendTypingInfo: String { return t("Собеседник не увидит, что вы печатаете, записываете голосовое или выбираете файл.", "Others won't see that you are typing, recording a voice message or choosing a file.") }
++    public var sendOnlineStatusInfo: String { return t("Вы выглядите офлайн, пока приложение открыто. Отправка сообщения всё равно обновляет время последнего визита.", "You appear offline while the app is open. Sending a message still updates your last seen time.") }
++    public var sendStoryViewsInfo: String { return t("Автор истории не увидит вас среди зрителей. История отмечается просмотренной только на этом устройстве.", "The author won't see you among the viewers. The story is marked seen on this device only.") }
++}
+diff --git a/submodules/ShadowgramUI/Sources/ShadowgramAutoReactionController.swift b/submodules/ShadowgramUI/Sources/ShadowgramAutoReactionController.swift
+index ed5ef571..bb0065f1 100644
+--- a/submodules/ShadowgramUI/Sources/ShadowgramAutoReactionController.swift
++++ b/submodules/ShadowgramUI/Sources/ShadowgramAutoReactionController.swift
+@@ -20,13 +20,15 @@ private final class ShadowgramAutoReactionArguments {
+     let openUser: (EnginePeer.Id) -> Void
+     let removeUser: (EnginePeer.Id) -> Void
+     let setPeerIdWithRevealedOptions: (EnginePeer.Id?, EnginePeer.Id?) -> Void
++    let setInGroups: (Bool) -> Void
+ 
+-    init(context: AccountContext, addUser: @escaping () -> Void, openUser: @escaping (EnginePeer.Id) -> Void, removeUser: @escaping (EnginePeer.Id) -> Void, setPeerIdWithRevealedOptions: @escaping (EnginePeer.Id?, EnginePeer.Id?) -> Void) {
++    init(context: AccountContext, addUser: @escaping () -> Void, openUser: @escaping (EnginePeer.Id) -> Void, removeUser: @escaping (EnginePeer.Id) -> Void, setPeerIdWithRevealedOptions: @escaping (EnginePeer.Id?, EnginePeer.Id?) -> Void, setInGroups: @escaping (Bool) -> Void) {
+         self.context = context
+         self.addUser = addUser
+         self.openUser = openUser
+         self.removeUser = removeUser
+         self.setPeerIdWithRevealedOptions = setPeerIdWithRevealedOptions
++        self.setInGroups = setInGroups
+     }
+ }
+ 
+@@ -48,6 +50,8 @@ private struct ShadowgramAutoReactionState: Equatable {
+ }
+ 
+ private enum ShadowgramAutoReactionEntryId: Hashable {
++    case groupsSwitch
++    case groupsFooter
+     case header
+     case addUser
+     case user(EnginePeer.Id)
+@@ -55,17 +59,28 @@ private enum ShadowgramAutoReactionEntryId: Hashable {
+ }
+ 
+ private enum ShadowgramAutoReactionEntry: ItemListNodeEntry {
++    case groupsSwitch(Bool)
++    case groupsFooter
+     case header
+     case addUser
+     case user(index: Int32, peer: EnginePeer, reaction: ShadowgramAutoReactionValue, editing: ItemListPeerItemEditing)
+     case footer
+ 
+     var section: ItemListSectionId {
+-        return 0
++        switch self {
++        case .groupsSwitch, .groupsFooter:
++            return 0
++        default:
++            return 1
++        }
+     }
+ 
+     var stableId: ShadowgramAutoReactionEntryId {
+         switch self {
++        case .groupsSwitch:
++            return .groupsSwitch
++        case .groupsFooter:
++            return .groupsFooter
+         case .header:
+             return .header
+         case .addUser:
+@@ -79,6 +94,10 @@ private enum ShadowgramAutoReactionEntry: ItemListNodeEntry {
+ 
+     private var sortIndex: Int32 {
+         switch self {
++        case .groupsSwitch:
++            return -2
++        case .groupsFooter:
++            return -1
+         case .header:
+             return 0
+         case .addUser:
+@@ -98,6 +117,12 @@ private enum ShadowgramAutoReactionEntry: ItemListNodeEntry {
+         let arguments = arguments as! ShadowgramAutoReactionArguments
+         let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
+         switch self {
++        case let .groupsSwitch(value):
++            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.autoReactionInGroups, value: value, sectionId: self.section, style: .blocks, updated: { value in
++                arguments.setInGroups(value)
++            })
++        case .groupsFooter:
++            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.autoReactionInGroupsFooter), sectionId: self.section)
+         case .header:
+             return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.autoReactionUsersHeader, sectionId: self.section)
+         case .addUser:
+@@ -130,8 +155,10 @@ private enum ShadowgramAutoReactionEntry: ItemListNodeEntry {
+     }
+ }
+ 
+-private func shadowgramAutoReactionEntries(presentationData: PresentationData, state: ShadowgramAutoReactionState, autoReactions: [Int64: ShadowgramAutoReactionValue], peers: [EnginePeer]) -> [ShadowgramAutoReactionEntry] {
++private func shadowgramAutoReactionEntries(presentationData: PresentationData, state: ShadowgramAutoReactionState, autoReactions: [Int64: ShadowgramAutoReactionValue], peers: [EnginePeer], inGroups: Bool) -> [ShadowgramAutoReactionEntry] {
+     var entries: [ShadowgramAutoReactionEntry] = []
++    entries.append(.groupsSwitch(inGroups))
++    entries.append(.groupsFooter)
+     entries.append(.header)
+     entries.append(.addUser)
+     let sortedPeers = peers.sorted { lhs, rhs in
+@@ -291,6 +318,8 @@ public func shadowgramAutoReactionController(context: AccountContext) -> ViewCon
+                 return state
+             }
+         }
++    }, setInGroups: { value in
++        ShadowgramSettings.shared.update { $0.autoReactionsInGroups = value }
+     })
+ 
+     let peers: Signal<([Int64: ShadowgramAutoReactionValue], [EnginePeer]), NoError> = ShadowgramSettings.shared.valuesSignal
+@@ -313,15 +342,20 @@ public func shadowgramAutoReactionController(context: AccountContext) -> ViewCon
+         }
+     }
+ 
++    let inGroups: Signal<Bool, NoError> = ShadowgramSettings.shared.valuesSignal
++    |> map { $0.autoReactionsInGroups }
++    |> distinctUntilChanged
++
+     let signal = combineLatest(queue: .mainQueue(),
+         context.sharedContext.presentationData,
+         statePromise.get(),
+-        peers
++        peers,
++        inGroups
+     )
+-    |> map { presentationData, state, peers -> (ItemListControllerState, (ItemListNodeState, Any)) in
++    |> map { presentationData, state, peers, inGroups -> (ItemListControllerState, (ItemListNodeState, Any)) in
+         let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
+         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.autoReaction), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
+-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: shadowgramAutoReactionEntries(presentationData: presentationData, state: state, autoReactions: peers.0, peers: peers.1), style: .blocks, animateChanges: true)
++        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: shadowgramAutoReactionEntries(presentationData: presentationData, state: state, autoReactions: peers.0, peers: peers.1, inGroups: inGroups), style: .blocks, animateChanges: true)
+         return (controllerState, (listState, arguments))
+     }
+ 
+diff --git a/submodules/ShadowgramUI/Sources/ShadowgramEditHistoryController.swift b/submodules/ShadowgramUI/Sources/ShadowgramEditHistoryController.swift
+index cf2802f8..5ed543ef 100644
+--- a/submodules/ShadowgramUI/Sources/ShadowgramEditHistoryController.swift
++++ b/submodules/ShadowgramUI/Sources/ShadowgramEditHistoryController.swift
+@@ -10,7 +10,7 @@ import PresentationDataUtils
+ import AccountContext
+ import ShadowgramSettings
+ 
+-private final class ShadowgramEditHistoryChatContents: ChatCustomContentsProtocol, ChatCustomContentsTitleProviding {
++private final class ShadowgramEditHistoryChatContents: ChatCustomContentsProtocol, ChatCustomContentsTitleProviding, ShadowgramEditHistoryChatContentsMarker {
+     let kind: ChatCustomContentsKind = .hashTagSearch(publicPosts: false)
+     let customTitle: String
+     let customSubtitle: String?
+diff --git a/submodules/ShadowgramUI/Sources/ShadowgramExtraSettingsController.swift b/submodules/ShadowgramUI/Sources/ShadowgramExtraSettingsController.swift
+index 839e4bc9..23c2e3ad 100644
+--- a/submodules/ShadowgramUI/Sources/ShadowgramExtraSettingsController.swift
++++ b/submodules/ShadowgramUI/Sources/ShadowgramExtraSettingsController.swift
+@@ -101,6 +101,8 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
+ 
+     case forwardSelfDestructingMedia(Bool)
+     case forwardSelfDestructingMediaFooter
++    case messageBlockedUsers(Bool)
++    case messageBlockedUsersFooter
+ 
+     case roundVideoCameraHeader
+     case roundVideoCamera(ShadowgramRoundVideoCamera, Bool)
+@@ -118,7 +120,7 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
+ 
+     var category: ShadowgramExtraSettingsCategory {
+         switch self {
+-        case .ghostHeader, .ghostMode, .ghostFooter, .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter, .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter:
++        case .ghostHeader, .ghostMode, .ghostFooter, .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter, .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter, .messageBlockedUsers, .messageBlockedUsersFooter:
+             return .privacy
+         case .messagesHeader, .saveDeletedMessages, .messagesFooter, .messagesExtraHeader, .keepEditHistory, .keepEditHistoryFooter, .autoReaction, .roundVideoCameraHeader, .roundVideoCamera, .mediaHeader, .pictureInPictureOnBackground, .pictureInPictureOnBackgroundFooter:
+             return .messages
+@@ -162,7 +164,7 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
+             return ShadowgramExtraSettingsSection.messagesExtra.rawValue
+         case .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter:
+             return ShadowgramExtraSettingsSection.capture.rawValue
+-        case .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter:
++        case .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter, .messageBlockedUsers, .messageBlockedUsersFooter:
+             return ShadowgramExtraSettingsSection.privacy.rawValue
+         case .roundVideoCameraHeader, .roundVideoCamera:
+             return ShadowgramExtraSettingsSection.roundVideoCamera.rawValue
+@@ -265,6 +267,10 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
+             return 37
+         case .forwardSelfDestructingMediaFooter:
+             return 38
++        case .messageBlockedUsers:
++            return 2400
++        case .messageBlockedUsersFooter:
++            return 2401
+         case .roundVideoCameraHeader:
+             return 50
+         case let .roundVideoCamera(camera, _):
+@@ -455,6 +461,12 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
+             })
+         case .forwardSelfDestructingMediaFooter:
+             return ItemListTextItem(presentationData: presentationData, text: .plain(strings.forwardSelfDestructingMediaFooter), sectionId: self.section)
++        case let .messageBlockedUsers(value):
++            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.messageBlockedUsers, value: value, sectionId: self.section, style: .blocks, updated: { value in
++                arguments.update { $0.messageBlockedUsers = value }
++            })
++        case .messageBlockedUsersFooter:
++            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.messageBlockedUsersFooter), sectionId: self.section)
+         case .roundVideoCameraHeader:
+             return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.roundVideoCameraHeader, sectionId: self.section)
+         case let .roundVideoCamera(camera, checked):
+@@ -572,6 +584,8 @@ private func shadowgramAllExtraSettingsEntries(values: ShadowgramSettingsValues,
+     entries.append(.bypassViewOnceFooter)
+     entries.append(.forwardSelfDestructingMedia(values.forwardSelfDestructingMedia))
+     entries.append(.forwardSelfDestructingMediaFooter)
++    entries.append(.messageBlockedUsers(values.messageBlockedUsers))
++    entries.append(.messageBlockedUsersFooter)
+ 
+     entries.append(.premiumUnlocksHeader)
+     entries.append(.unlockStoryTools(values.unlockStoryTools))
+diff --git a/submodules/ShadowgramUI/Sources/ShadowgramGhostModeController.swift b/submodules/ShadowgramUI/Sources/ShadowgramGhostModeController.swift
+index 08fb7afe..286203c3 100644
+--- a/submodules/ShadowgramUI/Sources/ShadowgramGhostModeController.swift
++++ b/submodules/ShadowgramUI/Sources/ShadowgramGhostModeController.swift
+@@ -1,6 +1,7 @@
+ import Foundation
+ import UIKit
+ import Display
++import AsyncDisplayKit
+ import SwiftSignalKit
+ import TelegramCore
+ import TelegramPresentationData
+@@ -17,33 +18,48 @@ private final class ShadowgramGhostModeArguments {
+     }
+ }
+ 
+-private enum ShadowgramGhostModeSection: Int32 {
+-    case switches
+-}
+-
+ private enum ShadowgramGhostModeEntry: ItemListNodeEntry {
+     case readReceipts(Bool)
++    case readReceiptsInfo
+     case typing(Bool)
++    case typingInfo
+     case onlineStatus(Bool)
++    case onlineStatusInfo
+     case storyViews(Bool)
+-    case footer
++    case storyViewsInfo
+ 
++    /// Every function is its own section, so its explanation sits right under its switch.
+     var section: ItemListSectionId {
+-        return ShadowgramGhostModeSection.switches.rawValue
++        switch self {
++        case .readReceipts, .readReceiptsInfo:
++            return 0
++        case .typing, .typingInfo:
++            return 1
++        case .onlineStatus, .onlineStatusInfo:
++            return 2
++        case .storyViews, .storyViewsInfo:
++            return 3
++        }
+     }
+ 
+     var stableId: Int32 {
+         switch self {
+         case .readReceipts:
+             return 0
+-        case .typing:
++        case .readReceiptsInfo:
+             return 1
+-        case .onlineStatus:
++        case .typing:
+             return 2
+-        case .storyViews:
++        case .typingInfo:
+             return 3
+-        case .footer:
++        case .onlineStatus:
+             return 4
++        case .onlineStatusInfo:
++            return 5
++        case .storyViews:
++            return 6
++        case .storyViewsInfo:
++            return 7
+         }
+     }
+ 
+@@ -59,20 +75,26 @@ private enum ShadowgramGhostModeEntry: ItemListNodeEntry {
+             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.sendReadReceipts, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                 arguments.update { $0.sendReadReceipts = value }
+             })
++        case .readReceiptsInfo:
++            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.sendReadReceiptsInfo), sectionId: self.section)
+         case let .typing(value):
+             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.sendTyping, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                 arguments.update { $0.sendTyping = value }
+             })
++        case .typingInfo:
++            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.sendTypingInfo), sectionId: self.section)
+         case let .onlineStatus(value):
+             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.sendOnlineStatus, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                 arguments.update { $0.sendOnlineStatus = value }
+             })
++        case .onlineStatusInfo:
++            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.sendOnlineStatusInfo), sectionId: self.section)
+         case let .storyViews(value):
+             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.sendStoryViews, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                 arguments.update { $0.sendStoryViews = value }
+             })
+-        case .footer:
+-            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.ghostModeFooter), sectionId: self.section)
++        case .storyViewsInfo:
++            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.sendStoryViewsInfo), sectionId: self.section)
+         }
+     }
+ }
+@@ -96,13 +118,32 @@ public func shadowgramGhostModeController(context: AccountContext) -> ViewContro
+         let closeButton = ItemListNavigationButton(content: .text(strings.close), style: .regular, enabled: true, action: {
+             dismissImpl?()
+         })
+-        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.ghostMode), leftNavigationButton: closeButton, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
++        // ⏻ flips every function at once: all on if any is off, otherwise all off.
++        let powerNode = ASImageNode()
++        powerNode.displaysAsynchronously = false
++        powerNode.image = shadowgramPowerIcon(color: presentationData.theme.rootController.navigationBar.accentTextColor)
++        powerNode.contentMode = .center
++        powerNode.frame = CGRect(origin: CGPoint(), size: CGSize(width: 24.0, height: 24.0))
++        let powerButton = ItemListNavigationButton(content: .node(powerNode), style: .regular, enabled: true, action: {
++            ShadowgramSettings.shared.update { values in
++                let allOn = values.sendReadReceipts && values.sendTyping && values.sendOnlineStatus && values.sendStoryViews
++                let newValue = !allOn
++                values.sendReadReceipts = newValue
++                values.sendTyping = newValue
++                values.sendOnlineStatus = newValue
++                values.sendStoryViews = newValue
++            }
++        })
++        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.ghostMode), leftNavigationButton: closeButton, rightNavigationButton: powerButton, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
+         let entries: [ShadowgramGhostModeEntry] = [
+             .readReceipts(values.sendReadReceipts),
++            .readReceiptsInfo,
+             .typing(values.sendTyping),
++            .typingInfo,
+             .onlineStatus(values.sendOnlineStatus),
++            .onlineStatusInfo,
+             .storyViews(values.sendStoryViews),
+-            .footer
++            .storyViewsInfo
+         ]
+         let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: entries, style: .blocks, animateChanges: true)
+         return (controllerState, (listState, arguments))
+diff --git a/submodules/ShadowgramUI/Sources/ShadowgramIcons.swift b/submodules/ShadowgramUI/Sources/ShadowgramIcons.swift
+index d531d896..7e1fa36e 100644
+--- a/submodules/ShadowgramUI/Sources/ShadowgramIcons.swift
++++ b/submodules/ShadowgramUI/Sources/ShadowgramIcons.swift
+@@ -76,3 +76,26 @@ public let shadowgramExtraSettingsIcon: UIImage = {
+         context.endTransparencyLayer()
+     }
+ }()
++
++/// The ⏻ power glyph (an open ring with a bar through the gap), drawn here because the system font has
++/// no reliable glyph for U+23FB. Template-tinted by the caller.
++public func shadowgramPowerIcon(color: UIColor) -> UIImage {
++    let size = CGSize(width: 24.0, height: 24.0)
++    let renderer = UIGraphicsImageRenderer(size: size)
++    return renderer.image { rendererContext in
++        let context = rendererContext.cgContext
++        context.setStrokeColor(color.cgColor)
++        context.setLineWidth(2.0)
++        context.setLineCap(.round)
++
++        let center = CGPoint(x: 12.0, y: 13.0)
++        let ring = UIBezierPath(arcCenter: center, radius: 7.5, startAngle: -CGFloat.pi / 2.0 + 0.62, endAngle: -CGFloat.pi / 2.0 - 0.62 + CGFloat.pi * 2.0, clockwise: true)
++        ring.lineWidth = 2.0
++        ring.lineCapStyle = .round
++        ring.stroke()
++
++        context.move(to: CGPoint(x: 12.0, y: 3.5))
++        context.addLine(to: CGPoint(x: 12.0, y: 12.0))
++        context.strokePath()
++    }
++}
+diff --git a/submodules/TelegramCore/Sources/Shadowgram/ShadowgramAutoReaction.swift b/submodules/TelegramCore/Sources/Shadowgram/ShadowgramAutoReaction.swift
+index 12be421e..cc0a4bbc 100644
+--- a/submodules/TelegramCore/Sources/Shadowgram/ShadowgramAutoReaction.swift
++++ b/submodules/TelegramCore/Sources/Shadowgram/ShadowgramAutoReaction.swift
+@@ -11,10 +11,12 @@ import ShadowgramSettings
+ private let shadowgramAutoReactionMaxAge: Int32 = 5 * 60
+ 
+ func shadowgramApplyAutoReactions(transaction: Transaction, accountPeerId: PeerId, messageIds: [MessageId]) {
+-    let autoReactions = ShadowgramSettings.shared.values.autoReactions
++    let settingsValues = ShadowgramSettings.shared.values
++    let autoReactions = settingsValues.autoReactions
+     if autoReactions.isEmpty {
+         return
+     }
++    let reactsInGroups = settingsValues.autoReactionsInGroups
+ 
+     let now = Int32(Date().timeIntervalSince1970)
+     var reactedGroupingKeys = Set<Int64>()
+@@ -28,6 +30,9 @@ func shadowgramApplyAutoReactions(transaction: Transaction, accountPeerId: PeerI
+         guard chatNamespace == Namespaces.Peer.CloudUser || chatNamespace == Namespaces.Peer.CloudGroup || chatNamespace == Namespaces.Peer.CloudChannel else {
+             continue
+         }
++        if chatNamespace != Namespaces.Peer.CloudUser && !reactsInGroups {
++            continue
++        }
+         guard let message = transaction.getMessage(id), message.flags.contains(.Incoming) else {
+             continue
+         }
+diff --git a/submodules/TelegramCore/Sources/Shadowgram/ShadowgramDeletedMessages.swift b/submodules/TelegramCore/Sources/Shadowgram/ShadowgramDeletedMessages.swift
+index 32a3d24c..3dd50516 100644
+--- a/submodules/TelegramCore/Sources/Shadowgram/ShadowgramDeletedMessages.swift
++++ b/submodules/TelegramCore/Sources/Shadowgram/ShadowgramDeletedMessages.swift
+@@ -150,6 +150,22 @@ func shadowgramDeletedMessageQuote(_ message: Message) -> (text: String, entitie
+     return (text, entities)
+ }
+ 
++/// The quote links the sender's name to `t.me/<username>`, and the server would turn that link into a
++/// link preview under the message. Merges `disableLinkPreviews` into the attributes so it does not.
++private func shadowgramDisablingLinkPreview(_ attributes: [MessageAttribute]) -> [MessageAttribute] {
++    var flags: OutgoingContentInfoFlags = [.disableLinkPreviews]
++    var result: [MessageAttribute] = []
++    for attribute in attributes {
++        if let attribute = attribute as? OutgoingContentInfoMessageAttribute {
++            flags.formUnion(attribute.flags)
++        } else {
++            result.append(attribute)
++        }
++    }
++    result.append(OutgoingContentInfoMessageAttribute(flags: flags))
++    return result
++}
++
+ func shadowgramForwardCopyOfDeletedMessage(sourceMessage: Message, peerId: PeerId, threadId: Int64?, forwardAttributes: [MessageAttribute], localGroupingKey: Int64?) -> EnqueueMessage? {
+     var mediaReference: AnyMediaReference?
+     for media in sourceMessage.media {
+@@ -167,6 +183,10 @@ func shadowgramForwardCopyOfDeletedMessage(sourceMessage: Message, peerId: PeerI
+         }
+         attributes.append(attribute)
+     }
++    if mediaReference == nil {
++        // A caption under media never gets a link preview, so only plain text needs the flag.
++        attributes = shadowgramDisablingLinkPreview(attributes)
++    }
+ 
+     let replyToMessageId = threadId.flatMap { EngineMessageReplySubject(messageId: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: Int32(clamping: $0)), quote: nil, innerSubject: nil) }
+     return .message(text: quote.text, attributes: attributes, inlineStickers: [:], mediaReference: mediaReference, threadId: threadId, replyToMessageId: replyToMessageId, replyToStoryId: nil, localGroupingKey: localGroupingKey, correlationId: nil, bubbleUpEmojiOrStickersets: [])
+@@ -198,6 +218,9 @@ func shadowgramReplacingReplyToDeletedMessage(transaction: Transaction, peerId:
+         entities.append(MessageTextEntity(range: (entity.range.lowerBound + offset) ..< (entity.range.upperBound + offset), type: entity.type))
+     }
+     updatedAttributes.append(TextEntitiesMessageAttribute(entities: entities))
++    if mediaReference == nil {
++        updatedAttributes = shadowgramDisablingLinkPreview(updatedAttributes)
++    }
+ 
+     let threadReply = threadId.flatMap { EngineMessageReplySubject(messageId: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: Int32(clamping: $0)), quote: nil, innerSubject: nil) }
+     return .message(text: prefix + text, attributes: updatedAttributes, inlineStickers: inlineStickers, mediaReference: mediaReference, threadId: threadId, replyToMessageId: threadReply, replyToStoryId: replyToStoryId, localGroupingKey: localGroupingKey, correlationId: correlationId, bubbleUpEmojiOrStickersets: bubbleUpEmojiOrStickersets)
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
+index d5edf11f..9c5cad97 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
+@@ -1863,7 +1863,16 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+             }
+             
+             if let subject = item.associatedData.subject, case let .customChatContents(contents) = subject, case .hashTagSearch = contents.kind {
+-                hasAvatar = true
++                if contents is ShadowgramEditHistoryChatContentsMarker {
++                    // The avatar header exists only for incoming messages of groups and channels with an author.
++                    var isBroadcast = false
++                    if let channel = firstMessage.peers[firstMessage.id.peerId] as? TelegramChannel, case .broadcast = channel.info {
++                        isBroadcast = true
++                    }
++                    hasAvatar = incoming && firstMessage.id.peerId.isGroupOrChannel && !isBroadcast && firstMessage.author != nil
++                } else {
++                    hasAvatar = true
++                }
+             }
+         }
+         
+@@ -1902,7 +1911,10 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
+         var needsShareButton = false
+         var needsSummarizeButton = false
+     
+-        if incoming, case let .customChatContents(contents) = item.associatedData.subject, case .hashTagSearch = contents.kind {
++        if let subject = item.associatedData.subject, case let .customChatContents(contents) = subject, contents is ShadowgramEditHistoryChatContentsMarker {
++            // A version of an edited message has no counterpart in the chat to open.
++            needsShareButton = false
++        } else if incoming, case let .customChatContents(contents) = item.associatedData.subject, case .hashTagSearch = contents.kind {
+             needsShareButton = true
+         } else if case .pinnedMessages = item.associatedData.subject {
+             needsShareButton = true
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/BUILD b/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/BUILD
+index 5e07704d..f89abd29 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/BUILD
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/BUILD
+@@ -17,6 +17,7 @@ swift_library(
+         "//submodules/Display",
+         "//submodules/ComponentFlow",
+         "//submodules/TelegramCore",
++        "//submodules/ShadowgramSettings:ShadowgramSettings",
+         "//submodules/TelegramPresentationData",
+         "//submodules/TelegramUIPreferences",
+         "//submodules/MediaPlayer:UniversalMediaPlayer",
+diff --git a/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/Sources/ChatMessageInteractiveMediaNode.swift b/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/Sources/ChatMessageInteractiveMediaNode.swift
+index 224e029c..2da0db09 100644
+--- a/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/Sources/ChatMessageInteractiveMediaNode.swift
++++ b/submodules/TelegramUI/Components/Chat/ChatMessageInteractiveMediaNode/Sources/ChatMessageInteractiveMediaNode.swift
+@@ -28,6 +28,7 @@ import InvisibleInkDustNode
+ import ChatControllerInteraction
+ import StoryContainerScreen
+ import ChatMessageDateAndStatusNode
++import ShadowgramSettings
+ import ChatHistoryEntry
+ import ChatMessageItemCommon
+ import WallpaperPreviewMedia
+@@ -924,6 +925,8 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
+             var nativeSize: CGSize
+             
+             let isSecretMedia = message.containsSecretMedia
++            // Shadowgram: with Unlimited View-Once Media the preview is neither blurred nor covered by the dust shader.
++            let shadowgramRevealsViewOnce = isSecretMedia && message.minAutoremoveOrClearTimeout == viewOnceTimeout && ShadowgramSettings.shared.values.bypassViewOnce
+             var secretBeginTimeAndTimeout: (Double, Double)?
+             if isSecretMedia {
+                 if let attribute = message.autoclearAttribute {
+@@ -1486,7 +1489,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
+                             if hasCurrentAnimatedStickerNode {
+                                 replaceAnimatedStickerNode = true
+                             }
+-                            if isSecretMedia {
++                            if isSecretMedia && !shadowgramRevealsViewOnce {
+                                 updateImageSignal = { synchronousLoad, _ in
+                                     return chatSecretPhoto(account: context.account, userLocation: .peer(message.id.peerId), photoReference: .message(message: MessageReference(message), media: image), ignoreFullSize: true)
+                                 }
+@@ -1646,7 +1649,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
+                                 }
+                             }
+                             
+-                            if isSecretMedia {
++                            if isSecretMedia && !shadowgramRevealsViewOnce {
+                                 updateImageSignal = { synchronousLoad, _ in
+                                     return chatSecretMessageVideo(account: context.account, userLocation: .peer(message.id.peerId), videoReference: .message(message: MessageReference(message), media: file))
+                                 }
+@@ -2565,6 +2568,8 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
+         
+         var secretBeginTimeAndTimeout: (Double?, Double)?
+         let isSecretMedia = message.containsSecretMedia
++        // Shadowgram: with Unlimited View-Once Media the preview is neither blurred nor covered by the dust shader.
++        let shadowgramRevealsViewOnce = isSecretMedia && message.minAutoremoveOrClearTimeout == viewOnceTimeout && ShadowgramSettings.shared.values.bypassViewOnce
+         if isSecretMedia {
+             if let attribute = message.autoclearAttribute {
+                 if let countdownBeginTime = attribute.countdownBeginTime {
+@@ -3077,7 +3082,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
+             displaySpoiler = true
+         } else if message.attributes.contains(where: { $0 is MediaSpoilerMessageAttribute }) {
+             displaySpoiler = true
+-        } else if isSecretMedia {
++        } else if isSecretMedia && !shadowgramRevealsViewOnce {
+             displaySpoiler = true
+         } else if message.isSensitiveContent(platform: "ios") {
+             if !self.showSensitiveContent {
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoProfileItems.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoProfileItems.swift
+index 43499cba..3ea80f26 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoProfileItems.swift
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoProfileItems.swift
+@@ -55,7 +55,6 @@ enum InfoSection: Int, CaseIterable {
+     case peerMembers
+     case channelMonoforum
+     case botAffiliateProgram
+-    case shadowgramPeerId
+ }
+ 
+ func infoItems(
+@@ -909,7 +908,7 @@ func infoItems(
+     if ShadowgramSettings.shared.values.showPeerIds, let peer = data.peer {
+         switch peer {
+         case .user, .channel, .legacyGroup:
+-            items[.shadowgramPeerId]!.append(shadowgramPeerIdInfoItem(peerId: peer.id, interaction: interaction))
++            items[.peerInfo]!.append(shadowgramPeerIdInfoItem(peerId: peer.id, interaction: interaction))
+         case .community, .secretChat:
+             break
+         }
+@@ -1881,15 +1880,25 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
+     return result
+ }
+ 
+-// Shadowgram: a labelled row with the peer's numeric ID. Tap copies it and shows a toast.
++// Shadowgram: the peer's numeric ID, shown in the same box as the username, phone and bio: a small
++// "ID" label with the value under it, left-aligned. Tap copies it and shows a toast.
+ private let shadowgramPeerIdItemBase: AnyHashable = AnyHashable("shadowgram.peerId")
+ 
+ private func shadowgramPeerIdInfoItem(peerId: EnginePeer.Id, interaction: PeerInfoInteraction) -> PeerInfoScreenItem {
+     let value = "\(peerId.id._internalGetInt64Value())"
+-    let item = PeerInfoScreenDisclosureItem(id: shadowgramPeerIdItemBase, label: .coloredText(value, .accent), text: "ID", hasArrow: false, action: {
+-        UIPasteboard.general.string = value
+-        interaction.shadowgramPeerIdCopied?()
+-    })
++    let item = PeerInfoScreenLabeledValueItem(
++        id: shadowgramPeerIdItemBase,
++        label: "ID",
++        text: value,
++        textColor: .accent,
++        action: { _, _ in
++            UIPasteboard.general.string = value
++            interaction.shadowgramPeerIdCopied?()
++        },
++        requestLayout: { animated in
++            interaction.requestLayout(animated)
++        }
++    )
+     item.shadowgramCaptureKinds = [.id]
+     return item
+ }
+diff --git a/submodules/TelegramUI/Sources/ChatInterfaceStateInputPanels.swift b/submodules/TelegramUI/Sources/ChatInterfaceStateInputPanels.swift
+index de612484..1b1d8972 100644
+--- a/submodules/TelegramUI/Sources/ChatInterfaceStateInputPanels.swift
++++ b/submodules/TelegramUI/Sources/ChatInterfaceStateInputPanels.swift
+@@ -12,6 +12,7 @@ import ChatTextInputPanelNode
+ import RichTextEditorMediaView
+ import RichTextEditorUIKit
+ import InstantPageUI
++import ShadowgramSettings
+ 
+ func chatInputFormulaRenderResult(context: RichTextFormulaRenderContext) -> RichTextFormulaRenderResult? {
+     guard let attachment = instantPageMathAttachment(
+@@ -169,7 +170,7 @@ func inputPanelForChatPresentationIntefaceState(_ chatPresentationInterfaceState
+         }
+     }
+     
+-    if chatPresentationInterfaceState.peerIsBlocked, let peer = chatPresentationInterfaceState.renderedPeer?.peer as? TelegramUser, peer.botInfo == nil {
++    if chatPresentationInterfaceState.peerIsBlocked, !ShadowgramSettings.shared.values.messageBlockedUsers, let peer = chatPresentationInterfaceState.renderedPeer?.peer as? TelegramUser, peer.botInfo == nil {
+         if let currentPanel = (currentPanel as? ChatUnblockInputPanelNode) ?? (currentSecondaryPanel as? ChatUnblockInputPanelNode) {
+             currentPanel.chatControllerInteraction = chatControllerInteraction
+             currentPanel.interfaceInteraction = interfaceInteraction

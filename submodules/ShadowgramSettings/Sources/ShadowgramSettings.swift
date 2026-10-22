@@ -105,6 +105,11 @@ public struct ShadowgramSettingsValues: Equatable {
     public var unlockChatTranslation: Bool
     public var hideAds: Bool
     public var unlockExtraFolders: Bool
+    /// Keep the message input in chats with users that this account has blocked, instead of the
+    /// "Unblock" button, so messages can be sent without unblocking first.
+    public var messageBlockedUsers: Bool
+    /// Auto reactions also apply to messages from the chosen users in groups, not only in private chats.
+    public var autoReactionsInGroups: Bool
 
     public static let defaultValues = ShadowgramSettingsValues(
         saveDeletedMessages: false,
@@ -138,10 +143,12 @@ public struct ShadowgramSettingsValues: Equatable {
         unlockMediaSaving: false,
         unlockChatTranslation: false,
         hideAds: false,
-        unlockExtraFolders: false
+        unlockExtraFolders: false,
+        messageBlockedUsers: false,
+        autoReactionsInGroups: true
     )
 
-    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactions: [Int64: ShadowgramAutoReactionValue], chatListOldestFirst: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool, roundVideoCamera: ShadowgramRoundVideoCamera, pictureInPictureOnBackground: Bool, forwardSelfDestructingMedia: Bool, unlockStoryTools: Bool, unlockMediaSaving: Bool, unlockChatTranslation: Bool, hideAds: Bool, unlockExtraFolders: Bool) {
+    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactions: [Int64: ShadowgramAutoReactionValue], chatListOldestFirst: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool, roundVideoCamera: ShadowgramRoundVideoCamera, pictureInPictureOnBackground: Bool, forwardSelfDestructingMedia: Bool, unlockStoryTools: Bool, unlockMediaSaving: Bool, unlockChatTranslation: Bool, hideAds: Bool, unlockExtraFolders: Bool, messageBlockedUsers: Bool, autoReactionsInGroups: Bool) {
         self.saveDeletedMessages = saveDeletedMessages
         self.unlimitedAccounts = unlimitedAccounts
         self.ghostModeEnabled = ghostModeEnabled
@@ -174,6 +181,8 @@ public struct ShadowgramSettingsValues: Equatable {
         self.unlockChatTranslation = unlockChatTranslation
         self.hideAds = hideAds
         self.unlockExtraFolders = unlockExtraFolders
+        self.messageBlockedUsers = messageBlockedUsers
+        self.autoReactionsInGroups = autoReactionsInGroups
     }
 
     /// What the client actually sends: everything unless ghost mode is on and hides it.
@@ -242,6 +251,8 @@ public final class ShadowgramSettings {
         static let unlockChatTranslation = "shadowgram.premium.chatTranslation"
         static let hideAds = "shadowgram.premium.hideAds"
         static let unlockExtraFolders = "shadowgram.premium.extraFolders"
+        static let messageBlockedUsers = "shadowgram.messageBlockedUsers"
+        static let autoReactionsInGroups = "shadowgram.autoReaction.inGroups"
     }
 
     private let defaults: UserDefaults
@@ -300,7 +311,9 @@ public final class ShadowgramSettings {
             unlockMediaSaving: bool(Key.unlockMediaSaving, defaultValues.unlockMediaSaving),
             unlockChatTranslation: bool(Key.unlockChatTranslation, defaultValues.unlockChatTranslation),
             hideAds: bool(Key.hideAds, defaultValues.hideAds),
-            unlockExtraFolders: bool(Key.unlockExtraFolders, defaultValues.unlockExtraFolders)
+            unlockExtraFolders: bool(Key.unlockExtraFolders, defaultValues.unlockExtraFolders),
+            messageBlockedUsers: bool(Key.messageBlockedUsers, defaultValues.messageBlockedUsers),
+            autoReactionsInGroups: bool(Key.autoReactionsInGroups, defaultValues.autoReactionsInGroups)
         )
         self.currentValues = values
         self.valuesPromise = ValuePromise(values, ignoreRepeated: true)
@@ -364,6 +377,8 @@ public final class ShadowgramSettings {
         self.defaults.set(values.unlockChatTranslation, forKey: Key.unlockChatTranslation)
         self.defaults.set(values.hideAds, forKey: Key.hideAds)
         self.defaults.set(values.unlockExtraFolders, forKey: Key.unlockExtraFolders)
+        self.defaults.set(values.messageBlockedUsers, forKey: Key.messageBlockedUsers)
+        self.defaults.set(values.autoReactionsInGroups, forKey: Key.autoReactionsInGroups)
 
         self.valuesPromise.set(values)
     }

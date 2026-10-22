@@ -101,6 +101,8 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
 
     case forwardSelfDestructingMedia(Bool)
     case forwardSelfDestructingMediaFooter
+    case messageBlockedUsers(Bool)
+    case messageBlockedUsersFooter
 
     case roundVideoCameraHeader
     case roundVideoCamera(ShadowgramRoundVideoCamera, Bool)
@@ -118,7 +120,7 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
 
     var category: ShadowgramExtraSettingsCategory {
         switch self {
-        case .ghostHeader, .ghostMode, .ghostFooter, .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter, .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter:
+        case .ghostHeader, .ghostMode, .ghostFooter, .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter, .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter, .messageBlockedUsers, .messageBlockedUsersFooter:
             return .privacy
         case .messagesHeader, .saveDeletedMessages, .messagesFooter, .messagesExtraHeader, .keepEditHistory, .keepEditHistoryFooter, .autoReaction, .roundVideoCameraHeader, .roundVideoCamera, .mediaHeader, .pictureInPictureOnBackground, .pictureInPictureOnBackgroundFooter:
             return .messages
@@ -162,7 +164,7 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return ShadowgramExtraSettingsSection.messagesExtra.rawValue
         case .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter:
             return ShadowgramExtraSettingsSection.capture.rawValue
-        case .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter:
+        case .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter, .messageBlockedUsers, .messageBlockedUsersFooter:
             return ShadowgramExtraSettingsSection.privacy.rawValue
         case .roundVideoCameraHeader, .roundVideoCamera:
             return ShadowgramExtraSettingsSection.roundVideoCamera.rawValue
@@ -265,6 +267,10 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return 37
         case .forwardSelfDestructingMediaFooter:
             return 38
+        case .messageBlockedUsers:
+            return 2400
+        case .messageBlockedUsersFooter:
+            return 2401
         case .roundVideoCameraHeader:
             return 50
         case let .roundVideoCamera(camera, _):
@@ -455,6 +461,12 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             })
         case .forwardSelfDestructingMediaFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain(strings.forwardSelfDestructingMediaFooter), sectionId: self.section)
+        case let .messageBlockedUsers(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.messageBlockedUsers, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.messageBlockedUsers = value }
+            })
+        case .messageBlockedUsersFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.messageBlockedUsersFooter), sectionId: self.section)
         case .roundVideoCameraHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.roundVideoCameraHeader, sectionId: self.section)
         case let .roundVideoCamera(camera, checked):
@@ -572,6 +584,8 @@ private func shadowgramAllExtraSettingsEntries(values: ShadowgramSettingsValues,
     entries.append(.bypassViewOnceFooter)
     entries.append(.forwardSelfDestructingMedia(values.forwardSelfDestructingMedia))
     entries.append(.forwardSelfDestructingMediaFooter)
+    entries.append(.messageBlockedUsers(values.messageBlockedUsers))
+    entries.append(.messageBlockedUsersFooter)
 
     entries.append(.premiumUnlocksHeader)
     entries.append(.unlockStoryTools(values.unlockStoryTools))

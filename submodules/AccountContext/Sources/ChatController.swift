@@ -1342,6 +1342,12 @@ public enum ChatCustomContentsKind: Equatable {
     case welcomeMessages
 }
 
+/// Shadowgram: adopted by the read-only chat that shows one version of an edited message. Such a chat
+/// reuses the hashtag-search kind, but its message has no counterpart on the server to jump to and
+/// no avatar column is wanted for it unless the avatar is really drawn.
+public protocol ShadowgramEditHistoryChatContentsMarker: AnyObject {
+}
+
 public protocol ChatCustomContentsProtocol: AnyObject {
     var kind: ChatCustomContentsKind { get }
     var historyView: Signal<(EngineRawMessageHistoryView, EngineViewUpdateType), NoError> { get }

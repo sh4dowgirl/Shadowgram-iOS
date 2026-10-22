@@ -10,7 +10,7 @@ import PresentationDataUtils
 import AccountContext
 import ShadowgramSettings
 
-private final class ShadowgramEditHistoryChatContents: ChatCustomContentsProtocol, ChatCustomContentsTitleProviding {
+private final class ShadowgramEditHistoryChatContents: ChatCustomContentsProtocol, ChatCustomContentsTitleProviding, ShadowgramEditHistoryChatContentsMarker {
     let kind: ChatCustomContentsKind = .hashTagSearch(publicPosts: false)
     let customTitle: String
     let customSubtitle: String?

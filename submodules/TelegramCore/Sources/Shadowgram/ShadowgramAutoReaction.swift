@@ -11,10 +11,12 @@ import ShadowgramSettings
 private let shadowgramAutoReactionMaxAge: Int32 = 5 * 60
 
 func shadowgramApplyAutoReactions(transaction: Transaction, accountPeerId: PeerId, messageIds: [MessageId]) {
-    let autoReactions = ShadowgramSettings.shared.values.autoReactions
+    let settingsValues = ShadowgramSettings.shared.values
+    let autoReactions = settingsValues.autoReactions
     if autoReactions.isEmpty {
         return
     }
+    let reactsInGroups = settingsValues.autoReactionsInGroups
 
     let now = Int32(Date().timeIntervalSince1970)
     var reactedGroupingKeys = Set<Int64>()
@@ -26,6 +28,9 @@ func shadowgramApplyAutoReactions(transaction: Transaction, accountPeerId: PeerI
         }
         let chatNamespace = id.peerId.namespace
         guard chatNamespace == Namespaces.Peer.CloudUser || chatNamespace == Namespaces.Peer.CloudGroup || chatNamespace == Namespaces.Peer.CloudChannel else {
+            continue
+        }
+        if chatNamespace != Namespaces.Peer.CloudUser && !reactsInGroups {
             continue
         }
         guard let message = transaction.getMessage(id), message.flags.contains(.Incoming) else {
