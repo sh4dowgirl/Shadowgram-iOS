@@ -87,6 +87,52 @@ private func endNotificationEpisodeMarker(episode: String) {
     let _ = try? FileManager.default.removeItem(atPath: notificationEpisodeMarkerPath(directory: directory, episode: episode))
 }
 
+private let shadowgramHiddenNotificationKey = "shadowgram.hidden"
+
+private func shadowgramCanFilterNotifications() -> Bool {
+    return Bundle.main.bundleIdentifier?.hasPrefix("ph.telegra.Telegraph.") ?? false
+}
+
+private func shadowgramRemoveHiddenNotifications() {
+    let center = UNUserNotificationCenter.current()
+    center.getDeliveredNotifications { notifications in
+        let identifiers = notifications.filter { $0.request.content.userInfo[shadowgramHiddenNotificationKey] != nil }.map { $0.request.identifier }
+        if !identifiers.isEmpty {
+            center.removeDeliveredNotifications(withIdentifiers: identifiers)
+        }
+    }
+}
+
+private func shadowgramDeliverableContent(_ value: NotificationContent, requestIdentifier: String?, episode: String) -> UNNotificationContent {
+    let content = value.generate()
+    if shadowgramCanFilterNotifications() || value.body != nil || !content.title.isEmpty || !content.subtitle.isEmpty || !content.body.isEmpty {
+        return content
+    }
+    guard let hiddenContent = content.mutableCopy() as? UNMutableNotificationContent else {
+        return content
+    }
+    Logger.shared.log("NotificationService \(episode)", "Delivering a hidden notification in place of an empty one")
+    hiddenContent.body = "·"
+    hiddenContent.sound = nil
+    hiddenContent.threadIdentifier = shadowgramHiddenNotificationKey
+    var userInfo = hiddenContent.userInfo
+    userInfo[shadowgramHiddenNotificationKey] = true
+    hiddenContent.userInfo = userInfo
+    if #available(iOS 15.0, *) {
+        hiddenContent.interruptionLevel = .passive
+        hiddenContent.relevanceScore = 0.0
+    }
+    if let requestIdentifier {
+        let center = UNUserNotificationCenter.current()
+        for delay in [0.3, 1.0, 2.5] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                center.removeDeliveredNotifications(withIdentifiers: [requestIdentifier])
+            }
+        }
+    }
+    return hiddenContent
+}
+
 private func rootPathForBasePath(_ appGroupPath: String) -> String {
     return appGroupPath + "/telegram-data"
 }
@@ -2772,6 +2818,7 @@ final class NotificationService: UNNotificationServiceExtension {
     private var content = Atomic<NotificationContent?>(value: nil)
     private var contentHandler: ((UNNotificationContent) -> Void)?
     private var episode: String?
+    private var requestIdentifier: String?
     
     override init() {
         super.init()
@@ -2787,13 +2834,16 @@ final class NotificationService: UNNotificationServiceExtension {
                 endNotificationEpisodeMarker(episode: previousEpisode)
             }
             if let previousContent = self.content.with({ $0 }) {
-                previousContentHandler(previousContent.generate())
+                previousContentHandler(shadowgramDeliverableContent(previousContent, requestIdentifier: self.requestIdentifier, episode: self.episode ?? "???"))
             } else if let previousInitialContent = self.initialContent {
                 previousContentHandler(previousInitialContent)
             }
         }
 
         self.episode = episode
+        self.requestIdentifier = request.identifier
+
+        shadowgramRemoveHiddenNotifications()
         
         self.initialContent = request.content
         self.contentHandler = contentHandler
@@ -2827,7 +2877,7 @@ final class NotificationService: UNNotificationServiceExtension {
                         strongSelf.contentHandler = nil
                         
                         if let content = content.with({ $0 }) {
-                            contentHandler(content.generate())
+                            contentHandler(shadowgramDeliverableContent(content, requestIdentifier: request.identifier, episode: episode))
                         } else if let initialContent = strongSelf.initialContent {
                             contentHandler(initialContent)
                         }
@@ -2858,7 +2908,7 @@ final class NotificationService: UNNotificationServiceExtension {
             }
             
             if let content = self.content.with({ $0 }) {
-                contentHandler(content.generate())
+                contentHandler(shadowgramDeliverableContent(content, requestIdentifier: self.requestIdentifier, episode: self.episode ?? "???"))
             } else if let initialContent = self.initialContent {
                 contentHandler(initialContent)
             }

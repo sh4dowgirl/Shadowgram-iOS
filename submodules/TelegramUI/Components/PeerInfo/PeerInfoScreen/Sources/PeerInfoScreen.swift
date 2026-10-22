@@ -6626,11 +6626,11 @@ public final class PeerInfoScreenImpl: ViewController, PeerInfoScreen, KeyShortc
             
             let accountTabBarAvatar: Signal<(UIImage, UIImage)?, NoError> = combineLatest(self.accountsAndPeers.get(), context.sharedContext.presentationData)
             |> map { primaryAndOther, presentationData -> (Account, EnginePeer, PresentationTheme)? in
-                // Shadowgram: the Settings tab always shows the gear icon, never the account's
-                // avatar (stock Telegram switches to the avatar once a second account is added).
-                let _ = primaryAndOther
-                let _ = presentationData
-                return nil
+                if let primary = primaryAndOther.0 {
+                    return (primary.0.account, primary.1, presentationData.theme)
+                } else {
+                    return nil
+                }
             }
             |> distinctUntilChanged(isEqual: { $0?.0 === $1?.0 && $0?.1 == $1?.1 && $0?.2 === $1?.2 })
             |> mapToSignal { primary -> Signal<(UIImage, UIImage)?, NoError> in

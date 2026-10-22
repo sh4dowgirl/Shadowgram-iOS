@@ -2120,9 +2120,17 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         self.isActivePromise.set(true)
 
         self.resetBadge()
-        
+
+        let notificationCenter = UNUserNotificationCenter.current()
+        notificationCenter.getDeliveredNotifications { notifications in
+            let identifiers = notifications.filter { $0.request.content.userInfo["shadowgram.hidden"] != nil }.map { $0.request.identifier }
+            if !identifiers.isEmpty {
+                notificationCenter.removeDeliveredNotifications(withIdentifiers: identifiers)
+            }
+        }
+
         self.maybeCheckForUpdates()
-        
+
         SharedDisplayLinkDriver.shared.updateForegroundState(self.isActiveValue)
         
         func cancelWindowPanGestures(view: UIView) {
