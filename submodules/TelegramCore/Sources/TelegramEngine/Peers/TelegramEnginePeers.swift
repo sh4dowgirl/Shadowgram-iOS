@@ -140,7 +140,7 @@ public extension TelegramEngine {
     }
 
     final class Peers {
-        private let account: Account
+        let account: Account
 
         init(account: Account) {
             self.account = account

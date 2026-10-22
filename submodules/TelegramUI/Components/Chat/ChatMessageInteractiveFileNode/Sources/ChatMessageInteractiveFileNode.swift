@@ -966,7 +966,6 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                         replyCount: dateReplies,
                         starsCount: starsCount,
                         isPinned: arguments.isPinned && !arguments.associatedData.isInPinnedListMode,
-                        isShadowgramDeleted: arguments.message.shadowgramIsDeleted,
                         hasAutoremove: arguments.message.isSelfExpiring,
                         canViewReactionList: canViewMessageReactionList(message: EngineMessage(arguments.topMessage)),
                         animationCache: arguments.controllerInteraction.presentationContext.animationCache,

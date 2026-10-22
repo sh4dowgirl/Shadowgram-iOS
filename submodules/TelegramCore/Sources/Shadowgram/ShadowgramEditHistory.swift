@@ -117,3 +117,43 @@ public extension EngineMessage {
         return []
     }
 }
+
+public struct ShadowgramEditHistoryVersion {
+    public let message: Message
+    public let isCurrent: Bool
+    public let date: Int32
+    public let text: String
+}
+
+public func shadowgramEditHistoryVersions(_ message: Message) -> [ShadowgramEditHistoryVersion] {
+    let entries = message.shadowgramEditHistory
+    var versions: [ShadowgramEditHistoryVersion] = []
+
+    let currentDate = message.editedTime ?? message.timestamp
+    versions.append(ShadowgramEditHistoryVersion(message: shadowgramEditHistoryVersionMessage(message, text: message.text, date: currentDate, keepEntities: true, index: 0), isCurrent: true, date: currentDate, text: message.text))
+
+    for (offset, entry) in entries.reversed().enumerated() {
+        versions.append(ShadowgramEditHistoryVersion(message: shadowgramEditHistoryVersionMessage(message, text: entry.text, date: entry.date, keepEntities: false, index: offset + 1), isCurrent: false, date: entry.date, text: entry.text))
+    }
+    return versions
+}
+
+private func shadowgramEditHistoryVersionMessage(_ message: Message, text: String, date: Int32, keepEntities: Bool, index: Int) -> Message {
+    var attributes: [MessageAttribute] = []
+    for attribute in message.attributes {
+        if attribute is ShadowgramEditHistoryMessageAttribute || attribute is ShadowgramDeletedMessageAttribute || attribute is EditedMessageAttribute || attribute is ReactionsMessageAttribute || attribute is PendingReactionsMessageAttribute || attribute is ReplyThreadMessageAttribute {
+            continue
+        }
+        if attribute is TextEntitiesMessageAttribute && !keepEntities {
+            continue
+        }
+        attributes.append(attribute)
+    }
+    let media = message.media.filter { !($0 is TelegramMediaWebpage) }
+    var flags = message.flags
+    flags.remove(.Failed)
+    flags.remove(.Unsent)
+    flags.remove(.Sending)
+    let id = MessageId(peerId: message.id.peerId, namespace: Namespaces.Message.Local, id: Int32.max - Int32(index))
+    return Message(stableId: UInt32.max - UInt32(index), stableVersion: 0, id: id, globallyUniqueId: nil, groupingKey: nil, groupInfo: nil, threadId: message.threadId, timestamp: date, flags: flags, tags: [], globalTags: [], localTags: [], customTags: [], forwardInfo: message.forwardInfo, author: message.author, text: text, attributes: attributes, media: media, peers: message.peers, associatedMessages: message.associatedMessages, associatedMessageIds: message.associatedMessageIds, associatedMedia: message.associatedMedia, associatedThreadInfo: message.associatedThreadInfo, associatedStories: message.associatedStories)
+}

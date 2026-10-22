@@ -4687,7 +4687,7 @@ func replayFinalState(
                     // helper. The check against the new text means a pure media or reaction edit
                     // does not add a bogus duplicate entry.
                     if previousMessage.text != message.text {
-                        updatedAttributes = shadowgramAppendEditHistory(previousText: previousMessage.text, previousDate: previousMessage.timestamp, attributes: updatedAttributes)
+                        updatedAttributes = shadowgramAppendEditHistory(previousText: previousMessage.text, previousDate: previousMessage.editedTime ?? previousMessage.timestamp, attributes: updatedAttributes)
                     } else if let kept = previousMessage.attributes.first(where: { $0 is ShadowgramEditHistoryMessageAttribute }) {
                         // Carry the history forward unchanged for media-only edits.
                         updatedAttributes.append(kept)

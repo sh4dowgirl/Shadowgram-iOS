@@ -1131,7 +1131,6 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                     replyCount: dateAndStatus.dateReplies,
                     starsCount: dateAndStatus.starsCount,
                     isPinned: dateAndStatus.isPinned,
-                    isShadowgramDeleted: message.shadowgramIsDeleted,
                     hasAutoremove: message.isSelfExpiring,
                     canViewReactionList: canViewMessageReactionList(message: EngineMessage(message)),
                     animationCache: presentationContext.animationCache,

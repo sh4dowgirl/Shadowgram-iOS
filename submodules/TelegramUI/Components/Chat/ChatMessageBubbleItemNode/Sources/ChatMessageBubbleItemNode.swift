@@ -2715,7 +2715,6 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                     replyCount: dateReplies,
                     starsCount: starsCount,
                     isPinned: message.tags.contains(.pinned) && !item.associatedData.isInPinnedListMode && !isReplyThread,
-                    isShadowgramDeleted: message.shadowgramIsDeleted,
                     hasAutoremove: message.isSelfExpiring,
                     canViewReactionList: canViewMessageReactionList(message: EngineMessage(message)),
                     animationCache: item.controllerInteraction.presentationContext.animationCache,
@@ -4032,7 +4031,11 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         let shadowgramWasDeleted = strongSelf.shadowgramDisplaysDeletedTint
         strongSelf.shadowgramDisplaysDeletedTint = shadowgramIsDeleted
         let shadowgramTintColor: UIColor? = shadowgramIsDeleted ? UIColor(red: 1.0, green: 0.27, blue: 0.23, alpha: item.presentationData.theme.theme.overallDarkAppearance ? 0.3 : 0.2) : nil
-        strongSelf.backgroundNode.setShadowgramDeletedTint(color: shadowgramTintColor, animated: shadowgramWasDeleted != nil && shadowgramWasDeleted != shadowgramIsDeleted)
+        var shadowgramAnimateTint = false
+        if shadowgramIsDeleted && shadowgramWasDeleted == false {
+            shadowgramAnimateTint = shadowgramMarkDeletedTintAnimated(stableId: item.message.stableId)
+        }
+        strongSelf.backgroundNode.setShadowgramDeletedTint(color: shadowgramTintColor, animated: shadowgramAnimateTint)
         
         strongSelf.backgroundType = backgroundType
         
@@ -8045,4 +8048,16 @@ public final class NameNavigateButton: HighlightableButton {
             self.titleTopicIconComponent = nil
         }
     }
+}
+
+private let shadowgramDeletedTintAnimatedStableIds = Atomic<Set<UInt32>>(value: Set())
+
+private func shadowgramMarkDeletedTintAnimated(stableId: UInt32) -> Bool {
+    var inserted = false
+    let _ = shadowgramDeletedTintAnimatedStableIds.modify { ids in
+        var ids = ids
+        inserted = ids.insert(stableId).inserted
+        return ids
+    }
+    return inserted
 }

@@ -1863,7 +1863,9 @@ extension ChatControllerImpl {
                 if case let .customChatContents(customChatContents) = initialSubject {
                     switch customChatContents.kind {
                     case .hashTagSearch:
-                        break
+                        if let titleProvider = customChatContents as? ChatCustomContentsTitleProviding {
+                            self.state.chatTitleContent = .custom(title: [ChatTitleContent.TitleTextItem(id: AnyHashable(0), content: .text(titleProvider.customTitle))], subtitle: titleProvider.customSubtitle, isEnabled: false)
+                        }
                     case let .quickReplyMessageInput(shortcut, shortcutType):
                         switch shortcutType {
                         case .generic:

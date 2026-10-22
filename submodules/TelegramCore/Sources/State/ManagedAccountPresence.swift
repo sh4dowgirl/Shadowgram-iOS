@@ -43,6 +43,9 @@ private final class AccountPresenceManagerImpl {
     
     private let queue: Queue
     private let network: Network
+    private let postbox: Postbox
+    private let accountPeerId: PeerId
+    private let contactPresencesDisposable = MetaDisposable()
     let isPerformingUpdate = ValuePromise<Bool>(false, ignoreRepeated: true)
     
     private var shouldKeepOnlinePresenceDisposable: Disposable?
@@ -51,9 +54,11 @@ private final class AccountPresenceManagerImpl {
     
     private var mode: Mode?
     
-    init(queue: Queue, shouldKeepOnlinePresence: Signal<Bool, NoError>, network: Network) {
+    init(queue: Queue, shouldKeepOnlinePresence: Signal<Bool, NoError>, network: Network, postbox: Postbox, accountPeerId: PeerId) {
         self.queue = queue
         self.network = network
+        self.postbox = postbox
+        self.accountPeerId = accountPeerId
         
         // Split into explicitly typed steps: as one chain the type checker gave up on it.
         let sendsOnlineStatus: Signal<Bool, NoError> = ShadowgramSettings.shared.valuesSignal
@@ -91,6 +96,7 @@ private final class AccountPresenceManagerImpl {
         assert(self.queue.isCurrent())
         self.shouldKeepOnlinePresenceDisposable?.dispose()
         self.currentRequestDisposable.dispose()
+        self.contactPresencesDisposable.dispose()
         self.onlineTimer?.invalidate()
     }
     
@@ -110,6 +116,9 @@ private final class AccountPresenceManagerImpl {
             self.onlineTimer = timer
             timer.start()
             request = self.network.request(Api.functions.account.updateStatus(offline: mode == .online ? .boolFalse : .boolTrue))
+            if mode == .ghostForeground {
+                self.contactPresencesDisposable.set(updateContactPresences(postbox: self.postbox, network: self.network, accountPeerId: self.accountPeerId).start())
+            }
         case .offline:
             request = self.network.request(Api.functions.account.updateStatus(offline: .boolTrue))
         }
@@ -131,10 +140,10 @@ final class AccountPresenceManager {
     private let queue = Queue()
     private let impl: QueueLocalObject<AccountPresenceManagerImpl>
     
-    init(shouldKeepOnlinePresence: Signal<Bool, NoError>, network: Network) {
+    init(shouldKeepOnlinePresence: Signal<Bool, NoError>, network: Network, postbox: Postbox, accountPeerId: PeerId) {
         let queue = self.queue
         self.impl = QueueLocalObject(queue: self.queue, generate: {
-            return AccountPresenceManagerImpl(queue: queue, shouldKeepOnlinePresence: shouldKeepOnlinePresence, network: network)
+            return AccountPresenceManagerImpl(queue: queue, shouldKeepOnlinePresence: shouldKeepOnlinePresence, network: network, postbox: postbox, accountPeerId: accountPeerId)
         })
     }
     

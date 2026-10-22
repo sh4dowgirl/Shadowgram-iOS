@@ -136,3 +136,38 @@ extension ShadowgramStrings {
     public var groupsFolderPlacementArchive: String { return t("Рядом с архивом", "Next to the Archive") }
     public var groupsFolderPlacementTab: String { return t("Отдельная вкладка", "Separate Tab") }
 }
+
+extension ShadowgramStrings {
+    public var editHistoryTitle: String { return t("История правок", "Edit History") }
+    public var editHistoryCurrent: String { return t("СЕЙЧАС", "CURRENT") }
+    public var editHistoryEarlier: String { return t("ПРЕДЫДУЩИЕ ВЕРСИИ", "EARLIER VERSIONS") }
+    public var editHistoryCurrentVersion: String { return t("Текущая версия", "Current version") }
+    public var editHistoryVersion: String { return t("Версия", "Version") }
+    public var editHistoryEmptyText: String { return t("Без текста", "No text") }
+}
+
+extension ShadowgramStrings {
+    public var chatListSortNewestFirst: String { return t("Сначала новые", "Newest First") }
+    public var chatListSortOldestFirst: String { return t("Сначала старые", "Oldest First") }
+}
+
+extension ShadowgramStrings {
+    public var chatListSortHeader: String { return t("СОРТИРОВКА ЧАТОВ", "CHAT SORTING") }
+    public var unlimitedAccountsShort: String { return t("Без лимита", "Unlimited") }
+    public var extraSettingsFooter: String { return t("Все настройки хранятся только на этом устройстве.", "All settings are stored on this device only.") }
+
+    public func extraSettingsCategoryTitle(_ category: Int32) -> String {
+        switch category {
+        case 0:
+            return t("Конфиденциальность", "Privacy")
+        case 1:
+            return t("Сообщения", "Messages")
+        case 2:
+            return t("Список чатов", "Chat List")
+        case 3:
+            return t("Интерфейс", "Interface")
+        default:
+            return t("Аккаунты", "Accounts")
+        }
+    }
+}

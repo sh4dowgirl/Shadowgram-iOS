@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import AsyncDisplayKit
 import Display
+import ShadowgramSettings
 import TelegramCore
 import SwiftSignalKit
 import TelegramPresentationData
@@ -544,7 +545,7 @@ public final class ChatListContainerNode: ASDisplayNode, ASGestureRecognizerDele
         self.applyItemNodeAsCurrent(id: .all, itemNode: itemNode)
         
         let panRecognizer = InteractiveTransitionGestureRecognizer(target: self, action: #selector(self.panGesture(_:)), allowedDirections: { [weak self] _ in
-            guard let self, self.availableFilters.count > 1 || (self.controller?.isStoryPostingAvailable == true && !(self.context.sharedContext.callManager?.hasActiveCall ?? false)) else {
+            guard let self, self.availableFilters.count > 1 || (self.controller?.isStoryPostingAvailable == true && !ShadowgramSettings.shared.values.disableCameraSwipe && !(self.context.sharedContext.callManager?.hasActiveCall ?? false)) else {
                 return []
             }
             guard case .chatList(.root) = self.location else {
@@ -609,6 +610,7 @@ public final class ChatListContainerNode: ASDisplayNode, ASGestureRecognizerDele
             && self.availableFilters.first?.id == self.selectedId
             && !recognizer.currentAllowedDirections.intersection(.right).isEmpty
             && self.controller?.isStoryPostingAvailable == true
+            && !ShadowgramSettings.shared.values.disableCameraSwipe
             && !(self.context.sharedContext.callManager?.hasActiveCall ?? false)
         let hasLiveStream = canOpenStoryCamera && self.controller?.chatListHeaderView()?.storyPeerListView()?.isLiveStreaming == true
         

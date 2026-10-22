@@ -1,4 +1,5 @@
 import Foundation
+import ShadowgramSettings
 import UIKit
 import AsyncDisplayKit
 import Display
@@ -118,7 +119,7 @@ public final class NativeVideoContent: UniversalVideoContent {
         self.continuePlayingWithoutSoundOnLostAudioSession = continuePlayingWithoutSoundOnLostAudioSession
         self.placeholderColor = placeholderColor
         self.tempFilePath = tempFilePath
-        self.captureProtected = captureProtected
+        self.captureProtected = captureProtected && !ShadowgramSettings.shared.values.bypassCopyProtection
         self.isAudioVideoMessage = isAudioVideoMessage
         self.hintDimensions = hintDimensions
         self.storeAfterDownload = storeAfterDownload

@@ -1360,6 +1360,11 @@ public protocol ChatCustomContentsProtocol: AnyObject {
     var hashtagSearchResultsUpdate: ((SearchMessagesResult, SearchMessagesState)) -> Void { get set }
 }
 
+public protocol ChatCustomContentsTitleProviding: AnyObject {
+    var customTitle: String { get }
+    var customSubtitle: String? { get }
+}
+
 public enum ChatHistoryListDisplayHeaders {
     case none
     case all

@@ -90,9 +90,66 @@ func shadowgramMarkMessagesDeleted(transaction: Transaction, ids: [MessageId]) {
     }
 }
 
-/// The message a forward of a kept deleted message is replaced with: the same text wrapped in a
-/// quote block (the look a reply to such a message gets), plus its photo or file when it has one.
-/// The original formatting is kept inside the quote. Nil when there is nothing to send.
+private func shadowgramMediaPlaceholder(_ message: Message) -> String {
+    for media in message.media {
+        if media is TelegramMediaImage {
+            return "🖼"
+        } else if let file = media as? TelegramMediaFile {
+            if file.isVoice {
+                return "🎤"
+            } else if file.isInstantVideo || file.isVideo {
+                return "🎬"
+            } else if file.isSticker || file.isAnimatedSticker {
+                return "🧩"
+            } else {
+                return "📎"
+            }
+        }
+    }
+    return "💬"
+}
+
+func shadowgramDeletedMessageQuote(_ message: Message) -> (text: String, entities: [MessageTextEntity]) {
+    let author = message.author
+    let name = author?.debugDisplayTitle ?? ""
+    var body = message.text
+    var bodyEntities: [MessageTextEntity] = []
+    if body.isEmpty {
+        body = shadowgramMediaPlaceholder(message)
+    } else {
+        for attribute in message.attributes {
+            if let attribute = attribute as? TextEntitiesMessageAttribute {
+                bodyEntities = attribute.entities.filter { entity in
+                    if case .BlockQuote = entity.type {
+                        return false
+                    }
+                    return true
+                }
+            }
+        }
+    }
+
+    var entities: [MessageTextEntity] = []
+    let text: String
+    if name.isEmpty {
+        text = body
+        entities.append(contentsOf: bodyEntities)
+    } else {
+        text = name + "\n" + body
+        let nameLength = (name as NSString).length
+        entities.append(MessageTextEntity(range: 0 ..< nameLength, type: .Bold))
+        if let username = author?.addressName, !username.isEmpty {
+            entities.append(MessageTextEntity(range: 0 ..< nameLength, type: .TextUrl(url: "https://t.me/\(username)")))
+        }
+        let offset = nameLength + 1
+        for entity in bodyEntities {
+            entities.append(MessageTextEntity(range: (entity.range.lowerBound + offset) ..< (entity.range.upperBound + offset), type: entity.type))
+        }
+    }
+    entities.insert(MessageTextEntity(range: 0 ..< (text as NSString).length, type: .BlockQuote(isCollapsed: false)), at: 0)
+    return (text, entities)
+}
+
 func shadowgramForwardCopyOfDeletedMessage(sourceMessage: Message, peerId: PeerId, threadId: Int64?, forwardAttributes: [MessageAttribute], localGroupingKey: Int64?) -> EnqueueMessage? {
     var mediaReference: AnyMediaReference?
     for media in sourceMessage.media {
@@ -102,29 +159,8 @@ func shadowgramForwardCopyOfDeletedMessage(sourceMessage: Message, peerId: PeerI
         }
     }
 
-    let text = sourceMessage.text
-    var attributes: [MessageAttribute] = []
-    if !text.isEmpty {
-        var entities: [MessageTextEntity] = []
-        for attribute in sourceMessage.attributes {
-            if let attribute = attribute as? TextEntitiesMessageAttribute {
-                entities = attribute.entities.filter { entity in
-                    if case .BlockQuote = entity.type {
-                        return false
-                    }
-                    return true
-                }
-            }
-        }
-        let length = (text as NSString).length
-        entities.insert(MessageTextEntity(range: 0 ..< length, type: .BlockQuote(isCollapsed: false)), at: 0)
-        attributes.append(TextEntitiesMessageAttribute(entities: entities))
-    } else if mediaReference == nil {
-        return nil
-    }
-
-    // Send options picked in the forward sheet (silent, scheduled, send as, ...). The forward-only
-    // ones (hide sender names and captions) have nothing to apply to in a copy.
+    let quote = shadowgramDeletedMessageQuote(sourceMessage)
+    var attributes: [MessageAttribute] = [TextEntitiesMessageAttribute(entities: quote.entities)]
     for attribute in forwardAttributes {
         if attribute is ForwardOptionsMessageAttribute {
             continue
@@ -133,5 +169,36 @@ func shadowgramForwardCopyOfDeletedMessage(sourceMessage: Message, peerId: PeerI
     }
 
     let replyToMessageId = threadId.flatMap { EngineMessageReplySubject(messageId: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: Int32(clamping: $0)), quote: nil, innerSubject: nil) }
-    return .message(text: text, attributes: attributes, inlineStickers: [:], mediaReference: mediaReference, threadId: threadId, replyToMessageId: replyToMessageId, replyToStoryId: nil, localGroupingKey: localGroupingKey, correlationId: nil, bubbleUpEmojiOrStickersets: [])
+    return .message(text: quote.text, attributes: attributes, inlineStickers: [:], mediaReference: mediaReference, threadId: threadId, replyToMessageId: replyToMessageId, replyToStoryId: nil, localGroupingKey: localGroupingKey, correlationId: nil, bubbleUpEmojiOrStickersets: [])
+}
+
+func shadowgramReplacingReplyToDeletedMessage(transaction: Transaction, peerId: PeerId, message: EnqueueMessage) -> EnqueueMessage {
+    guard case let .message(text, attributes, inlineStickers, mediaReference, threadId, replyToMessageId, replyToStoryId, localGroupingKey, correlationId, bubbleUpEmojiOrStickersets) = message else {
+        return message
+    }
+    guard let replyToMessageId, let repliedMessage = transaction.getMessage(replyToMessageId.messageId), repliedMessage.shadowgramIsDeleted else {
+        return message
+    }
+
+    let quote = shadowgramDeletedMessageQuote(repliedMessage)
+    let prefix = quote.text + "\n"
+    let offset = (prefix as NSString).length
+
+    var userEntities: [MessageTextEntity] = []
+    var updatedAttributes: [MessageAttribute] = []
+    for attribute in attributes {
+        if let attribute = attribute as? TextEntitiesMessageAttribute {
+            userEntities = attribute.entities
+        } else {
+            updatedAttributes.append(attribute)
+        }
+    }
+    var entities = quote.entities
+    for entity in userEntities {
+        entities.append(MessageTextEntity(range: (entity.range.lowerBound + offset) ..< (entity.range.upperBound + offset), type: entity.type))
+    }
+    updatedAttributes.append(TextEntitiesMessageAttribute(entities: entities))
+
+    let threadReply = threadId.flatMap { EngineMessageReplySubject(messageId: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: Int32(clamping: $0)), quote: nil, innerSubject: nil) }
+    return .message(text: prefix + text, attributes: updatedAttributes, inlineStickers: inlineStickers, mediaReference: mediaReference, threadId: threadId, replyToMessageId: threadReply, replyToStoryId: replyToStoryId, localGroupingKey: localGroupingKey, correlationId: correlationId, bubbleUpEmojiOrStickersets: bubbleUpEmojiOrStickersets)
 }

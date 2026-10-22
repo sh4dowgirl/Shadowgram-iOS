@@ -1190,7 +1190,6 @@ public class ChatMessageTodoBubbleContentNode: ChatMessageBubbleContentNode {
                         replyCount: dateReplies,
                         starsCount: starsCount,
                         isPinned: item.message.tags.contains(.pinned) && !item.associatedData.isInPinnedListMode && !isReplyThread,
-                        isShadowgramDeleted: item.message.shadowgramIsDeleted,
                         hasAutoremove: item.message.isSelfExpiring,
                         canViewReactionList: canViewMessageReactionList(message: EngineMessage(item.topMessage)),
                         animationCache: item.controllerInteraction.presentationContext.animationCache,

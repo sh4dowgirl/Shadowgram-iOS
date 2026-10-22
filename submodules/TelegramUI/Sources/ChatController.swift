@@ -266,6 +266,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     var contentData: ChatControllerImpl.ContentData?
     let contentDataReady = ValuePromise<Bool>(false, ignoreRepeated: true)
     var contentDataDisposable: Disposable?
+    var shadowgramPresenceRefreshDisposable: Disposable?
     var newTopicEventsDisposable: Disposable?
     var didHandlePerformDismissAction: Bool = false
     var didInitializePersistentPeerInterfaceData: Bool = false
@@ -2274,7 +2275,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 }
             }
 
-            let isSecret = strongSelf.presentationInterfaceState.copyProtectionEnabled || strongSelf.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat
+            let isSecret = ShadowgramSettings.shared.values.hidesChatFromCapture(stockProtected: strongSelf.presentationInterfaceState.copyProtectionEnabled || strongSelf.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat, rawPeerId: strongSelf.chatLocation.peerId?.toInt64())
             let pinchController = makePinchController(sourceNode: sourceNode, disableScreenshots: isSecret, getContentAreaInScreenSpace: {
                 guard let strongSelf = self else {
                     return CGRect()
@@ -7077,6 +7078,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         let _ = ChatControllerCount.modify { value in
             return value - 1
         }
+        self.shadowgramPresenceRefreshDisposable?.dispose()
 
         self.richTextCheckboxCompletionObserver?.dispose()
         for (_, timer) in self.richTextCheckboxDebounceTimers {
@@ -7847,6 +7849,25 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         
         self.didAppear = true
         
+        if self.shadowgramPresenceRefreshDisposable == nil, let peerId = self.chatLocation.peerId, peerId.namespace == Namespaces.Peer.CloudUser, peerId != self.context.account.peerId {
+            let engine = self.context.engine
+            let refresh: Signal<Never, NoError> = engine.peers.shadowgramRefreshUserPresences(peerIds: [peerId])
+            |> then(Signal<Never, NoError>.complete() |> delay(15.0, queue: Queue.concurrentDefaultQueue()))
+            let hidesOnline: Signal<Bool, NoError> = ShadowgramSettings.shared.valuesSignal
+            |> map { values -> Bool in
+                return !values.effectiveSendOnlineStatus
+            }
+            |> distinctUntilChanged
+            self.shadowgramPresenceRefreshDisposable = (hidesOnline
+            |> mapToSignal { hidesOnline -> Signal<Never, NoError> in
+                if hidesOnline {
+                    return refresh |> restart
+                } else {
+                    return .complete()
+                }
+            }).startStrict()
+        }
+        
         self.chatDisplayNode.historyNode.experimentalSnapScrollToItem = false
         self.chatDisplayNode.historyNode.canReadHistory.set(self.computedCanReadHistoryPromise.get())
         self.chatDisplayNode.historyNode.areContentAnimationsEnabled = true
@@ -8274,6 +8295,9 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     
     override public func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        
+        self.shadowgramPresenceRefreshDisposable?.dispose()
+        self.shadowgramPresenceRefreshDisposable = nil
         
         if #available(iOS 18.0, *) {
         } else {

@@ -32,6 +32,15 @@ private enum ShadowgramExtraSettingsSection: Int32 {
     case groupsPlacement
     case autoReaction
     case privacy
+    case chatListSort
+}
+
+private enum ShadowgramExtraSettingsCategory: Int32, CaseIterable {
+    case privacy
+    case messages
+    case chatList
+    case interface
+    case accounts
 }
 
 private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
@@ -83,6 +92,33 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
     case bypassViewOnce(Bool)
     case bypassViewOnceFooter
 
+    case chatListSortHeader
+    case chatListSort(oldestFirst: Bool, checked: Bool)
+
+    var category: ShadowgramExtraSettingsCategory {
+        switch self {
+        case .ghostHeader, .ghostMode, .ghostFooter, .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter, .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter:
+            return .privacy
+        case .messagesHeader, .saveDeletedMessages, .messagesFooter, .messagesExtraHeader, .keepEditHistory, .keepEditHistoryFooter, .autoReaction:
+            return .messages
+        case .groupsHeader, .groupsFolder, .groupsMinMembers, .groupsPlacementHeader, .groupsPlacement, .groupsFooter, .disableCameraSwipe, .disableCameraSwipeFooter, .chatListSortHeader, .chatListSort:
+            return .chatList
+        case .interfaceHeader, .showPeerIds, .showPeerIdsFooter, .openByPeerId, .openByPeerIdAction, .openByPeerIdFooter:
+            return .interface
+        case .accountsHeader, .unlimitedAccounts, .accountsFooter:
+            return .accounts
+        }
+    }
+
+    var isCategoryTitleHeader: Bool {
+        switch self {
+        case .messagesHeader, .messagesExtraHeader, .interfaceHeader, .accountsHeader:
+            return true
+        default:
+            return false
+        }
+    }
+
     var section: ItemListSectionId {
         switch self {
         case .messagesHeader, .saveDeletedMessages, .messagesFooter:
@@ -105,6 +141,8 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return ShadowgramExtraSettingsSection.capture.rawValue
         case .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter:
             return ShadowgramExtraSettingsSection.privacy.rawValue
+        case .chatListSortHeader, .chatListSort:
+            return ShadowgramExtraSettingsSection.chatListSort.rawValue
         }
     }
 
@@ -190,6 +228,10 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return 1101 + placement.rawValue
         case .autoReaction:
             return 2300
+        case .chatListSortHeader:
+            return 40
+        case let .chatListSort(oldestFirst, _):
+            return oldestFirst ? 42 : 41
         }
     }
 
@@ -202,6 +244,10 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return 12 * 100 + 51 + placement.rawValue
         case .autoReaction:
             return 23 * 100 + 50
+        case .chatListSortHeader:
+            return 12 * 100 + 60
+        case let .chatListSort(oldestFirst, _):
+            return 12 * 100 + (oldestFirst ? 62 : 61)
         default:
             return self.stableId * 100
         }
@@ -340,11 +386,23 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             })
         case .bypassViewOnceFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain(strings.bypassViewOnceFooter), sectionId: self.section)
+        case .chatListSortHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.chatListSortHeader, sectionId: self.section)
+        case let .chatListSort(oldestFirst, checked):
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: oldestFirst ? strings.chatListSortOldestFirst : strings.chatListSortNewestFirst, style: .left, checked: checked, zeroSeparatorInsets: false, sectionId: self.section, action: {
+                arguments.update { $0.chatListOldestFirst = oldestFirst }
+            })
         }
     }
 }
 
-private func shadowgramExtraSettingsEntries(values: ShadowgramSettingsValues, strings: ShadowgramStrings) -> [ShadowgramExtraSettingsEntry] {
+private func shadowgramExtraSettingsEntries(values: ShadowgramSettingsValues, strings: ShadowgramStrings, category: ShadowgramExtraSettingsCategory) -> [ShadowgramExtraSettingsEntry] {
+    return shadowgramAllExtraSettingsEntries(values: values, strings: strings).filter { entry in
+        return entry.category == category && !entry.isCategoryTitleHeader
+    }
+}
+
+private func shadowgramAllExtraSettingsEntries(values: ShadowgramSettingsValues, strings: ShadowgramStrings) -> [ShadowgramExtraSettingsEntry] {
     var entries: [ShadowgramExtraSettingsEntry] = []
 
     entries.append(.messagesHeader)
@@ -379,6 +437,9 @@ private func shadowgramExtraSettingsEntries(values: ShadowgramSettingsValues, st
         entries.append(.openByPeerIdAction)
     }
     entries.append(.openByPeerIdFooter)
+    entries.append(.chatListSortHeader)
+    entries.append(.chatListSort(oldestFirst: false, checked: !values.chatListOldestFirst))
+    entries.append(.chatListSort(oldestFirst: true, checked: values.chatListOldestFirst))
     entries.append(.disableCameraSwipe(values.disableCameraSwipe))
     entries.append(.disableCameraSwipeFooter)
 
@@ -405,8 +466,7 @@ private func shadowgramExtraSettingsEntries(values: ShadowgramSettingsValues, st
     return entries
 }
 
-/// The "Extra Settings" screen, opened from Settings above Telegram Premium.
-public func shadowgramExtraSettingsController(context: AccountContext) -> ViewController {
+private func shadowgramExtraSettingsCategoryController(context: AccountContext, category: ShadowgramExtraSettingsCategory) -> ViewController {
     weak var weakController: ViewController?
     let arguments = ShadowgramExtraSettingsArguments(update: { f in
         ShadowgramSettings.shared.update(f)
@@ -428,8 +488,124 @@ public func shadowgramExtraSettingsController(context: AccountContext) -> ViewCo
     )
     |> map { presentationData, values -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
+        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.extraSettingsCategoryTitle(category.rawValue)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: shadowgramExtraSettingsEntries(values: values, strings: strings, category: category), style: .blocks, animateChanges: true)
+        return (controllerState, (listState, arguments))
+    }
+
+    let controller = ItemListController(context: context, state: signal)
+    weakController = controller
+    return controller
+}
+
+private final class ShadowgramExtraSettingsRootArguments {
+    let open: (ShadowgramExtraSettingsCategory) -> Void
+
+    init(open: @escaping (ShadowgramExtraSettingsCategory) -> Void) {
+        self.open = open
+    }
+}
+
+private enum ShadowgramExtraSettingsRootEntry: ItemListNodeEntry {
+    case category(ShadowgramExtraSettingsCategory, String)
+    case footer
+
+    var section: ItemListSectionId {
+        switch self {
+        case .category:
+            return 0
+        case .footer:
+            return 0
+        }
+    }
+
+    var stableId: Int32 {
+        switch self {
+        case let .category(category, _):
+            return category.rawValue
+        case .footer:
+            return 100
+        }
+    }
+
+    static func <(lhs: ShadowgramExtraSettingsRootEntry, rhs: ShadowgramExtraSettingsRootEntry) -> Bool {
+        return lhs.stableId < rhs.stableId
+    }
+
+    func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
+        let arguments = arguments as! ShadowgramExtraSettingsRootArguments
+        let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
+        switch self {
+        case let .category(category, label):
+            let icon: UIImage?
+            switch category {
+            case .privacy:
+                icon = PresentationResourcesSettings.lockOrange
+            case .messages:
+                icon = PresentationResourcesSettings.savedMessages
+            case .chatList:
+                icon = PresentationResourcesSettings.chatFolders
+            case .interface:
+                icon = PresentationResourcesSettings.appearance
+            case .accounts:
+                icon = PresentationResourcesSettings.myProfile
+            }
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: icon, title: strings.extraSettingsCategoryTitle(category.rawValue), label: label, sectionId: self.section, style: .blocks, action: {
+                arguments.open(category)
+            })
+        case .footer:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.extraSettingsFooter), sectionId: self.section)
+        }
+    }
+}
+
+private func shadowgramExtraSettingsCategoryLabel(_ category: ShadowgramExtraSettingsCategory, values: ShadowgramSettingsValues, strings: ShadowgramStrings) -> String {
+    switch category {
+    case .privacy:
+        return values.ghostModeEnabled ? strings.ghostMode : ""
+    case .messages:
+        var count = 0
+        if values.saveDeletedMessages {
+            count += 1
+        }
+        if values.keepEditHistory {
+            count += 1
+        }
+        if values.autoReactionMode != .nobody || !values.autoReactionAlwaysIds.isEmpty {
+            count += 1
+        }
+        return count == 0 ? "" : "\(count)"
+    case .chatList:
+        return values.chatListOldestFirst ? strings.chatListSortOldestFirst : ""
+    case .interface:
+        return ""
+    case .accounts:
+        return values.unlimitedAccounts ? strings.unlimitedAccountsShort : ""
+    }
+}
+
+/// The "Extra Settings" screen, opened from Settings above Telegram Premium.
+public func shadowgramExtraSettingsController(context: AccountContext) -> ViewController {
+    weak var weakController: ViewController?
+    let arguments = ShadowgramExtraSettingsRootArguments(open: { [weak context] category in
+        guard let context, let controller = weakController else {
+            return
+        }
+        controller.push(shadowgramExtraSettingsCategoryController(context: context, category: category))
+    })
+
+    let signal = combineLatest(queue: .mainQueue(),
+        context.sharedContext.presentationData,
+        ShadowgramSettings.shared.valuesSignal
+    )
+    |> map { presentationData, values -> (ItemListControllerState, (ItemListNodeState, Any)) in
+        let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
+        var entries: [ShadowgramExtraSettingsRootEntry] = ShadowgramExtraSettingsCategory.allCases.map { category in
+            return .category(category, shadowgramExtraSettingsCategoryLabel(category, values: values, strings: strings))
+        }
+        entries.append(.footer)
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.extraSettingsTitle), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: shadowgramExtraSettingsEntries(values: values, strings: strings), style: .blocks, animateChanges: true)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: entries, style: .blocks, animateChanges: false)
         return (controllerState, (listState, arguments))
     }
 

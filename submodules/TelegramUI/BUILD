@@ -76,6 +76,7 @@ swift_library(
         "//submodules/TelegramPresentationData:TelegramPresentationData",
         "//submodules/AccountContext:AccountContext",
         "//submodules/ShadowgramSettings:ShadowgramSettings",
+        "//submodules/ShadowgramUI:ShadowgramUI",
         "//submodules/LegacyComponents:LegacyComponents",
         "//submodules/lottie-ios:Lottie",
         "//submodules/FFMpegBinding:FFMpegBinding",

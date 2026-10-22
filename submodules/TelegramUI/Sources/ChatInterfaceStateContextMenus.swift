@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import TelegramCore
 import ShadowgramSettings
+import ShadowgramUI
 import AsyncDisplayKit
 import Display
 import UIKit
@@ -1201,24 +1202,13 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             })))
         }
 
-        // Shadowgram: an "Edit History" item for messages this client has kept past versions of.
-        let shadowgramHistory = messages[0].shadowgramEditHistory
-        if !shadowgramHistory.isEmpty {
-            actions.append(.action(ContextMenuActionItem(text: shadowgramEditHistoryTitle(languageCode: chatPresentationInterfaceState.strings.primaryComponent.languageCode), icon: { theme in
+        if !messages[0].shadowgramEditHistory.isEmpty {
+            let editHistoryMessage = messages[0]
+            actions.append(.action(ContextMenuActionItem(text: ShadowgramStrings(languageCode: chatPresentationInterfaceState.strings.primaryComponent.languageCode).editHistoryTitle, icon: { theme in
                 return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Edit"), color: theme.actionSheet.primaryTextColor)
             }, action: { c, _ in
                 c?.dismiss(completion: {
-                    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-                    let languageCode = presentationData.strings.primaryComponent.languageCode
-                    let title = shadowgramEditHistoryTitle(languageCode: languageCode)
-                    let text = shadowgramFormatEditHistory(entries: shadowgramHistory, currentText: messages[0].text, languageCode: languageCode, dateTimeFormat: presentationData.dateTimeFormat)
-                    controllerInteraction.presentController(textAlertController(
-                        context: context,
-                        title: title,
-                        text: text,
-                        actions: [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})],
-                        actionLayout: .vertical
-                    ), nil)
+                    controllerInteraction.navigationController()?.pushViewController(shadowgramEditHistoryController(context: context, message: editHistoryMessage))
                 })
             })))
         }
@@ -4090,58 +4080,4 @@ private final class ChatRateTranscriptionContextItemNode: ASDisplayNode, Context
     func actionNode(at point: CGPoint) -> ContextActionNodeProtocol {
         return self
     }
-}
-
-// Shadowgram helpers for the Edit History alert.
-
-private func shadowgramEditHistoryTitle(languageCode: String) -> String {
-    return languageCode.lowercased().hasPrefix("ru") ? "История правок" : "Edit History"
-}
-
-private func shadowgramFormatEditHistory(entries: [ShadowgramEditHistoryEntry], currentText: String, languageCode: String, dateTimeFormat: PresentationDateTimeFormat) -> String {
-    // Shadowgram: oldest versions first, each labelled with a timestamp; the current text closes
-    // the list. Entries read oldest-first already.
-    let isRussian = languageCode.lowercased().hasPrefix("ru")
-    let currentLabel = isRussian ? "Сейчас" : "Now"
-
-    var lines: [String] = []
-    for (index, entry) in entries.enumerated() {
-        let label = isRussian ? "Версия \(index + 1)" : "Version \(index + 1)"
-        let timestamp = shadowgramFormatHistoryTimestamp(entry.date, dateTimeFormat: dateTimeFormat)
-        lines.append("[\(label), \(timestamp)]")
-        lines.append(entry.text.isEmpty ? "—" : entry.text)
-        lines.append("")
-    }
-    lines.append("[\(currentLabel)]")
-    lines.append(currentText.isEmpty ? "—" : currentText)
-    return lines.joined(separator: "\n")
-}
-
-private func shadowgramFormatHistoryTimestamp(_ timestamp: Int32, dateTimeFormat: PresentationDateTimeFormat) -> String {
-    var t = time_t(timestamp)
-    var tm = tm()
-    localtime_r(&t, &tm)
-    let hour = Int(tm.tm_hour)
-    let minute = Int(tm.tm_min)
-    let day = Int(tm.tm_mday)
-    let month = Int(tm.tm_mon + 1)
-    let year = Int(tm.tm_year + 1900) % 100
-    let hourString: String
-    switch dateTimeFormat.timeFormat {
-    case .military:
-        hourString = String(format: "%02d:%02d", hour, minute)
-    case .regular:
-        let hour12 = (hour % 12 == 0) ? 12 : hour % 12
-        let suffix = hour >= 12 ? "PM" : "AM"
-        hourString = String(format: "%d:%02d %@", hour12, minute, suffix)
-    }
-    let dateSeparator = dateTimeFormat.dateSeparator
-    let dateString: String
-    switch dateTimeFormat.dateFormat {
-    case .monthFirst:
-        dateString = String(format: "%02d%@%02d%@%02d", month, dateSeparator, day, dateSeparator, year)
-    case .dayFirst:
-        dateString = String(format: "%02d%@%02d%@%02d", day, dateSeparator, month, dateSeparator, year)
-    }
-    return "\(dateString) \(hourString)"
 }

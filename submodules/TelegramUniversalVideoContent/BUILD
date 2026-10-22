@@ -53,6 +53,7 @@ swift_library(
         ":HlsBundle",
     ],
     deps = [
+        "//submodules/ShadowgramSettings:ShadowgramSettings",
         "//submodules/AsyncDisplayKit:AsyncDisplayKit",
         "//submodules/Display:Display",
         "//submodules/Postbox:Postbox",

@@ -1,4 +1,5 @@
 import Foundation
+import ShadowgramSettings
 import UIKit
 import AsyncDisplayKit
 import SwiftSignalKit
@@ -31,6 +32,9 @@ open class TransformImageNode: ASDisplayNode {
 
     public var captureProtected: Bool = false {
         didSet {
+            if self.captureProtected && ShadowgramSettings.shared.values.bypassCopyProtection {
+                self.captureProtected = false
+            }
             if self.captureProtected != oldValue {
                 if self.isNodeLoaded {
                     setLayerDisableScreenshots(self.layer, self.captureProtected)
@@ -289,6 +293,9 @@ open class TransformImageView: UIView {
 
     public var captureProtected: Bool = false {
         didSet {
+            if self.captureProtected && ShadowgramSettings.shared.values.bypassCopyProtection {
+                self.captureProtected = false
+            }
             if self.captureProtected != oldValue {
                 setLayerDisableScreenshots(self.layer, self.captureProtected)
             }

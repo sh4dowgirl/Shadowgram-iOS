@@ -265,7 +265,6 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
         var starsCount: Int64?
         var tonAmount: Int64?
         var isPinned: Bool
-        var isShadowgramDeleted: Bool
         var hasAutoremove: Bool
         var canViewReactionList: Bool
         var animationCache: AnimationCache
@@ -292,7 +291,6 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             starsCount: Int64?,
             tonAmount: Int64? = nil,
             isPinned: Bool,
-            isShadowgramDeleted: Bool = false,
             hasAutoremove: Bool,
             canViewReactionList: Bool,
             animationCache: AnimationCache,
@@ -318,7 +316,6 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             self.starsCount = starsCount
             self.tonAmount = tonAmount
             self.isPinned = isPinned
-            self.isShadowgramDeleted = isShadowgramDeleted
             self.hasAutoremove = hasAutoremove
             self.canViewReactionList = canViewReactionList
             self.animationCache = animationCache
@@ -606,11 +603,6 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
                 }
             }
             
-            // Shadowgram: a message someone else deleted shows a trash icon in the pinned-icon slot.
-            if arguments.isShadowgramDeleted && arguments.replyCount == 0 {
-                repliesImage = shadowgramDeletedStatusIcon(color: dateColor)
-            }
-            
             var updatedDateText = arguments.dateText
             if arguments.edited {
                 if let useEditedTimestamp = arguments.context.getAppConfigValue("message_primary_edited_date") as? Bool, useEditedTimestamp {
@@ -813,7 +805,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
                     reactionInset += 3.0
                 }
                 replyCountLayoutAndApply = layoutAndApply
-            } else if arguments.isPinned || arguments.isShadowgramDeleted {
+            } else if arguments.isPinned {
                 reactionInset += 12.0
             }
             
@@ -1554,48 +1546,4 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
 
 public func shouldDisplayInlineDateReactions(message: EngineMessage, isPremium: Bool, forceInline: Bool) -> Bool {
     return false
-}
-
-// Shadowgram: trash icon for messages that someone else deleted, sized like the pinned icon
-// it stands in for and tinted like the date text. Drawn once per color.
-private let shadowgramDeletedIconCache = Atomic<[UInt32: UIImage]>(value: [:])
-
-private func shadowgramDeletedStatusIcon(color: UIColor) -> UIImage? {
-    let key = color.argb
-    if let image = shadowgramDeletedIconCache.with({ $0[key] }) {
-        return image
-    }
-    let size = UIImage(bundleImageName: "Chat/Message/Pinned")?.size ?? CGSize(width: 10.0, height: 11.0)
-    let renderer = UIGraphicsImageRenderer(size: size)
-    let image = renderer.image { rendererContext in
-        let context = rendererContext.cgContext
-        let w = size.width
-        let h = size.height
-        context.setFillColor(color.cgColor)
-
-        // Handle and lid.
-        UIBezierPath(roundedRect: CGRect(x: w * 0.36, y: 0.0, width: w * 0.28, height: h * 0.2), cornerRadius: h * 0.06).fill()
-        UIBezierPath(roundedRect: CGRect(x: 0.0, y: h * 0.14, width: w, height: h * 0.13), cornerRadius: h * 0.06).fill()
-
-        // Body.
-        let body = UIBezierPath()
-        body.move(to: CGPoint(x: w * 0.12, y: h * 0.33))
-        body.addLine(to: CGPoint(x: w * 0.88, y: h * 0.33))
-        body.addLine(to: CGPoint(x: w * 0.8, y: h))
-        body.addLine(to: CGPoint(x: w * 0.2, y: h))
-        body.close()
-        body.fill()
-
-        // Two slits.
-        context.setBlendMode(.clear)
-        UIBezierPath(rect: CGRect(x: w * 0.36, y: h * 0.45, width: max(0.6, w * 0.08), height: h * 0.42)).fill()
-        UIBezierPath(rect: CGRect(x: w * 0.56, y: h * 0.45, width: max(0.6, w * 0.08), height: h * 0.42)).fill()
-        context.setBlendMode(.normal)
-    }
-    let _ = shadowgramDeletedIconCache.modify { current in
-        var current = current
-        current[key] = image
-        return current
-    }
-    return image
 }

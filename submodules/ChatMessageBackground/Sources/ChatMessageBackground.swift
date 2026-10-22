@@ -440,8 +440,8 @@ public class ChatMessageBackground: ASDisplayNode {
         self.shadowgramTintView?.image = self.shadowgramTintShapeImage
     }
     
-    /// Shadowgram: tints the bubble with `color` (nil removes the tint). `animated` fades the tint
-    /// in with a short soft pulse, for a message that gets deleted while it is on screen.
+    /// Shadowgram: tints the bubble with `color` (nil removes the tint). `animated` fades the tint in,
+    /// for a message that gets deleted while it is on screen.
     public func setShadowgramDeletedTint(color: UIColor?, animated: Bool) {
         if self.shadowgramTintColor == color {
             return
@@ -472,16 +472,7 @@ public class ChatMessageBackground: ASDisplayNode {
             tintView.layer.removeAllAnimations()
             tintView.alpha = 1.0
             if animated && isNew {
-                let fade = CAKeyframeAnimation(keyPath: "opacity")
-                fade.values = [0.0, 1.0, 0.65, 1.0] as [NSNumber]
-                fade.keyTimes = [0.0, 0.45, 0.72, 1.0] as [NSNumber]
-                fade.duration = 0.9
-                fade.timingFunctions = [
-                    CAMediaTimingFunction(name: .easeOut),
-                    CAMediaTimingFunction(name: .easeInEaseOut),
-                    CAMediaTimingFunction(name: .easeInEaseOut)
-                ]
-                tintView.layer.add(fade, forKey: "shadowgramDeletedTint")
+                tintView.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.6, timingFunction: CAMediaTimingFunctionName.easeOut.rawValue)
             }
         } else if let tintView = self.shadowgramTintView {
             self.shadowgramTintView = nil

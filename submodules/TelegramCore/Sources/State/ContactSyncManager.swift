@@ -398,7 +398,7 @@ private func pushDeviceContactData(accountPeerId: PeerId, postbox: Postbox, netw
     return batches
 }
 
-private func updateContactPresences(postbox: Postbox, network: Network, accountPeerId: PeerId) -> Signal<Never, NoError> {
+func updateContactPresences(postbox: Postbox, network: Network, accountPeerId: PeerId) -> Signal<Never, NoError> {
     return network.request(Api.functions.contacts.getStatuses())
     |> `catch` { _ -> Signal<[Api.ContactStatus], NoError> in
         return .single([])

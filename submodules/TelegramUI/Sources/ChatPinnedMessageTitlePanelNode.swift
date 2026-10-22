@@ -1,4 +1,5 @@
 import Foundation
+import ShadowgramSettings
 import UIKit
 import Display
 import AsyncDisplayKit
@@ -291,7 +292,7 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
         }
         self.isReplyThread = isReplyThread
         
-        self.captureProtected = interfaceState.copyProtectionEnabled || interfaceState.myCopyProtectionEnabled
+        self.captureProtected = ShadowgramSettings.shared.values.hidesChatFromCapture(stockProtected: interfaceState.copyProtectionEnabled || interfaceState.myCopyProtectionEnabled, rawPeerId: interfaceState.chatLocation.peerId?.toInt64())
         
         self.contextContainer.isGestureEnabled = !isReplyThread
         

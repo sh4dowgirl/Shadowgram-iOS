@@ -10,6 +10,7 @@ swift_library(
         "-warnings-as-errors",
     ],
     deps = [
+        "//submodules/ShadowgramSettings:ShadowgramSettings",
     	"//submodules/ObjCRuntimeUtils:ObjCRuntimeUtils",
     	"//submodules/UIKitRuntimeUtils:UIKitRuntimeUtils",
         "//submodules/AppBundle:AppBundle",

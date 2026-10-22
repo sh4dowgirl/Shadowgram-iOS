@@ -2994,7 +2994,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
     private weak var storyCameraTooltip: TooltipScreen?
     fileprivate func openStoryCamera(fromList: Bool, gesturePullOffset: CGFloat? = nil) {
         // Shadowgram: "Disable left swipe camera" in Extra Settings. All in-list story camera
-        // openings вЂ” the pull-down of the stories header, taps on the account without stories вЂ”
+        // openings — the pull-down of the stories header, taps on the account without stories —
         // go through here with fromList: true, so dropping them here covers the whole surface.
         if fromList && ShadowgramSettings.shared.values.disableCameraSwipe {
             return
@@ -4845,6 +4845,29 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
     
     public func activateCompose() {
         self.composePressed()
+    }
+    
+    fileprivate func shadowgramSortPressed(sourceView: UIView) {
+        let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
+        let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
+        let oldestFirst = ShadowgramSettings.shared.values.chatListOldestFirst
+        
+        var items: [ContextMenuItem] = []
+        for value in [false, true] {
+            items.append(.action(ContextMenuActionItem(text: value ? strings.chatListSortOldestFirst : strings.chatListSortNewestFirst, icon: { theme in
+                if value == oldestFirst {
+                    return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Check"), color: theme.contextMenu.primaryColor)
+                } else {
+                    return nil
+                }
+            }, action: { _, a in
+                a(.default)
+                ShadowgramSettings.shared.update { $0.chatListOldestFirst = value }
+            })))
+        }
+        
+        let contextController = makeContextController(presentationData: presentationData, source: .reference(HeaderContextReferenceContentSource(controller: self, sourceView: sourceView)), items: .single(ContextController.Items(content: .list(items))), gesture: nil)
+        self.presentInGlobalOverlay(contextController)
     }
     
     @objc fileprivate func composePressed() {
@@ -6838,11 +6861,15 @@ private final class ChatListLocationContext {
     var rightButton: AnyComponentWithIdentity<NavigationButtonComponentEnvironment>?
     var proxyButton: AnyComponentWithIdentity<NavigationButtonComponentEnvironment>?
     var storyButton: AnyComponentWithIdentity<NavigationButtonComponentEnvironment>?
+    var sortButton: AnyComponentWithIdentity<NavigationButtonComponentEnvironment>?
     
     var rightButtons: [AnyComponentWithIdentity<NavigationButtonComponentEnvironment>] {
         var result: [AnyComponentWithIdentity<NavigationButtonComponentEnvironment>] = []
         if let rightButton = self.rightButton {
             result.append(rightButton)
+        }
+        if let sortButton = self.sortButton {
+            result.append(sortButton)
         }
         if let storyButton = self.storyButton {
             result.append(storyButton)
@@ -7229,6 +7256,7 @@ private final class ChatListLocationContext {
                 self.rightButton = nil
                 self.storyButton = nil
                 self.proxyButton = nil
+                self.sortButton = nil
             }
             let title = !stateAndFilterId.state.selectedPeerIds.isEmpty ? presentationData.strings.ChatList_SelectedChats(Int32(stateAndFilterId.state.selectedPeerIds.count)) : defaultTitle
             
@@ -7245,6 +7273,7 @@ private final class ChatListLocationContext {
                 self.rightButton = nil
                 self.storyButton = nil
                 self.proxyButton = nil
+                self.sortButton = nil
             }
             self.leftButton = AnyComponentWithIdentity(id: "done", component: AnyComponent(NavigationButtonComponent(
                 content: .text(title: presentationData.strings.Common_Done, isBold: true),
@@ -7287,6 +7316,17 @@ private final class ChatListLocationContext {
                         content: .icon(imageName: "Chat List/ComposeIcon"),
                         pressed: { [weak self] _ in
                             self?.parentController?.composePressed()
+                        }
+                    )))
+                }
+                
+                if isReorderingTabs {
+                    self.sortButton = nil
+                } else {
+                    self.sortButton = AnyComponentWithIdentity(id: "shadowgramSort", component: AnyComponent(NavigationButtonComponent(
+                        content: .icon(imageName: "Peer Info/SortIcon"),
+                        pressed: { [weak self] sourceView in
+                            self?.parentController?.shadowgramSortPressed(sourceView: sourceView)
                         }
                     )))
                 }

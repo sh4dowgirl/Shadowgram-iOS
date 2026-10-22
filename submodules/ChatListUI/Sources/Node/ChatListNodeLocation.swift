@@ -195,9 +195,23 @@ public func chatListFilterPredicate(filter: ChatListFilterData, accountPeerId: E
     })
 }
 
-/// `applyShadowgramGroupsFolder`: true only for a real chat list (not a peer picker or a search),
-/// where the root list should lose the folder's groups and show the folder entry instead.
 public func chatListViewForLocation(chatListLocation: ChatListControllerLocation, location: ChatListNodeLocation, account: Account, shouldLoadCanMessagePeer: Bool, applyShadowgramGroupsFolder: Bool = false) -> Signal<ChatListNodeViewUpdate, NoError> {
+    if applyShadowgramGroupsFolder, case let .chatList(groupId) = chatListLocation, groupId == .root {
+        return shadowgramChatListOldestFirst
+        |> mapToSignal { oldestFirst -> Signal<ChatListNodeViewUpdate, NoError> in
+            if oldestFirst {
+                let fullLocation: ChatListNodeLocation = .initial(count: shadowgramChatListOldestFirstWindow, filter: location.filter)
+                return chatListViewForLocationWithGroupsFolder(chatListLocation: chatListLocation, location: fullLocation, account: account, shouldLoadCanMessagePeer: shouldLoadCanMessagePeer, applyShadowgramGroupsFolder: applyShadowgramGroupsFolder)
+                |> map(shadowgramOldestFirstChatListUpdate)
+            } else {
+                return chatListViewForLocationWithGroupsFolder(chatListLocation: chatListLocation, location: location, account: account, shouldLoadCanMessagePeer: shouldLoadCanMessagePeer, applyShadowgramGroupsFolder: applyShadowgramGroupsFolder)
+            }
+        }
+    }
+    return chatListViewForLocationWithGroupsFolder(chatListLocation: chatListLocation, location: location, account: account, shouldLoadCanMessagePeer: shouldLoadCanMessagePeer, applyShadowgramGroupsFolder: applyShadowgramGroupsFolder)
+}
+
+private func chatListViewForLocationWithGroupsFolder(chatListLocation: ChatListControllerLocation, location: ChatListNodeLocation, account: Account, shouldLoadCanMessagePeer: Bool, applyShadowgramGroupsFolder: Bool) -> Signal<ChatListNodeViewUpdate, NoError> {
     // Shadowgram groups folder: the folder screen is the root list behind the folder's predicate,
     // and the plain root list ("All", no filter) loses the folder's groups and gains its entry.
     if case let .chatList(groupId) = chatListLocation {

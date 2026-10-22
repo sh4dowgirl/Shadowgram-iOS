@@ -1,4 +1,5 @@
 import Foundation
+import ShadowgramSettings
 import UIKit
 import SwiftSignalKit
 import TelegramCore
@@ -335,7 +336,7 @@ extension ChatControllerImpl {
                     }
                 }
                 
-                let isSecret = self.presentationInterfaceState.copyProtectionEnabled || self.presentationInterfaceState.myCopyProtectionEnabled || self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat
+                let isSecret = ShadowgramSettings.shared.values.hidesChatFromCapture(stockProtected: self.presentationInterfaceState.copyProtectionEnabled || self.presentationInterfaceState.myCopyProtectionEnabled || self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat, rawPeerId: self.chatLocation.peerId?.toInt64())
                 let controller = makeContextController(presentationData: self.presentationData, source: source, items: actionsSignal, recognizer: recognizer, gesture: gesture, disableScreenshots: isSecret, hideReactionPanelTail: hideReactionPanelTail)
                 controller.dismissed = { [weak self] in
                     self?.canReadHistory.set(true)
