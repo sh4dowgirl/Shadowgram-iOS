@@ -42,11 +42,32 @@ jobs:
           echo "Нужен Xcode $XCODE_VERSION"
           sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
           xcodebuild -version
-          if ! xcrun -f metal >/dev/null 2>&1 || ! xcrun metal --version >/dev/null 2>&1; then
+          if ! xcrun metal --version >/dev/null 2>&1; then
+            XCODE_BUILD=$(xcodebuild -version | awk '/Build version/ {print $3}')
+            EXPORT_DIR="$RUNNER_TEMP/metal-toolchain"
+            rm -rf "$EXPORT_DIR"
             for attempt in 1 2 3; do
-              sudo xcodebuild -downloadComponent MetalToolchain && break
+              xcodebuild -downloadComponent MetalToolchain -exportPath "$EXPORT_DIR" 2>&1 | tee "$RUNNER_TEMP/metal-download.log" && break
               sleep 10
             done
+            BUNDLE=$(ls -d "$EXPORT_DIR"/*.exportedBundle 2>/dev/null | head -1)
+            TOOLCHAIN_BUILD=$(sed -n 's/.*Metal Toolchain \([0-9A-Za-z]*\).*/\1/p' "$RUNNER_TEMP/metal-download.log" | tail -1)
+            echo "Xcode $XCODE_BUILD, Metal Toolchain $TOOLCHAIN_BUILD, bundle $BUNDLE"
+            if [ -n "$BUNDLE" ]; then
+              if [ -n "$TOOLCHAIN_BUILD" ] && [ "$TOOLCHAIN_BUILD" != "$XCODE_BUILD" ]; then
+                find "$BUNDLE" -maxdepth 1 -name '*.plist' -exec sed -i '' -e "s/$TOOLCHAIN_BUILD/$XCODE_BUILD/g" {} +
+              fi
+              sudo xcodebuild -importComponent MetalToolchain -importPath "$BUNDLE" || true
+            fi
+          fi
+          if ! xcrun metal --version >/dev/null 2>&1; then
+            echo "Metal Toolchain для Xcode $XCODE_VERSION не подключился, собираю на Xcode 27.0"
+            sudo xcode-select -s /Applications/Xcode_27.app
+            xcodebuild -version
+            if ! xcrun metal --version >/dev/null 2>&1; then
+              sudo xcodebuild -downloadComponent MetalToolchain
+            fi
+            echo "XCODE_OVERRIDE_FLAG=--overrideXcodeVersion" >> "$GITHUB_ENV"
           fi
           xcrun metal --version
           df -h /
@@ -145,7 +166,7 @@ jobs:
         timeout-minutes: 320
         run: |
           mkdir -p "$HOME/telegram-bazel-cache" "$RUNNER_TEMP/artifacts"
-          python3 build-system/Make/Make.py \
+          python3 build-system/Make/Make.py $XCODE_OVERRIDE_FLAG \
             --cacheDir="$HOME/telegram-bazel-cache" \
             build \
             --configurationPath="$RUNNER_TEMP/configuration.json" \
