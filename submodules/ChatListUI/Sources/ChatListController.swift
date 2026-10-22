@@ -2921,6 +2921,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                 chatListTitle: primaryContext.chatListTitle,
                 leftButton: primaryContext.leftButton,
                 rightButtons: primaryContext.rightButtons,
+                accentRightButton: primaryContext.accentRightButton,
                 backPressed: displayBackButton ? { [weak self] in
                     guard let self else {
                         return
@@ -2938,6 +2939,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                 chatListTitle: secondaryContext.chatListTitle,
                 leftButton: secondaryContext.leftButton,
                 rightButtons: secondaryContext.rightButtons,
+                accentRightButton: secondaryContext.accentRightButton,
                 backPressed: { [weak self] in
                     guard let self else {
                         return
@@ -6863,9 +6865,16 @@ private final class ChatListLocationContext {
     var storyButton: AnyComponentWithIdentity<NavigationButtonComponentEnvironment>?
     var sortButton: AnyComponentWithIdentity<NavigationButtonComponentEnvironment>?
     
+    var accentRightButton: AnyComponentWithIdentity<NavigationButtonComponentEnvironment>? {
+        if let rightButton = self.rightButton, rightButton.id == AnyHashable("compose") {
+            return rightButton
+        }
+        return nil
+    }
+    
     var rightButtons: [AnyComponentWithIdentity<NavigationButtonComponentEnvironment>] {
         var result: [AnyComponentWithIdentity<NavigationButtonComponentEnvironment>] = []
-        if let rightButton = self.rightButton {
+        if let rightButton = self.rightButton, rightButton.id != AnyHashable("compose") {
             result.append(rightButton)
         }
         if let sortButton = self.sortButton {

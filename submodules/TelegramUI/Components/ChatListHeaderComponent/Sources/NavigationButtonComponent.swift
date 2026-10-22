@@ -8,13 +8,18 @@ import MoreHeaderButton
 
 public final class NavigationButtonComponentEnvironment: Equatable {
     public let theme: PresentationTheme
+    public let isAccent: Bool
     
-    public init(theme: PresentationTheme) {
+    public init(theme: PresentationTheme, isAccent: Bool = false) {
         self.theme = theme
+        self.isAccent = isAccent
     }
     
     public static func ==(lhs: NavigationButtonComponentEnvironment, rhs: NavigationButtonComponentEnvironment) -> Bool {
         if lhs.theme != rhs.theme {
+            return false
+        }
+        if lhs.isAccent != rhs.isAccent {
             return false
         }
         return true
@@ -64,6 +69,7 @@ public final class NavigationButtonComponent: Component {
         
         private var component: NavigationButtonComponent?
         private var theme: PresentationTheme?
+        private var isAccent: Bool = false
         
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -103,9 +109,11 @@ public final class NavigationButtonComponent: Component {
             self.component = component
             
             let theme = environment[NavigationButtonComponentEnvironment.self].value.theme
+            let isAccent = environment[NavigationButtonComponentEnvironment.self].value.isAccent
             var themeUpdated = false
-            if self.theme !== theme {
+            if self.theme !== theme || self.isAccent != isAccent {
                 self.theme = theme
+                self.isAccent = isAccent
                 themeUpdated = true
             }
             
@@ -165,11 +173,11 @@ public final class NavigationButtonComponent: Component {
                 }
                 if self.iconImageName != imageName || themeUpdated {
                     self.iconImageName = imageName
-                    iconView.image = generateTintedImage(image: UIImage(bundleImageName: imageName), color: theme.chat.inputPanel.panelControlColor)
+                    iconView.image = generateTintedImage(image: UIImage(bundleImageName: imageName), color: isAccent ? theme.list.itemCheckColors.foregroundColor : theme.chat.inputPanel.panelControlColor)
                 }
                 
                 if let iconSize = iconView.image?.size {
-                    size.width = 44.0
+                    size.width = isAccent ? max(44.0, availableSize.height) : 44.0
                     
                     iconView.frame = CGRect(origin: CGPoint(x: floor((size.width - iconSize.width) / 2.0), y: floor((availableSize.height - iconSize.height) / 2.0)), size: iconSize)
                 }
