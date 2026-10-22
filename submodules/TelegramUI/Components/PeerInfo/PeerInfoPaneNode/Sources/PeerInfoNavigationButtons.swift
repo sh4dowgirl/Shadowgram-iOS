@@ -19,6 +19,7 @@ public enum PeerInfoHeaderNavigationButtonKey {
     case more
     case sort
     case qrCode
+    case ghost
     case moreSearchSort
     case postStory
 }
@@ -27,7 +28,7 @@ public enum PeerInfoHeaderNavigationButtonKey {
 /// (Apple: text-only items stay horizontal).
 public func peerInfoNavigationButtonIsIcon(_ key: PeerInfoHeaderNavigationButtonKey) -> Bool {
     switch key {
-    case .back, .qrCode, .search, .searchWithTags, .standaloneSearch, .more, .sort, .moreSearchSort, .postStory:
+    case .back, .qrCode, .ghost, .search, .searchWithTags, .standaloneSearch, .more, .sort, .moreSearchSort, .postStory:
         return true
     case .edit, .done, .cancel, .select, .selectionDone, .editPhoto, .editVideo:
         return false
@@ -73,6 +74,7 @@ public struct PeerInfoNavigationFlags: Equatable {
     public var canEditBotPreviews = false
     /// The stories pane shows the account's own stories.
     public var isOwnStories = false
+    public var showsGhost = false
 
     public init() {
     }
@@ -90,6 +92,9 @@ public func peerInfoNavigationButtonSets(_ flags: PeerInfoNavigationFlags) -> (n
     }
     if flags.isSettings {
         normal.left.append(.qrCode)
+        if flags.showsGhost {
+            normal.right.append(.ghost)
+        }
         normal.right.append(.search)
         normal.right.append(.edit)
     } else if flags.isMyProfile || flags.canEdit {

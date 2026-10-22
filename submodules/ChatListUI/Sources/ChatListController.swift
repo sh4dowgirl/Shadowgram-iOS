@@ -2917,7 +2917,6 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                 chatListTitle: primaryContext.chatListTitle,
                 leftButton: primaryContext.leftButton,
                 rightButtons: primaryContext.rightButtons,
-                accentRightButton: primaryContext.accentRightButton,
                 backPressed: displayBackButton ? { [weak self] in
                     guard let self else {
                         return
@@ -2935,7 +2934,6 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                 chatListTitle: secondaryContext.chatListTitle,
                 leftButton: secondaryContext.leftButton,
                 rightButtons: secondaryContext.rightButtons,
-                accentRightButton: secondaryContext.accentRightButton,
                 backPressed: { [weak self] in
                     guard let self else {
                         return

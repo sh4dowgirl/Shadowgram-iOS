@@ -5545,7 +5545,9 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
             standaloneSearchImage: PresentationResourcesRootController.navigationCompactSearchWhiteIcon(theme),
             searchWithTagsImage: PresentationResourcesRootController.navigationCompactTagsSearchWhiteIcon(theme),
             searchLabel: strings.Common_Search,
-            moreLabel: strings.Common_More
+            moreLabel: strings.Common_More,
+            ghostImage: shadowgramGhostNavigationIcon(),
+            ghostLabel: "Ghost Mode"
         )
         self.cachedNavigationItemResources = (theme, strings, resources)
         return resources
@@ -6158,6 +6160,7 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
                 navigationFlags.canEditBotPreviews = true
             }
             navigationFlags.isOwnStories = self.data?.peer?.id == self.context.account.peerId
+            navigationFlags.showsGhost = self.isSettings && ShadowgramSettings.shared.values.ghostModeEnabled
             let navigationSets = peerInfoNavigationButtonSets(navigationFlags)
             let showsPaneSet = self.paneSetLatch.update(fraction: effectiveAreaExpansionFraction)
 

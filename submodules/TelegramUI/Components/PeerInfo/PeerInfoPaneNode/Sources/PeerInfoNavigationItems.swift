@@ -17,8 +17,10 @@ public struct PeerInfoNavigationItemResources: Equatable {
     public var searchWithTagsImage: UIImage?
     public var searchLabel: String
     public var moreLabel: String
+    public var ghostImage: UIImage?
+    public var ghostLabel: String
 
-    public init(edit: String, cancel: String, done: String, qrCodeImage: UIImage?, qrCodeLabel: String, postStoryImage: UIImage?, postStoryLabel: String, standaloneSearchImage: UIImage?, searchWithTagsImage: UIImage?, searchLabel: String, moreLabel: String) {
+    public init(edit: String, cancel: String, done: String, qrCodeImage: UIImage?, qrCodeLabel: String, postStoryImage: UIImage?, postStoryLabel: String, standaloneSearchImage: UIImage?, searchWithTagsImage: UIImage?, searchLabel: String, moreLabel: String, ghostImage: UIImage? = nil, ghostLabel: String = "") {
         self.edit = edit
         self.cancel = cancel
         self.done = done
@@ -30,6 +32,8 @@ public struct PeerInfoNavigationItemResources: Equatable {
         self.searchWithTagsImage = searchWithTagsImage
         self.searchLabel = searchLabel
         self.moreLabel = moreLabel
+        self.ghostImage = ghostImage
+        self.ghostLabel = ghostLabel
     }
 }
 
@@ -109,6 +113,8 @@ public final class PeerInfoNavigationItems {
             item.accessibilityLabel = resources.done
         case .qrCode:
             item = self.imageItem(resources.qrCodeImage, label: resources.qrCodeLabel)
+        case .ghost:
+            item = self.imageItem(resources.ghostImage, label: resources.ghostLabel)
         case .postStory:
             item = self.imageItem(resources.postStoryImage, label: resources.postStoryLabel)
         case .standaloneSearch, .searchWithTags:
