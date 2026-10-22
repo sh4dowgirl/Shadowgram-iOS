@@ -30,6 +30,7 @@ submodules/GalleryUI/Sources/Items/ChatAnimationGalleryItem.swift
 submodules/GalleryUI/Sources/Items/ChatImageGalleryItem.swift
 submodules/GalleryUI/Sources/Items/UniversalVideoGalleryItem.swift
 submodules/GalleryUI/Sources/SecretMediaPreviewController.swift
+submodules/GalleryUI/Sources/ShadowgramSelfDestructingMedia.swift
 submodules/LegacyMediaPickerUI/Sources/LegacyPaintStickersContext.swift
 submodules/MediaPlayer/Sources/ChunkMediaPlayer.swift
 submodules/MediaPlayer/Sources/ChunkMediaPlayerV2.swift

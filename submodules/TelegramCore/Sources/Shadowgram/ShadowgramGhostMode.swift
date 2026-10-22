@@ -1,7 +1,7 @@
 import Foundation
 import Postbox
 import SwiftSignalKit
-import TelegramApi
+internal import TelegramApi
 import ShadowgramSettings
 
 // Ghost mode (Shadowgram Extra Settings). Each check is read at the moment a request would be

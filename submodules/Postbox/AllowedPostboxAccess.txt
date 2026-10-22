@@ -45,6 +45,7 @@ submodules/GalleryUI/Sources/Items/ChatImageGalleryItem.swift
 submodules/GalleryUI/Sources/Items/UniversalVideoGalleryItem.swift
 submodules/GalleryUI/Sources/Items/VideoAdComponent.swift
 submodules/GalleryUI/Sources/SecretMediaPreviewController.swift
+submodules/GalleryUI/Sources/ShadowgramSelfDestructingMedia.swift
 submodules/InstantPageUI/Sources/InstantImageGalleryItem.swift
 submodules/InstantPageUI/Sources/InstantPageArticleNode.swift
 submodules/InstantPageUI/Sources/InstantPageImageNode.swift

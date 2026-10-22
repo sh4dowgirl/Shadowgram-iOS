@@ -4684,23 +4684,25 @@ func replayFinalState(
                         return current
                     })
                     
+                    var mergedMessage = mergedServerMessageUpdate(previous: previousMessage, updated: message)
+                    
                     // Shadowgram: keep the previous version of the message's text, so the whole
                     // edit history can be opened later. Previous versions that this client has
                     // kept are already in `previousMessage.attributes` and are preserved by the
                     // helper. The check against the new text means a pure media or reaction edit
                     // does not add a bogus duplicate entry.
                     if previousMessage.text != message.text {
-                        updatedAttributes = shadowgramAppendEditHistory(previousText: previousMessage.text, previousDate: previousMessage.editedTime ?? previousMessage.timestamp, attributes: updatedAttributes)
+                        mergedMessage = mergedMessage.withUpdatedAttributes(shadowgramAppendEditHistory(previousText: previousMessage.text, previousDate: previousMessage.editedTime ?? previousMessage.timestamp, attributes: mergedMessage.attributes))
                     } else if let kept = previousMessage.attributes.first(where: { $0 is ShadowgramEditHistoryMessageAttribute }) {
                         // Carry the history forward unchanged for media-only edits.
-                        updatedAttributes.append(kept)
+                        mergedMessage = mergedMessage.withUpdatedAttributes(mergedMessage.attributes + [kept])
                     }
 
                     if let message = locallyRenderedMessage(message: message, peers: peers) {
                         generatedEvent = reactionGeneratedEvent(previousMessage.reactionsAttribute, message.reactionsAttribute, message: message, transaction: transaction)
                     }
                     
-                    return .update(mergedServerMessageUpdate(previous: previousMessage, updated: message))
+                    return .update(mergedMessage)
                 })
                 if let generatedEvent = generatedEvent {
                     addedReactionEvents.append(generatedEvent)

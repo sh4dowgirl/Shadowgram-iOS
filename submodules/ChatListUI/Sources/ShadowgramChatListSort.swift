@@ -1,5 +1,4 @@
 import Foundation
-import Postbox
 import TelegramCore
 import SwiftSignalKit
 import ShadowgramSettings
@@ -62,7 +61,7 @@ func shadowgramOldestFirstChatListUpdate(_ update: ChatListNodeViewUpdate) -> Ch
             continue
         }
         let timestamp = Int32.max - 1 - Int32(rank)
-        let updatedIndex = ChatListIndex(pinningIndex: nil, messageIndex: MessageIndex(id: index.messageIndex.id, timestamp: timestamp))
+        let updatedIndex = EngineChatList.Item.Index.ChatList(pinningIndex: nil, messageIndex: EngineMessage.Index(id: index.messageIndex.id, timestamp: timestamp))
         items.append(shadowgramChatListItem(item, index: .chatList(updatedIndex)))
     }
     items.sort(by: { $0.index < $1.index })

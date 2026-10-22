@@ -287,7 +287,7 @@ public final class ChatListNavigationBar: Component {
         /// The edge effect's tint and gradient length; a navigation transition draws the same backdrop
         /// (`componentTransitionState`).
         fileprivate static let edgeEffectTintAlpha: CGFloat = 0.85
-        fileprivate static let edgeEffectEdgeLength: CGFloat = 54.0
+        fileprivate static let edgeEffectEdgeLength: CGFloat = 66.0
 
         /// Everything the header draws; a navigation transition lifts it (`takeView()`) while the view stays in the
         /// screen.
