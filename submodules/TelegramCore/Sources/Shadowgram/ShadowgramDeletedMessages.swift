@@ -192,6 +192,73 @@ func shadowgramForwardCopyOfDeletedMessage(sourceMessage: Message, peerId: PeerI
     return .message(text: quote.text, attributes: attributes, inlineStickers: [:], mediaReference: mediaReference, threadId: threadId, replyToMessageId: replyToMessageId, replyToStoryId: nil, localGroupingKey: localGroupingKey, correlationId: nil, bubbleUpEmojiOrStickersets: [])
 }
 
+private func shadowgramLocalResourceCopy(mediaBox: MediaBox, resource: MediaResource, size: Int64?) -> LocalFileMediaResource? {
+    guard mediaBox.completedResourcePath(resource) != nil else {
+        return nil
+    }
+    let copy = LocalFileMediaResource(fileId: Int64.random(in: Int64.min ... Int64.max), size: size)
+    mediaBox.copyResourceData(from: resource.id, to: copy.id, synchronous: true)
+    guard mediaBox.completedResourcePath(copy) != nil else {
+        return nil
+    }
+    return copy
+}
+
+private func shadowgramUploadableMediaCopy(mediaBox: MediaBox, media: Media) -> Media? {
+    if let image = media as? TelegramMediaImage {
+        guard let largest = largestImageRepresentation(image.representations), let resource = shadowgramLocalResourceCopy(mediaBox: mediaBox, resource: largest.resource, size: nil) else {
+            return nil
+        }
+        return TelegramMediaImage(imageId: MediaId(namespace: Namespaces.Media.LocalImage, id: Int64.random(in: Int64.min ... Int64.max)), representations: [TelegramMediaImageRepresentation(dimensions: largest.dimensions, resource: resource, progressiveSizes: [], immediateThumbnailData: image.immediateThumbnailData)], immediateThumbnailData: image.immediateThumbnailData, reference: nil, partialReference: nil, flags: [])
+    } else if let file = media as? TelegramMediaFile {
+        guard let resource = shadowgramLocalResourceCopy(mediaBox: mediaBox, resource: file.resource, size: file.size) else {
+            return nil
+        }
+        var previewRepresentations: [TelegramMediaImageRepresentation] = []
+        if let thumbnail = largestImageRepresentation(file.previewRepresentations), let thumbnailResource = shadowgramLocalResourceCopy(mediaBox: mediaBox, resource: thumbnail.resource, size: nil) {
+            previewRepresentations.append(TelegramMediaImageRepresentation(dimensions: thumbnail.dimensions, resource: thumbnailResource, progressiveSizes: [], immediateThumbnailData: nil))
+        }
+        return TelegramMediaFile(fileId: MediaId(namespace: Namespaces.Media.LocalFile, id: Int64.random(in: Int64.min ... Int64.max)), partialReference: nil, resource: resource, previewRepresentations: previewRepresentations, videoThumbnails: [], immediateThumbnailData: file.immediateThumbnailData, mimeType: file.mimeType, size: file.size, attributes: file.attributes, alternativeRepresentations: [])
+    } else {
+        return nil
+    }
+}
+
+func shadowgramForwardsProtectedMessageAsCopy(_ message: Message) -> Bool {
+    let values = ShadowgramSettings.shared.values
+    guard values.bypassCopyProtection && values.forwardProtectedAsCopy else {
+        return false
+    }
+    return message.isCopyProtected()
+}
+
+func shadowgramForwardCopyOfProtectedMessage(sourceMessage: Message, mediaBox: MediaBox, peerId: PeerId, threadId: Int64?, forwardAttributes: [MessageAttribute], localGroupingKey: Int64?) -> EnqueueMessage {
+    var mediaReference: AnyMediaReference?
+    for media in sourceMessage.media {
+        if media is TelegramMediaImage || media is TelegramMediaFile {
+            if let copy = shadowgramUploadableMediaCopy(mediaBox: mediaBox, media: media) {
+                mediaReference = .standalone(media: copy)
+            }
+            break
+        }
+    }
+
+    let quote = shadowgramDeletedMessageQuote(sourceMessage)
+    var attributes: [MessageAttribute] = [TextEntitiesMessageAttribute(entities: quote.entities)]
+    for attribute in forwardAttributes {
+        if attribute is ForwardOptionsMessageAttribute {
+            continue
+        }
+        attributes.append(attribute)
+    }
+    if mediaReference == nil {
+        attributes = shadowgramDisablingLinkPreview(attributes)
+    }
+
+    let replyToMessageId = threadId.flatMap { EngineMessageReplySubject(messageId: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: Int32(clamping: $0)), quote: nil, innerSubject: nil) }
+    return .message(text: quote.text, attributes: attributes, inlineStickers: [:], mediaReference: mediaReference, threadId: threadId, replyToMessageId: replyToMessageId, replyToStoryId: nil, localGroupingKey: localGroupingKey, correlationId: nil, bubbleUpEmojiOrStickersets: [])
+}
+
 func shadowgramReplacingReplyToDeletedMessage(transaction: Transaction, peerId: PeerId, message: EnqueueMessage) -> EnqueueMessage {
     guard case let .message(text, attributes, inlineStickers, mediaReference, threadId, replyToMessageId, replyToStoryId, localGroupingKey, correlationId, bubbleUpEmojiOrStickersets) = message else {
         return message

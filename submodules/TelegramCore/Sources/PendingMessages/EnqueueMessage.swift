@@ -934,6 +934,18 @@ func enqueueMessages(transaction: Transaction, account: Account, peerId: PeerId,
                     }
                     continue outer
                 }
+                if let sourceMessage = transaction.getMessage(sourceId), shadowgramForwardsProtectedMessageAsCopy(sourceMessage) {
+                    let replacement = shadowgramForwardCopyOfProtectedMessage(
+                        sourceMessage: sourceMessage,
+                        mediaBox: account.postbox.mediaBox,
+                        peerId: peerId,
+                        threadId: threadId,
+                        forwardAttributes: forwardAttributes,
+                        localGroupingKey: forwardGroupingKey(grouping: grouping, sourceGroupingKey: sourceMessage.groupingKey, generatedKeys: &localGroupingKeyBySourceKey)
+                    )
+                    updatedMessages.append((true, replacement))
+                    continue outer
+                }
                 if let sourceMessage = forwardedMessageToBeReuploaded(transaction: transaction, id: sourceId) {
                     var mediaReference: AnyMediaReference?
                     if sourceMessage.id.peerId.namespace == Namespaces.Peer.SecretChat {

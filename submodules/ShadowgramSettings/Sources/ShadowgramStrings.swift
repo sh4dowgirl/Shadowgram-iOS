@@ -197,3 +197,8 @@ extension ShadowgramStrings {
     public var sendOnlineStatusInfo: String { return t("Вы выглядите офлайн, пока приложение открыто. Отправка сообщения всё равно обновляет время последнего визита.", "You appear offline while the app is open. Sending a message still updates your last seen time.") }
     public var sendStoryViewsInfo: String { return t("Автор истории не увидит вас среди зрителей. История отмечается просмотренной только на этом устройстве.", "The author won't see you among the viewers. The story is marked seen on this device only.") }
 }
+
+extension ShadowgramStrings {
+    public var forwardProtectedAsCopy: String { return t("Пересылать копией", "Forward as a Copy") }
+    public var forwardProtectedAsCopyFooter: String { return t("Сервер не пропускает пересылку из чатов, где она запрещена. Такие сообщения отправляются копией в цитате с именем автора, как удалённые. Медиа отправляется, только если уже загружено на устройство.", "The server refuses forwards from chats where forwarding is restricted. Such messages are sent as a copy in a quote with the author's name, like deleted ones. Media is sent only if it is already downloaded to the device.") }
+}
