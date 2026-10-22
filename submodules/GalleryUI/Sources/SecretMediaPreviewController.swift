@@ -14,6 +14,7 @@ import AppBundle
 import LocalizedPeerData
 import TooltipUI
 import TelegramNotices
+import UndoUI
 
 private func galleryMediaForMedia(media: Media) -> Media? {
     if let media = media as? TelegramMediaImage {
@@ -102,6 +103,69 @@ private final class SecretMediaPreviewControllerNode: GalleryControllerNode {
         }
     }
     
+    private var markViewedButton: HighlightableButtonNode?
+    private var forwardButton: HighlightableButtonNode?
+    
+    var markViewedPressed: () -> Void = {}
+    var forwardPressed: () -> Void = {}
+    
+    private func makeShadowgramButton(icon: String, accessibilityLabel: String?) -> HighlightableButtonNode {
+        let button = HighlightableButtonNode()
+        button.backgroundColor = UIColor(white: 0.0, alpha: 0.5)
+        button.cornerRadius = 22.0
+        button.setImage(generateTintedImage(image: UIImage(bundleImageName: icon), color: .white), for: [])
+        button.accessibilityLabel = accessibilityLabel
+        return button
+    }
+    
+    func updateShadowgramButtons(markViewed: Bool, markViewedTitle: String, forward: Bool, forwardTitle: String) {
+        if markViewed {
+            if self.markViewedButton == nil {
+                let button = self.makeShadowgramButton(icon: "Chat/Context Menu/Eye", accessibilityLabel: markViewedTitle)
+                button.addTarget(self, action: #selector(self.markViewedButtonPressed), forControlEvents: .touchUpInside)
+                self.markViewedButton = button
+                self.addSubnode(button)
+            }
+        } else if let markViewedButton = self.markViewedButton {
+            self.markViewedButton = nil
+            markViewedButton.removeFromSupernode()
+        }
+        if forward {
+            if self.forwardButton == nil {
+                let button = self.makeShadowgramButton(icon: "Chat/Input/Accessory Panels/MessageSelectionForward", accessibilityLabel: forwardTitle)
+                button.addTarget(self, action: #selector(self.forwardButtonPressed), forControlEvents: .touchUpInside)
+                self.forwardButton = button
+                self.addSubnode(button)
+            }
+        } else if let forwardButton = self.forwardButton {
+            self.forwardButton = nil
+            forwardButton.removeFromSupernode()
+        }
+        if let (layout, _) = self.validLayout {
+            self.layoutShadowgramButtons(layout, transition: .immediate)
+        }
+    }
+    
+    @objc private func markViewedButtonPressed() {
+        self.markViewedPressed()
+    }
+    
+    @objc private func forwardButtonPressed() {
+        self.forwardPressed()
+    }
+    
+    private func layoutShadowgramButtons(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+        let diameter: CGFloat = 44.0
+        let bottomInset = max(layout.intrinsicInsets.bottom, layout.safeInsets.bottom)
+        let originY = layout.size.height - bottomInset - 8.0 - diameter
+        if let markViewedButton = self.markViewedButton {
+            transition.updateFrame(node: markViewedButton, frame: CGRect(origin: CGPoint(x: layout.safeInsets.left + 16.0, y: originY), size: CGSize(width: diameter, height: diameter)))
+        }
+        if let forwardButton = self.forwardButton {
+            transition.updateFrame(node: forwardButton, frame: CGRect(origin: CGPoint(x: layout.size.width - layout.safeInsets.right - 16.0 - diameter, y: originY), size: CGSize(width: diameter, height: diameter)))
+        }
+    }
+    
     var statusPressed: (UIView) -> Void = { _ in }
     @objc private func statusTapGesture() {
         if let sourceView = self.timeoutNode?.view {
@@ -115,6 +179,8 @@ private final class SecretMediaPreviewControllerNode: GalleryControllerNode {
         super.animateIn(animateContent: animateContent, useSimpleAnimation: useSimpleAnimation)
         
         self.timeoutNode?.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
+        self.markViewedButton?.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
+        self.forwardButton?.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
     }
     
     override func animateOut(animateContent: Bool, completion: @escaping () -> Void) {
@@ -123,10 +189,18 @@ private final class SecretMediaPreviewControllerNode: GalleryControllerNode {
         if let timeoutNode = self.timeoutNode {
             timeoutNode.layer.animateAlpha(from: timeoutNode.alpha, to: 0.0, duration: 0.2, removeOnCompletion: false)
         }
+        if let markViewedButton = self.markViewedButton {
+            markViewedButton.layer.animateAlpha(from: markViewedButton.alpha, to: 0.0, duration: 0.2, removeOnCompletion: false)
+        }
+        if let forwardButton = self.forwardButton {
+            forwardButton.layer.animateAlpha(from: forwardButton.alpha, to: 0.0, duration: 0.2, removeOnCompletion: false)
+        }
     }
     
     override func updateDismissTransition(_ value: CGFloat) {
         self.timeoutNode?.alpha = value
+        self.markViewedButton?.alpha = value
+        self.forwardButton?.alpha = value
         self.onDismissTransitionUpdate(value)
     }
     
@@ -135,6 +209,7 @@ private final class SecretMediaPreviewControllerNode: GalleryControllerNode {
         
         self.validLayout = (layout, navigationBarHeight)
         self.layoutTimeoutNode(layout, navigationBarHeight: navigationBarHeight, transition: transition)
+        self.layoutShadowgramButtons(layout, transition: transition)
     }
     
     private func layoutTimeoutNode(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
@@ -180,6 +255,8 @@ public final class SecretMediaPreviewController: ViewController {
     private var screenCaptureEventsDisposable: Disposable?
     
     private weak var tooltipController: TooltipScreen?
+    
+    private var shadowgramMarkViewedRequested = false
     
     public init(context: AccountContext, messageId: MessageId) {
         self.context = context
@@ -270,6 +347,26 @@ public final class SecretMediaPreviewController: ViewController {
             if let self {
                 self.dismissAllTooltips()
             }
+        }
+        
+        self.controllerNode.markViewedPressed = { [weak self] in
+            guard let self else {
+                return
+            }
+            self.shadowgramMarkViewedRequested = true
+            self.updateShadowgramButtons()
+            let _ = self.context.engine.messages.shadowgramReportViewOnceMediaViewed(messageId: self.messageId).start()
+            let strings = ShadowgramStrings(languageCode: self.presentationData.strings.primaryComponent.languageCode)
+            self.present(UndoOverlayController(presentationData: self.presentationData, content: .info(title: nil, text: strings.selfDestructingMarkedViewed, timeout: nil, customUndoText: nil), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return false }), in: .current)
+        }
+        
+        self.controllerNode.forwardPressed = { [weak self] in
+            guard let self, let message = self.messageView?.message else {
+                return
+            }
+            shadowgramForwardSelfDestructingMedia(context: self.context, message: message, present: { [weak self] controller in
+                self?.present(controller, in: .window(.root))
+            })
         }
         
         self.controllerNode.statusBar = self.statusBar
@@ -499,7 +596,23 @@ public final class SecretMediaPreviewController: ViewController {
         })
     }
     
+    private func updateShadowgramButtons() {
+        guard self.isNodeLoaded else {
+            return
+        }
+        var markViewed = false
+        var forward = false
+        if let message = self.messageView?.message {
+            markViewed = !self.shadowgramMarkViewedRequested && shadowgramViewOnceMediaIsUnreported(message)
+            forward = shadowgramCanForwardSelfDestructingMedia(message)
+        }
+        let strings = ShadowgramStrings(languageCode: self.presentationData.strings.primaryComponent.languageCode)
+        self.controllerNode.updateShadowgramButtons(markViewed: markViewed, markViewedTitle: strings.selfDestructingMarkViewed, forward: forward, forwardTitle: self.presentationData.strings.Conversation_ContextMenuForward)
+    }
+    
     private func applyMessageView() {
+        self.updateShadowgramButtons()
+        
         var message: Message?
         if let messageView = self.messageView, let m = messageView.message {
             message = m

@@ -3,6 +3,7 @@ import UIKit
 import TelegramCore
 import ShadowgramSettings
 import ShadowgramUI
+import GalleryUI
 import AsyncDisplayKit
 import Display
 import UIKit
@@ -1576,7 +1577,18 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             }
         }
         
-        if (loggingSettings.logToFile || loggingSettings.logToConsole) && !downloadableMediaResourceInfos.isEmpty {
+        if message.containsSecretMedia {
+            if shadowgramCanForwardSelfDestructingMedia(message) {
+                actions.append(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Conversation_ContextMenuForward, icon: { theme in
+                    return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Forward"), color: theme.actionSheet.primaryTextColor)
+                }, action: { _, f in
+                    f(.dismissWithoutContent)
+                    shadowgramForwardSelfDestructingMedia(context: context, message: message, present: { c in
+                        controllerInteraction.presentController(c, nil)
+                    })
+                })))
+            }
+        } else if (loggingSettings.logToFile || loggingSettings.logToConsole) && !downloadableMediaResourceInfos.isEmpty {
             actions.append(.action(ContextMenuActionItem(text: "Send Logs", icon: { theme in
                 return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Message"), color: theme.actionSheet.primaryTextColor)
             }, action: { _, f in

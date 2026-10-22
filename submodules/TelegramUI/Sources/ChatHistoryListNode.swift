@@ -38,6 +38,7 @@ import TextFormat
 import ChatNewThreadInfoItem
 import PhoneNumberFormat
 import Postbox
+import ShadowgramSettings
 
 struct ChatTopVisibleMessageRange: Equatable {
     var lowerBound: MessageIndex
@@ -2008,7 +2009,7 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
         )
         |> map { setting, peer -> Bool in
             let isPremium = peer?.isPremium ?? false
-            return setting && isPremium
+            return setting && (isPremium || ShadowgramSettings.shared.values.unlockStoryTools)
         }
         |> distinctUntilChanged
         
@@ -2300,8 +2301,9 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
                     providedByGroupBoost: audioTranscriptionProvidedByBoost
                 )
                 
+                let canTranslateChat = isPremium || ShadowgramSettings.shared.values.unlockChatTranslation
                 var translateToLanguage: (fromLang: String, toLang: String)?
-                if let translationState, (isPremium || autoTranslate)  && translationState.isEnabled {
+                if let translationState, (canTranslateChat || autoTranslate)  && translationState.isEnabled {
                     var languageCode = translationState.toLang ?? chatPresentationData.strings.baseLanguageCode
                     let rawSuffix = "-raw"
                     if languageCode.hasSuffix(rawSuffix) {

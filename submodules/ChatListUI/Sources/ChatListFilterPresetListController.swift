@@ -13,6 +13,7 @@ import ChatListFilterSettingsHeaderItem
 import PremiumUI
 import UndoUI
 import ChatFolderLinkPreviewScreen
+import ShadowgramSettings
 
 private final class ChatListFilterPresetListControllerArguments {
     let context: AccountContext
@@ -292,7 +293,7 @@ private func chatListFilterPresetListControllerEntries(presentationData: Present
             }
             if case let .filter(_, title, _, _) = filter {
                 folderCount += 1
-                entries.append(.preset(index: PresetIndex(value: entries.count), title: title, label: chatCount == 0 ? "" : "\(chatCount)", preset: filter, canBeReordered: filters.count > 1, canBeDeleted: true, isEditing: state.isEditing, isAllChats: false, isDisabled: !isPremium && folderCount > limits.maxFoldersCount, displayTags: effectiveDisplayTags == true))
+                entries.append(.preset(index: PresetIndex(value: entries.count), title: title, label: chatCount == 0 ? "" : "\(chatCount)", preset: filter, canBeReordered: filters.count > 1, canBeDeleted: true, isEditing: state.isEditing, isAllChats: false, isDisabled: !isPremium && !ShadowgramSettings.shared.values.unlockExtraFolders && folderCount > limits.maxFoldersCount, displayTags: effectiveDisplayTags == true))
             }
         }
         

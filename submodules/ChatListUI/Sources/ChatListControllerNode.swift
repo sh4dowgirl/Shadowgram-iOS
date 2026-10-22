@@ -1618,7 +1618,7 @@ final class ChatListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
                                 var isDisabled = false
                                 if let filtersLimit = tabContainerData.2 {
                                     if let folderIndex = folderFilterIndex(mappedId, tabContainerData.0) {
-                                        isDisabled = !isPremium && folderIndex >= filtersLimit
+                                        isDisabled = !isPremium && !ShadowgramSettings.shared.values.unlockExtraFolders && folderIndex >= filtersLimit
                                     }
                                 }
                                 
@@ -1663,7 +1663,7 @@ final class ChatListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
                                 var isDisabled = false
                                 if let filtersLimit = tabContainerData.2 {
                                     if let folderIndex = folderFilterIndex(entry.id, tabContainerData.0) {
-                                        isDisabled = !isPremium && folderIndex >= filtersLimit
+                                        isDisabled = !isPremium && !ShadowgramSettings.shared.values.unlockExtraFolders && folderIndex >= filtersLimit
                                     }
                                 }
                                 

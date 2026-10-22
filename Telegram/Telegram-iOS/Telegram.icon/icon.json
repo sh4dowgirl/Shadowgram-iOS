@@ -27,14 +27,14 @@
             }
           ],
           "glass" : true,
-          "image-name" : "Plane.svg",
-          "name" : "Plane",
+          "image-name" : "Moon.svg",
+          "name" : "Moon",
           "position-specializations" : [
             {
               "value" : {
-                "scale" : 1.45,
+                "scale" : 1.0,
                 "translation-in-points" : [
-                  15,
+                  0,
                   0
                 ]
               }
@@ -42,7 +42,7 @@
             {
               "idiom" : "watchOS",
               "value" : {
-                "scale" : 1.35,
+                "scale" : 1.0,
                 "translation-in-points" : [
                   0,
                   0

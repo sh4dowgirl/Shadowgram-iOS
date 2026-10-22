@@ -55,6 +55,7 @@ enum InfoSection: Int, CaseIterable {
     case peerMembers
     case channelMonoforum
     case botAffiliateProgram
+    case shadowgramPeerId
 }
 
 func infoItems(
@@ -100,9 +101,6 @@ func infoItems(
     }
     
     if case let .user(user) = data.peer {
-        if ShadowgramSettings.shared.values.showPeerIds {
-            items[currentPeerInfoSection]!.append(shadowgramPeerIdInfoItem(peerId: user.id, section: currentPeerInfoSection, interaction: interaction, presentationData: presentationData))
-        }
         let ItemCallList = 1000
         let ItemPersonalChannelHeader = 2000
         let ItemPersonalChannel = 2001
@@ -559,9 +557,6 @@ func infoItems(
             }
         }
     } else if case let .channel(channel) = data.peer {
-        if ShadowgramSettings.shared.values.showPeerIds {
-            items[currentPeerInfoSection]!.append(shadowgramPeerIdInfoItem(peerId: channel.id, section: currentPeerInfoSection, interaction: interaction, presentationData: presentationData))
-        }
         let ItemUsername = 1
         let ItemUsernameInfo = 2
         let ItemAbout = 3
@@ -834,9 +829,6 @@ func infoItems(
             }
         }
     } else if case let .legacyGroup(group) = data.peer {
-        if ShadowgramSettings.shared.values.showPeerIds {
-            items[currentPeerInfoSection]!.append(shadowgramPeerIdInfoItem(peerId: group.id, section: currentPeerInfoSection, interaction: interaction, presentationData: presentationData))
-        }
         if let cachedData = data.cachedData as? CachedGroupData {
             let aboutText: String?
             if group.isFake {
@@ -911,6 +903,15 @@ func infoItems(
             }, openStories: { sourceView in
                 interaction.performMemberAction(member, .openStories(sourceView: sourceView))
             }))
+        }
+    }
+    
+    if ShadowgramSettings.shared.values.showPeerIds, let peer = data.peer {
+        switch peer {
+        case .user, .channel, .legacyGroup:
+            items[.shadowgramPeerId]!.append(shadowgramPeerIdInfoItem(peerId: peer.id, interaction: interaction))
+        case .community, .secretChat:
+            break
         }
     }
     
@@ -1883,23 +1884,14 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
 // Shadowgram: a labelled row with the peer's numeric ID. Tap copies it and shows a toast.
 private let shadowgramPeerIdItemBase: AnyHashable = AnyHashable("shadowgram.peerId")
 
-private func shadowgramPeerIdInfoItem(peerId: EnginePeer.Id, section: InfoSection, interaction: PeerInfoInteraction, presentationData: PresentationData) -> PeerInfoScreenItem {
-    // Treating `_` the label keeps the row aligned with the username/phone rows above it, which
-    // use short string labels too.
+private func shadowgramPeerIdInfoItem(peerId: EnginePeer.Id, interaction: PeerInfoInteraction) -> PeerInfoScreenItem {
     let value = "\(peerId.id._internalGetInt64Value())"
-    return shadowgramCaptureProtected(kinds: [.id], PeerInfoScreenLabeledValueItem(
-        id: shadowgramPeerIdItemBase,
-        label: "ID",
-        text: value,
-        textColor: .accent,
-        action: { _, _ in
-            UIPasteboard.general.string = value
-            interaction.shadowgramPeerIdCopied?()
-        },
-        requestLayout: { animated in
-            interaction.requestLayout(animated)
-        }
-    ))
+    let item = PeerInfoScreenDisclosureItem(id: shadowgramPeerIdItemBase, label: .coloredText(value, .accent), text: "ID", hasArrow: false, action: {
+        UIPasteboard.general.string = value
+        interaction.shadowgramPeerIdCopied?()
+    })
+    item.shadowgramCaptureKinds = [.id]
+    return item
 }
 
 /// Shadowgram: marks a labelled value as personal data that Extra Settings can hide from screen capture.

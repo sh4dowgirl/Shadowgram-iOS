@@ -2155,7 +2155,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
             )
             |> map { setting, peer -> Bool in
                 let isPremium = peer?.isPremium ?? false
-                return setting && isPremium
+                return setting && (isPremium || ShadowgramSettings.shared.values.unlockStoryTools)
             }
             |> distinctUntilChanged
             
@@ -4124,7 +4124,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                     selectedEntryId = .all
                 }
             }
-            let filtersLimit = isPremium == false ? limits.maxFoldersCount : nil
+            let filtersLimit = (isPremium == false && !ShadowgramSettings.shared.values.unlockExtraFolders) ? limits.maxFoldersCount : nil
             strongSelf.tabContainerData = (resolvedItems, false, filtersLimit)
             var availableFilters: [ChatListContainerNodeFilter] = []
             var hasAllChats = false

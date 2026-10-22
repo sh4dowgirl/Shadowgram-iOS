@@ -25,6 +25,7 @@ swift_library(
         "//submodules/LegacyMediaPickerUI",
         "//submodules/ChatPresentationInterfaceState",
         "//submodules/TelegramUI/Components/ChatSendButtonRadialStatusNode",
+        "//submodules/ShadowgramSettings:ShadowgramSettings",
     ],
     visibility = [
         "//visibility:public",

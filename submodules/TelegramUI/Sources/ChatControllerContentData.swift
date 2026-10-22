@@ -15,6 +15,7 @@ import EmojiStatusComponent
 import TelegramUIPreferences
 import TranslateUI
 import TelegramNotices
+import ShadowgramSettings
 
 extension ChatControllerImpl {
     final class ContentData {
@@ -2201,7 +2202,7 @@ extension ChatControllerImpl {
                     }
                     let isPremium = context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.Peer(id: context.account.peerId))
                     |> map { peer -> Bool in
-                        return peer?.isPremium ?? false
+                        return (peer?.isPremium ?? false) || ShadowgramSettings.shared.values.unlockChatTranslation
                     } |> distinctUntilChanged
                     
                     let isHidden = context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.TranslationHidden(id: peerId))

@@ -33,6 +33,7 @@ import ChatSendMessageActionUI
 import ChatControllerInteraction
 import LottieComponent
 import GlassBackgroundComponent
+import ShadowgramSettings
 
 struct CameraState: Equatable {
     enum Recording: Equatable {
@@ -963,7 +964,7 @@ public class VideoMessageCameraScreen: ViewController {
             self.previewContainerView.addSubview(self.previewContainerContentView)
                         
             let isDualCameraEnabled = cameraImpl.isDualCameraSupported(forRoundVideo: true)
-            let isFrontPosition = "".isEmpty
+            let isFrontPosition = ShadowgramSettings.shared.values.roundVideoCamera != .back
             
             self.mainPreviewView = cameraImpl.makeCameraSimplePreviewView(frame: .zero, main: true, roundVideo: true)
             self.additionalPreviewView = cameraImpl.makeCameraSimplePreviewView(frame: .zero, main: false, roundVideo: true)

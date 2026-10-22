@@ -25,6 +25,7 @@ swift_library(
         "//submodules/AppBundle",
         "//submodules/TelegramCore",
         "//submodules/Postbox",
+        "//submodules/ShadowgramSettings:ShadowgramSettings",
         "//submodules/ShareController",
         "//submodules/UndoUI",
         "//submodules/AttachmentUI",

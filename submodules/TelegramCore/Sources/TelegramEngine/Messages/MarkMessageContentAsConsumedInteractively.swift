@@ -208,8 +208,9 @@ func markMessageContentAsConsumedRemotely(transaction: Transaction, messageId: M
         
         let timestamp = Int32(CFAbsoluteTimeGetCurrent() + NSTimeIntervalSince1970)
         let countdownBeginTime = consumeDate ?? timestamp
+        let shadowgramKeepMedia = shadowgramKeepsViewOnceMedia(message)
         
-        for i in 0 ..< updatedAttributes.count {
+        for i in 0 ..< updatedAttributes.count where !shadowgramKeepMedia {
             if let attribute = updatedAttributes[i] as? AutoremoveTimeoutMessageAttribute {
                 if (attribute.countdownBeginTime == nil || attribute.countdownBeginTime == 0) && message.containsSecretMedia {
                     updatedAttributes[i] = AutoremoveTimeoutMessageAttribute(timeout: attribute.timeout, countdownBeginTime: countdownBeginTime)

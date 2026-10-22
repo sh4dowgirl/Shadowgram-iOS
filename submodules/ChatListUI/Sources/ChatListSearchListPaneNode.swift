@@ -40,6 +40,7 @@ import ButtonComponent
 import BundleIconComponent
 import AnimatedTextComponent
 import TextFormat
+import ShadowgramSettings
 
 private func isIncludedCommunityContainer(_ peer: EnginePeer?, filter: ChatListNodePeersFilter) -> Bool {
     if filter.contains(.includeCommunities), case .community = peer {
@@ -2709,7 +2710,7 @@ final class ChatListSearchListPaneNode: ASDisplayNode, ChatListSearchPaneNode {
                             |> mapToSignal { result in
                                 return context.engine.peers.searchAdPeers(query: query)
                                 |> map { adPeers in
-                                    return (result.0, result.1, adPeers, false)
+                                    return (result.0, result.1, ShadowgramSettings.shared.values.hideAds ? [] : adPeers, false)
                                 }
                             }
                         )

@@ -5,339 +5,327 @@ import SwiftSignalKit
 import TelegramCore
 import TelegramPresentationData
 import ItemListUI
+import ItemListPeerItem
+import ItemListPeerActionItem
 import PresentationDataUtils
 import AccountContext
-import SettingsUI
+import LocalizedPeerData
+import TextFormat
+import EntityKeyboard
 import ShadowgramSettings
 
 private final class ShadowgramAutoReactionArguments {
-    let setMode: (ShadowgramAutoReactionMode) -> Void
-    let openReaction: () -> Void
-    let openExceptions: (Bool) -> Void
+    let context: AccountContext
+    let addUser: () -> Void
+    let openUser: (EnginePeer.Id) -> Void
+    let removeUser: (EnginePeer.Id) -> Void
+    let setPeerIdWithRevealedOptions: (EnginePeer.Id?, EnginePeer.Id?) -> Void
 
-    init(setMode: @escaping (ShadowgramAutoReactionMode) -> Void, openReaction: @escaping () -> Void, openExceptions: @escaping (Bool) -> Void) {
-        self.setMode = setMode
-        self.openReaction = openReaction
-        self.openExceptions = openExceptions
+    init(context: AccountContext, addUser: @escaping () -> Void, openUser: @escaping (EnginePeer.Id) -> Void, removeUser: @escaping (EnginePeer.Id) -> Void, setPeerIdWithRevealedOptions: @escaping (EnginePeer.Id?, EnginePeer.Id?) -> Void) {
+        self.context = context
+        self.addUser = addUser
+        self.openUser = openUser
+        self.removeUser = removeUser
+        self.setPeerIdWithRevealedOptions = setPeerIdWithRevealedOptions
     }
 }
 
-private enum ShadowgramAutoReactionSection: Int32 {
-    case mode
-    case reaction
-    case exceptions
+private enum ShadowgramAutoReactionTag: ItemListItemTag, Equatable {
+    case addUser
+    case user(EnginePeer.Id)
+
+    func isEqual(to other: ItemListItemTag) -> Bool {
+        if let other = other as? ShadowgramAutoReactionTag {
+            return self == other
+        } else {
+            return false
+        }
+    }
+}
+
+private struct ShadowgramAutoReactionState: Equatable {
+    var peerIdWithRevealedOptions: EnginePeer.Id?
+}
+
+private enum ShadowgramAutoReactionEntryId: Hashable {
+    case header
+    case addUser
+    case user(EnginePeer.Id)
+    case footer
 }
 
 private enum ShadowgramAutoReactionEntry: ItemListNodeEntry {
-    case modeHeader
-    case mode(ShadowgramAutoReactionMode, Bool)
-    case modeFooter
-    case reactionHeader
-    case reaction(String)
-    case exceptionsHeader
-    case always(Int)
-    case never(Int)
-    case exceptionsFooter
+    case header
+    case addUser
+    case user(index: Int32, peer: EnginePeer, reaction: ShadowgramAutoReactionValue, editing: ItemListPeerItemEditing)
+    case footer
 
     var section: ItemListSectionId {
+        return 0
+    }
+
+    var stableId: ShadowgramAutoReactionEntryId {
         switch self {
-        case .modeHeader, .mode, .modeFooter:
-            return ShadowgramAutoReactionSection.mode.rawValue
-        case .reactionHeader, .reaction:
-            return ShadowgramAutoReactionSection.reaction.rawValue
-        case .exceptionsHeader, .always, .never, .exceptionsFooter:
-            return ShadowgramAutoReactionSection.exceptions.rawValue
+        case .header:
+            return .header
+        case .addUser:
+            return .addUser
+        case let .user(_, peer, _, _):
+            return .user(peer.id)
+        case .footer:
+            return .footer
         }
     }
 
-    var stableId: Int32 {
+    private var sortIndex: Int32 {
         switch self {
-        case .modeHeader:
+        case .header:
             return 0
-        case let .mode(mode, _):
-            switch mode {
-            case .everybody:
-                return 1
-            case .contacts:
-                return 2
-            case .nobody:
-                return 3
-            }
-        case .modeFooter:
-            return 4
-        case .reactionHeader:
-            return 5
-        case .reaction:
-            return 6
-        case .exceptionsHeader:
-            return 7
-        case .always:
-            return 8
-        case .never:
-            return 9
-        case .exceptionsFooter:
-            return 10
+        case .addUser:
+            return 1
+        case let .user(index, _, _, _):
+            return 2 + index
+        case .footer:
+            return Int32.max
         }
     }
 
     static func <(lhs: ShadowgramAutoReactionEntry, rhs: ShadowgramAutoReactionEntry) -> Bool {
-        return lhs.stableId < rhs.stableId
+        return lhs.sortIndex < rhs.sortIndex
     }
 
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
         let arguments = arguments as! ShadowgramAutoReactionArguments
         let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
         switch self {
-        case .modeHeader:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.autoReactionWhoHeader, sectionId: self.section)
-        case let .mode(mode, checked):
-            let title: String
-            switch mode {
-            case .everybody:
-                title = strings.autoReactionEverybody
-            case .contacts:
-                title = strings.autoReactionContacts
-            case .nobody:
-                title = strings.autoReactionNobody
+        case .header:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.autoReactionUsersHeader, sectionId: self.section)
+        case .addUser:
+            return ItemListPeerActionItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesItemList.addPersonIcon(presentationData.theme), title: strings.autoReactionAddUser, sectionId: self.section, height: .peerList, editing: false, action: {
+                arguments.addUser()
+            }, tag: ShadowgramAutoReactionTag.addUser)
+        case let .user(_, peer, reaction, editing):
+            let font = Font.regular(floor(presentationData.fontSize.itemListBaseFontSize * 20.0 / 17.0))
+            let label: NSAttributedString
+            switch reaction {
+            case let .emoji(emoji):
+                label = NSAttributedString(string: emoji, font: font, textColor: presentationData.theme.list.itemPrimaryTextColor)
+            case let .custom(fileId):
+                label = NSAttributedString(string: "😀", attributes: [
+                    .font: font,
+                    .foregroundColor: presentationData.theme.list.itemPrimaryTextColor,
+                    ChatTextInputAttributes.customEmoji: ChatTextInputTextCustomEmojiAttribute(interactivelySelectedFromPackId: nil, fileId: fileId, file: nil)
+                ])
             }
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: title, style: .left, checked: checked, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                arguments.setMode(mode)
-            })
-        case .modeFooter:
-            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.autoReactionWhoFooter), sectionId: self.section)
-        case .reactionHeader:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.autoReactionReactionHeader, sectionId: self.section)
-        case let .reaction(reaction):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: strings.autoReactionReaction, label: reaction, sectionId: self.section, style: .blocks, action: {
-                arguments.openReaction()
-            })
-        case .exceptionsHeader:
-            return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.autoReactionExceptionsHeader, sectionId: self.section)
-        case let .always(count):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: strings.autoReactionAlways, label: strings.autoReactionPeerCount(count), sectionId: self.section, style: .blocks, action: {
-                arguments.openExceptions(true)
-            })
-        case let .never(count):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: strings.autoReactionNever, label: strings.autoReactionPeerCount(count), sectionId: self.section, style: .blocks, action: {
-                arguments.openExceptions(false)
-            })
-        case .exceptionsFooter:
-            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.autoReactionExceptionsFooter), sectionId: self.section)
+            return ItemListPeerItem(presentationData: presentationData, systemStyle: .glass, dateTimeFormat: presentationData.dateTimeFormat, nameDisplayOrder: presentationData.nameDisplayOrder, context: arguments.context, peer: peer, presence: nil, text: .none, label: .attributedText(label), editing: editing, enabled: true, selectable: true, sectionId: self.section, action: {
+                arguments.openUser(peer.id)
+            }, setPeerIdWithRevealedOptions: { peerId, fromPeerId in
+                arguments.setPeerIdWithRevealedOptions(peerId, fromPeerId)
+            }, removePeer: { peerId in
+                arguments.removeUser(peerId)
+            }, tag: ShadowgramAutoReactionTag.user(peer.id))
+        case .footer:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.autoReactionFooter), sectionId: self.section)
         }
     }
 }
 
-private func shadowgramAutoReactionEntries(values: ShadowgramSettingsValues) -> [ShadowgramAutoReactionEntry] {
+private func shadowgramAutoReactionEntries(presentationData: PresentationData, state: ShadowgramAutoReactionState, autoReactions: [Int64: ShadowgramAutoReactionValue], peers: [EnginePeer]) -> [ShadowgramAutoReactionEntry] {
     var entries: [ShadowgramAutoReactionEntry] = []
-    entries.append(.modeHeader)
-    entries.append(.mode(.everybody, values.autoReactionMode == .everybody))
-    entries.append(.mode(.contacts, values.autoReactionMode == .contacts))
-    entries.append(.mode(.nobody, values.autoReactionMode == .nobody))
-    entries.append(.modeFooter)
-    entries.append(.reactionHeader)
-    entries.append(.reaction(values.autoReaction))
-    entries.append(.exceptionsHeader)
-    entries.append(.always(values.autoReactionAlwaysIds.count))
-    entries.append(.never(values.autoReactionNeverIds.count))
-    entries.append(.exceptionsFooter)
+    entries.append(.header)
+    entries.append(.addUser)
+    let sortedPeers = peers.sorted { lhs, rhs in
+        let lhsTitle = lhs.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
+        let rhsTitle = rhs.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
+        let result = lhsTitle.localizedCaseInsensitiveCompare(rhsTitle)
+        if result == .orderedSame {
+            return lhs.id.toInt64() < rhs.id.toInt64()
+        }
+        return result == .orderedAscending
+    }
+    var index: Int32 = 0
+    for peer in sortedPeers {
+        guard let reaction = autoReactions[peer.id.toInt64()] else {
+            continue
+        }
+        entries.append(.user(index: index, peer: peer, reaction: reaction, editing: ItemListPeerItemEditing(editable: true, editing: false, revealed: state.peerIdWithRevealedOptions == peer.id)))
+        index += 1
+    }
+    entries.append(.footer)
     return entries
 }
 
-/// Short label for the Extra Settings row: the mode, and the reaction while it is on.
 public func shadowgramAutoReactionSummary(values: ShadowgramSettingsValues, strings: ShadowgramStrings) -> String {
-    switch values.autoReactionMode {
-    case .everybody:
-        return "\(values.autoReaction) \(strings.autoReactionEverybody)"
-    case .contacts:
-        return "\(values.autoReaction) \(strings.autoReactionContacts)"
-    case .nobody:
-        return values.autoReactionAlwaysIds.isEmpty ? strings.autoReactionOff : "\(values.autoReaction) \(strings.autoReactionPeerCount(values.autoReactionAlwaysIds.count))"
+    if values.autoReactions.isEmpty {
+        return strings.autoReactionOff
     }
+    return strings.autoReactionUserCount(values.autoReactions.count)
 }
 
-/// Extra Settings ▸ Auto Reaction.
-public func shadowgramAutoReactionController(context: AccountContext) -> ViewController {
-    var pushImpl: ((ViewController) -> Void)?
-    var presentImpl: ((ViewController) -> Void)?
+private func shadowgramAutoReactionSourceView(controller: ItemListController, tag: ShadowgramAutoReactionTag) -> UIView? {
+    var result: UIView?
+    controller.forEachItemNode { itemNode in
+        if let taggedNode = itemNode as? ItemListItemNode, let itemTag = taggedNode.tag, itemTag.isEqual(to: tag) {
+            result = itemNode.view
+        }
+    }
+    return result
+}
 
-    let arguments = ShadowgramAutoReactionArguments(setMode: { mode in
-        ShadowgramSettings.shared.update { $0.autoReactionMode = mode }
-    }, openReaction: {
-        pushImpl?(shadowgramAutoReactionPickerController(context: context))
-    }, openExceptions: { isAlways in
-        shadowgramOpenAutoReactionExceptions(context: context, isAlways: isAlways, push: { c in
-            pushImpl?(c)
-        }, present: { c in
-            presentImpl?(c)
-        })
+private func shadowgramPresentAutoReactionSelector(context: AccountContext, controller: ItemListController, peerId: EnginePeer.Id, anchor: ShadowgramAutoReactionTag) {
+    let isPremium = context.isPremium
+    let current = ShadowgramSettings.shared.values.autoReactions[peerId.toInt64()]
+    let _ = (context.engine.stickers.availableReactions()
+    |> take(1)
+    |> deliverOnMainQueue).start(next: { [weak controller] availableReactions in
+        guard let controller else {
+            return
+        }
+        let sourceView: UIView = shadowgramAutoReactionSourceView(controller: controller, tag: anchor) ?? controller.view
+
+        var selectedItems = Set<EngineMedia.Id>()
+        if let current {
+            switch current {
+            case let .emoji(emoji):
+                if let reaction = availableReactions?.reactions.first(where: { $0.value == .builtin(emoji) }) {
+                    selectedItems.insert(reaction.selectAnimation.fileId)
+                }
+            case let .custom(fileId):
+                selectedItems.insert(EngineMedia.Id(namespace: Namespaces.Media.CloudFile, id: fileId))
+            }
+        }
+
+        let selectionController = context.sharedContext.makeEmojiStatusSelectionController(
+            context: context,
+            mode: .customStatusSelection(completion: { file, _ in
+                guard let file else {
+                    return
+                }
+                let value: ShadowgramAutoReactionValue
+                if let reaction = availableReactions?.reactions.first(where: { $0.selectAnimation.fileId == file.fileId }) {
+                    guard case let .builtin(emoji) = reaction.value else {
+                        return
+                    }
+                    value = .emoji(emoji)
+                } else if isPremium {
+                    value = .custom(file.fileId.id)
+                } else {
+                    return
+                }
+                ShadowgramSettings.shared.update { $0.autoReactions[peerId.toInt64()] = value }
+            }),
+            sourceView: sourceView,
+            emojiContent: EmojiPagerContentComponent.emojiInputData(
+                context: context,
+                animationCache: context.animationCache,
+                animationRenderer: context.animationRenderer,
+                isStandalone: false,
+                subject: .reactionList,
+                hasTrending: false,
+                topReactionItems: [],
+                areUnicodeEmojiEnabled: false,
+                areCustomEmojiEnabled: isPremium,
+                chatPeerId: nil,
+                selectedItems: selectedItems
+            ) |> map { $0 as AnyObject },
+            currentSelection: nil,
+            color: nil,
+            destinationItemView: {
+                return nil
+            }
+        )
+        controller.present(selectionController, in: .window(.root))
     })
+}
+
+public func shadowgramAutoReactionController(context: AccountContext) -> ViewController {
+    let initialState = ShadowgramAutoReactionState(peerIdWithRevealedOptions: nil)
+    let statePromise = ValuePromise(initialState, ignoreRepeated: true)
+    let stateValue = Atomic(value: initialState)
+    let updateState: ((ShadowgramAutoReactionState) -> ShadowgramAutoReactionState) -> Void = { f in
+        statePromise.set(stateValue.modify { f($0) })
+    }
+
+    weak var weakController: ItemListController?
+
+    let arguments = ShadowgramAutoReactionArguments(context: context, addUser: {
+        guard let controller = weakController else {
+            return
+        }
+        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+        let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
+        let peerController = context.sharedContext.makePeerSelectionController(PeerSelectionControllerParams(context: context, filter: [.onlyPrivateChats, .excludeSavedMessages, .excludeSecretChats, .excludeBots, .removeSearchHeader, .excludeRecent, .doNotSearchMessages], title: strings.autoReactionSelectUser))
+        peerController.peerSelected = { [weak peerController] peer, _ in
+            peerController?.dismiss()
+            guard case let .user(user) = peer, user.botInfo == nil, peer.id != context.account.peerId else {
+                return
+            }
+            let peerId = peer.id
+            Queue.mainQueue().after(0.45, {
+                guard let controller = weakController else {
+                    return
+                }
+                shadowgramPresentAutoReactionSelector(context: context, controller: controller, peerId: peerId, anchor: .addUser)
+            })
+        }
+        controller.push(peerController)
+    }, openUser: { peerId in
+        guard let controller = weakController else {
+            return
+        }
+        shadowgramPresentAutoReactionSelector(context: context, controller: controller, peerId: peerId, anchor: .user(peerId))
+    }, removeUser: { peerId in
+        updateState { state in
+            var state = state
+            state.peerIdWithRevealedOptions = nil
+            return state
+        }
+        ShadowgramSettings.shared.update { $0.autoReactions[peerId.toInt64()] = nil }
+    }, setPeerIdWithRevealedOptions: { peerId, fromPeerId in
+        updateState { state in
+            if (peerId == nil && fromPeerId == state.peerIdWithRevealedOptions) || (peerId != nil && fromPeerId == nil) {
+                var state = state
+                state.peerIdWithRevealedOptions = peerId
+                return state
+            } else {
+                return state
+            }
+        }
+    })
+
+    let peers: Signal<([Int64: ShadowgramAutoReactionValue], [EnginePeer]), NoError> = ShadowgramSettings.shared.valuesSignal
+    |> map { $0.autoReactions }
+    |> distinctUntilChanged
+    |> mapToSignal { autoReactions -> Signal<([Int64: ShadowgramAutoReactionValue], [EnginePeer]), NoError> in
+        let peerIds = autoReactions.keys.map { EnginePeer.Id($0) }
+        if peerIds.isEmpty {
+            return .single((autoReactions, []))
+        }
+        return context.engine.data.subscribe(EngineDataMap(peerIds.map(TelegramEngine.EngineData.Item.Peer.Peer.init)))
+        |> map { peerMap -> ([Int64: ShadowgramAutoReactionValue], [EnginePeer]) in
+            var peers: [EnginePeer] = []
+            for peerId in peerIds {
+                if let maybePeer = peerMap[peerId], let peer = maybePeer {
+                    peers.append(peer)
+                }
+            }
+            return (autoReactions, peers)
+        }
+    }
 
     let signal = combineLatest(queue: .mainQueue(),
         context.sharedContext.presentationData,
-        ShadowgramSettings.shared.valuesSignal
+        statePromise.get(),
+        peers
     )
-    |> map { presentationData, values -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    |> map { presentationData, state, peers -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.autoReaction), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: shadowgramAutoReactionEntries(values: values), style: .blocks, animateChanges: true)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: shadowgramAutoReactionEntries(presentationData: presentationData, state: state, autoReactions: peers.0, peers: peers.1), style: .blocks, animateChanges: true)
         return (controllerState, (listState, arguments))
     }
 
     let controller = ItemListController(context: context, state: signal)
-    pushImpl = { [weak controller] c in
-        controller?.push(c)
-    }
-    presentImpl = { [weak controller] c in
-        controller?.present(c, in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
-    }
+    weakController = controller
     return controller
-}
-
-// MARK: - Exceptions
-
-/// Stores an exceptions list. A chat moved into one list leaves the other, as in privacy settings.
-private func shadowgramSaveAutoReactionExceptions(isAlways: Bool, ids: Set<Int64>) {
-    ShadowgramSettings.shared.update { values in
-        if isAlways {
-            values.autoReactionAlwaysIds = ids
-            values.autoReactionNeverIds.subtract(ids)
-        } else {
-            values.autoReactionNeverIds = ids
-            values.autoReactionAlwaysIds.subtract(ids)
-        }
-    }
-}
-
-/// The privacy-style exceptions list: straight to the chat picker while it is empty, the list
-/// screen (add, remove, open) once it has chats.
-private func shadowgramOpenAutoReactionExceptions(context: AccountContext, isAlways: Bool, push: @escaping (ViewController) -> Void, present: @escaping (ViewController) -> Void) {
-    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-    let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
-    let title = isAlways ? strings.autoReactionAlways : strings.autoReactionNever
-    let values = ShadowgramSettings.shared.values
-    let ids = isAlways ? values.autoReactionAlwaysIds : values.autoReactionNeverIds
-
-    let pushList: ([EnginePeer.Id]) -> Void = { peerIds in
-        let _ = (context.engine.data.get(EngineDataMap(peerIds.map(TelegramEngine.EngineData.Item.Peer.Peer.init)))
-        |> deliverOnMainQueue).start(next: { peerMap in
-            var initialPeers: [EnginePeer.Id: SelectivePrivacyPeer] = [:]
-            for peerId in peerIds {
-                if let maybePeer = peerMap[peerId], let peer = maybePeer {
-                    initialPeers[peerId] = SelectivePrivacyPeer(peer: peer, participantCount: nil)
-                }
-            }
-            let controller = selectivePrivacyPeersController(context: context, title: title, initialPeers: initialPeers, initialEnableForPremium: false, displayPremiumCategory: false, initialEnableForBots: false, displayBotsCategory: false, updated: { updatedPeers, _, _ in
-                shadowgramSaveAutoReactionExceptions(isAlways: isAlways, ids: Set(updatedPeers.keys.map { $0.toInt64() }))
-            })
-            push(controller)
-        })
-    }
-
-    if !ids.isEmpty {
-        pushList(ids.sorted().map { EnginePeer.Id($0) })
-        return
-    }
-
-    let controller = context.sharedContext.makeContactMultiselectionController(ContactMultiselectionControllerParams(context: context, mode: .chatSelection(ContactMultiselectionControllerMode.ChatSelection(
-        title: strings.autoReactionSearchTitle,
-        searchPlaceholder: strings.autoReactionSearchPlaceholder,
-        selectedChats: Set(),
-        additionalCategories: nil,
-        chatListFilters: nil,
-        onlyUsers: false,
-        disableChannels: false,
-        disableBots: false,
-        disableContacts: false
-    )), alwaysEnabled: true))
-    let _ = (controller.result
-    |> take(1)
-    |> deliverOnMainQueue).start(next: { [weak controller] result in
-        guard case let .result(peerIds, _) = result else {
-            return
-        }
-        let selected = peerIds.compactMap { peerId -> EnginePeer.Id? in
-            if case let .peer(value) = peerId {
-                return value
-            } else {
-                return nil
-            }
-        }
-        controller?.dismiss()
-        if selected.isEmpty {
-            return
-        }
-        shadowgramSaveAutoReactionExceptions(isAlways: isAlways, ids: Set(selected.map { $0.toInt64() }))
-        pushList(selected)
-    })
-    present(controller)
-}
-
-// MARK: - Reaction picker
-
-private final class ShadowgramAutoReactionPickerArguments {
-    let select: (String) -> Void
-
-    init(select: @escaping (String) -> Void) {
-        self.select = select
-    }
-}
-
-private struct ShadowgramAutoReactionPickerEntry: ItemListNodeEntry {
-    let index: Int32
-    let emoji: String
-    let title: String
-    let isSelected: Bool
-
-    var section: ItemListSectionId {
-        return 0
-    }
-
-    var stableId: Int32 {
-        return self.index
-    }
-
-    static func <(lhs: ShadowgramAutoReactionPickerEntry, rhs: ShadowgramAutoReactionPickerEntry) -> Bool {
-        return lhs.index < rhs.index
-    }
-
-    func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
-        let arguments = arguments as! ShadowgramAutoReactionPickerArguments
-        let emoji = self.emoji
-        return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: "\(emoji)  \(self.title)", style: .left, checked: self.isSelected, zeroSeparatorInsets: false, sectionId: self.section, action: {
-            arguments.select(emoji)
-        })
-    }
-}
-
-/// The standard (non-Premium) reactions, one tap to pick.
-private func shadowgramAutoReactionPickerController(context: AccountContext) -> ViewController {
-    let arguments = ShadowgramAutoReactionPickerArguments(select: { emoji in
-        ShadowgramSettings.shared.update { $0.autoReaction = emoji }
-    })
-
-    let signal = combineLatest(queue: .mainQueue(),
-        context.sharedContext.presentationData,
-        ShadowgramSettings.shared.valuesSignal,
-        context.engine.stickers.availableReactions()
-    )
-    |> map { presentationData, values, availableReactions -> (ItemListControllerState, (ItemListNodeState, Any)) in
-        let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
-        var entries: [ShadowgramAutoReactionPickerEntry] = []
-        var seen = Set<String>()
-        for reaction in availableReactions?.reactions ?? [] {
-            guard reaction.isEnabled, !reaction.isPremium, case let .builtin(emoji) = reaction.value, !seen.contains(emoji) else {
-                continue
-            }
-            seen.insert(emoji)
-            entries.append(ShadowgramAutoReactionPickerEntry(index: Int32(entries.count), emoji: emoji, title: reaction.title, isSelected: emoji == values.autoReaction))
-        }
-        if entries.isEmpty {
-            entries.append(ShadowgramAutoReactionPickerEntry(index: 0, emoji: values.autoReaction, title: "", isSelected: true))
-        }
-        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.autoReactionReaction), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: entries, style: .blocks, animateChanges: false)
-        return (controllerState, (listState, arguments))
-    }
-
-    return ItemListController(context: context, state: signal)
 }

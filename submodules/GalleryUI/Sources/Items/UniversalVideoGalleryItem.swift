@@ -39,6 +39,7 @@ import BundleIconComponent
 import VideoPlaybackControlsComponent
 import PhotoResources
 import GlassBackgroundComponent
+import ShadowgramSettings
 
 public enum UniversalVideoGalleryItemContentInfo {
     case message(Message, GalleryMediaSubject?)
@@ -995,6 +996,8 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
     private var customUnembedWhenPortrait: ((OverlayMediaItemNode) -> Bool)?
 
     private var nativePictureInPictureContent: AnyObject?
+    private var isAutomaticPictureInPictureContent = false
+    private var didAttemptAutomaticPictureInPicture = false
     
     private var activePictureInPictureNavigationController: NavigationController?
     private var activePictureInPictureController: ViewController?
@@ -1811,6 +1814,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                     if !disablePlayerControls && strongSelf.isCentral == true && isPlaying {
                         strongSelf.isPlayingPromise.set(true)
                         strongSelf.isPlaying = true
+                        strongSelf.setupAutomaticPictureInPictureIfNeeded()
                     } else if !isPlaying {
                         strongSelf.isPlayingPromise.set(false)
                         strongSelf.isPlaying = false
@@ -2958,7 +2962,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             }
         }
         
-        if #available(iOS 15.0, *) {
+        if #available(iOS 15.0, *), !self.isAutomaticPictureInPictureContent {
             if let nativePictureInPictureContent = self.nativePictureInPictureContent as? NativePictureInPictureContentImpl {
                 self.context.engine.accountData.addAppLogEvent(type: "swipe_up_pip")
                 nativePictureInPictureContent.beginPictureInPicture()
@@ -3218,7 +3222,25 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         }
     }
     
+    private func setupAutomaticPictureInPictureIfNeeded() {
+        guard !self.didAttemptAutomaticPictureInPicture, self.nativePictureInPictureContent == nil, self.isCentral == true, self.hasPictureInPicture, ShadowgramSettings.shared.values.pictureInPictureOnBackground else {
+            return
+        }
+        guard let videoNode = self.videoNode, videoNode.getVideoLayer() != nil else {
+            return
+        }
+        self.didAttemptAutomaticPictureInPicture = true
+        self.setupNativePictureInPicture()
+        if #available(iOS 15.0, *) {
+            if let nativePictureInPictureContent = self.nativePictureInPictureContent as? NativePictureInPictureContentImpl {
+                self.isAutomaticPictureInPictureContent = true
+                nativePictureInPictureContent.updateIsCentral(isCentral: true)
+            }
+        }
+    }
+    
     @objc func pictureInPictureButtonPressed() {
+        self.isAutomaticPictureInPictureContent = false
         if self.nativePictureInPictureContent == nil {
             self.setupNativePictureInPicture()
         }
@@ -3788,7 +3810,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                                     })))
                                 }
                                 
-                                if self.context.isPremium {
+                                if self.context.isPremium || ShadowgramSettings.shared.values.unlockMediaSaving {
                                     addItem(nil, content.fileReference)
                                 } else {
                                     #if DEBUG

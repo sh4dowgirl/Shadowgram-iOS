@@ -1,12 +1,32 @@
 import Foundation
 import SwiftSignalKit
 
-/// Who gets an automatic reaction on their messages (Extra Settings ▸ Auto Reaction).
-public enum ShadowgramAutoReactionMode: Int32 {
-    /// Off, apart from the "always" exceptions.
-    case nobody = 0
-    case contacts = 1
-    case everybody = 2
+public enum ShadowgramAutoReactionValue: Equatable {
+    case emoji(String)
+    case custom(Int64)
+
+    public init?(encoded: String) {
+        if encoded.hasPrefix("e:") {
+            let value = String(encoded.dropFirst(2))
+            if value.isEmpty {
+                return nil
+            }
+            self = .emoji(value)
+        } else if encoded.hasPrefix("c:"), let fileId = Int64(encoded.dropFirst(2)) {
+            self = .custom(fileId)
+        } else {
+            return nil
+        }
+    }
+
+    public var encoded: String {
+        switch self {
+        case let .emoji(value):
+            return "e:\(value)"
+        case let .custom(fileId):
+            return "c:\(fileId)"
+        }
+    }
 }
 
 /// Where the groups folder shows up.
@@ -15,6 +35,11 @@ public enum ShadowgramGroupsFolderPlacement: Int32 {
     case archive = 0
     /// Its own tab next to the chat folders.
     case tab = 1
+}
+
+public enum ShadowgramRoundVideoCamera: Int32 {
+    case front = 0
+    case back = 1
 }
 
 /// Client-side switches of Shadowgram's "Extra Settings".
@@ -64,14 +89,7 @@ public struct ShadowgramSettingsValues: Equatable {
     public var privateChatIds: Set<Int64>
     /// Where the groups folder shows up.
     public var groupsFolderPlacement: ShadowgramGroupsFolderPlacement
-    /// Whose new messages get the automatic reaction.
-    public var autoReactionMode: ShadowgramAutoReactionMode
-    /// The reaction, a standard reaction emoji.
-    public var autoReaction: String
-    /// Users and groups that always get the reaction (raw peer ids).
-    public var autoReactionAlwaysIds: Set<Int64>
-    /// Users and groups that never get it (raw peer ids).
-    public var autoReactionNeverIds: Set<Int64>
+    public var autoReactions: [Int64: ShadowgramAutoReactionValue]
     public var chatListOldestFirst: Bool
     /// Show exact last-seen timestamps even when users hide them.
     public var showExactLastSeen: Bool
@@ -79,6 +97,14 @@ public struct ShadowgramSettingsValues: Equatable {
     public var bypassCopyProtection: Bool
     /// View once-view media unlimited times without notifying the sender.
     public var bypassViewOnce: Bool
+    public var roundVideoCamera: ShadowgramRoundVideoCamera
+    public var pictureInPictureOnBackground: Bool
+    public var forwardSelfDestructingMedia: Bool
+    public var unlockStoryTools: Bool
+    public var unlockMediaSaving: Bool
+    public var unlockChatTranslation: Bool
+    public var hideAds: Bool
+    public var unlockExtraFolders: Bool
 
     public static let defaultValues = ShadowgramSettingsValues(
         saveDeletedMessages: false,
@@ -100,17 +126,22 @@ public struct ShadowgramSettingsValues: Equatable {
         hideUsernameOnCapture: false,
         privateChatIds: Set(),
         groupsFolderPlacement: .archive,
-        autoReactionMode: .nobody,
-        autoReaction: "👍",
-        autoReactionAlwaysIds: Set(),
-        autoReactionNeverIds: Set(),
+        autoReactions: [:],
         chatListOldestFirst: false,
         showExactLastSeen: false,
         bypassCopyProtection: false,
-        bypassViewOnce: false
+        bypassViewOnce: false,
+        roundVideoCamera: .front,
+        pictureInPictureOnBackground: false,
+        forwardSelfDestructingMedia: false,
+        unlockStoryTools: false,
+        unlockMediaSaving: false,
+        unlockChatTranslation: false,
+        hideAds: false,
+        unlockExtraFolders: false
     )
 
-    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactionMode: ShadowgramAutoReactionMode, autoReaction: String, autoReactionAlwaysIds: Set<Int64>, autoReactionNeverIds: Set<Int64>, chatListOldestFirst: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool) {
+    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactions: [Int64: ShadowgramAutoReactionValue], chatListOldestFirst: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool, roundVideoCamera: ShadowgramRoundVideoCamera, pictureInPictureOnBackground: Bool, forwardSelfDestructingMedia: Bool, unlockStoryTools: Bool, unlockMediaSaving: Bool, unlockChatTranslation: Bool, hideAds: Bool, unlockExtraFolders: Bool) {
         self.saveDeletedMessages = saveDeletedMessages
         self.unlimitedAccounts = unlimitedAccounts
         self.ghostModeEnabled = ghostModeEnabled
@@ -130,14 +161,19 @@ public struct ShadowgramSettingsValues: Equatable {
         self.hideUsernameOnCapture = hideUsernameOnCapture
         self.privateChatIds = privateChatIds
         self.groupsFolderPlacement = groupsFolderPlacement
-        self.autoReactionMode = autoReactionMode
-        self.autoReaction = autoReaction
-        self.autoReactionAlwaysIds = autoReactionAlwaysIds
-        self.autoReactionNeverIds = autoReactionNeverIds
+        self.autoReactions = autoReactions
         self.chatListOldestFirst = chatListOldestFirst
         self.showExactLastSeen = showExactLastSeen
         self.bypassCopyProtection = bypassCopyProtection
         self.bypassViewOnce = bypassViewOnce
+        self.roundVideoCamera = roundVideoCamera
+        self.pictureInPictureOnBackground = pictureInPictureOnBackground
+        self.forwardSelfDestructingMedia = forwardSelfDestructingMedia
+        self.unlockStoryTools = unlockStoryTools
+        self.unlockMediaSaving = unlockMediaSaving
+        self.unlockChatTranslation = unlockChatTranslation
+        self.hideAds = hideAds
+        self.unlockExtraFolders = unlockExtraFolders
     }
 
     /// What the client actually sends: everything unless ghost mode is on and hides it.
@@ -193,14 +229,19 @@ public final class ShadowgramSettings {
         static let hideUsernameOnCapture = "shadowgram.capture.hideUsername"
         static let privateChatIds = "shadowgram.privateChatIds"
         static let groupsFolderPlacement = "shadowgram.groupsFolder.placement"
-        static let autoReactionMode = "shadowgram.autoReaction.mode"
-        static let autoReaction = "shadowgram.autoReaction.reaction"
-        static let autoReactionAlwaysIds = "shadowgram.autoReaction.always"
-        static let autoReactionNeverIds = "shadowgram.autoReaction.never"
+        static let autoReactions = "shadowgram.autoReaction.peers"
         static let chatListOldestFirst = "shadowgram.chatList.oldestFirst"
         static let showExactLastSeen = "shadowgram.showExactLastSeen"
         static let bypassCopyProtection = "shadowgram.bypassCopyProtection"
         static let bypassViewOnce = "shadowgram.bypassViewOnce"
+        static let roundVideoCamera = "shadowgram.roundVideo.camera"
+        static let pictureInPictureOnBackground = "shadowgram.pip.onBackground"
+        static let forwardSelfDestructingMedia = "shadowgram.selfDestructing.forward"
+        static let unlockStoryTools = "shadowgram.premium.storyTools"
+        static let unlockMediaSaving = "shadowgram.premium.mediaSaving"
+        static let unlockChatTranslation = "shadowgram.premium.chatTranslation"
+        static let hideAds = "shadowgram.premium.hideAds"
+        static let unlockExtraFolders = "shadowgram.premium.extraFolders"
     }
 
     private let defaults: UserDefaults
@@ -219,6 +260,12 @@ public final class ShadowgramSettings {
         let minMembers = (defaults.object(forKey: Key.groupsFolderMinMembers) as? NSNumber)?.int32Value ?? defaultValues.groupsFolderMinMembers
         func idSet(_ key: String) -> Set<Int64> {
             return Set(((defaults.array(forKey: key) as? [NSNumber]) ?? []).map { $0.int64Value })
+        }
+        var autoReactions: [Int64: ShadowgramAutoReactionValue] = [:]
+        for (key, value) in (defaults.dictionary(forKey: Key.autoReactions) as? [String: String]) ?? [:] {
+            if let peerId = Int64(key), let reaction = ShadowgramAutoReactionValue(encoded: value) {
+                autoReactions[peerId] = reaction
+            }
         }
 
         let values = ShadowgramSettingsValues(
@@ -241,14 +288,19 @@ public final class ShadowgramSettings {
             hideUsernameOnCapture: bool(Key.hideUsernameOnCapture, defaultValues.hideUsernameOnCapture),
             privateChatIds: idSet(Key.privateChatIds),
             groupsFolderPlacement: (defaults.object(forKey: Key.groupsFolderPlacement) as? NSNumber).flatMap { ShadowgramGroupsFolderPlacement(rawValue: $0.int32Value) } ?? defaultValues.groupsFolderPlacement,
-            autoReactionMode: (defaults.object(forKey: Key.autoReactionMode) as? NSNumber).flatMap { ShadowgramAutoReactionMode(rawValue: $0.int32Value) } ?? defaultValues.autoReactionMode,
-            autoReaction: (defaults.string(forKey: Key.autoReaction)).flatMap { $0.isEmpty ? nil : $0 } ?? defaultValues.autoReaction,
-            autoReactionAlwaysIds: idSet(Key.autoReactionAlwaysIds),
-            autoReactionNeverIds: idSet(Key.autoReactionNeverIds),
+            autoReactions: autoReactions,
             chatListOldestFirst: bool(Key.chatListOldestFirst, defaultValues.chatListOldestFirst),
             showExactLastSeen: bool(Key.showExactLastSeen, defaultValues.showExactLastSeen),
             bypassCopyProtection: bool(Key.bypassCopyProtection, defaultValues.bypassCopyProtection),
-            bypassViewOnce: bool(Key.bypassViewOnce, defaultValues.bypassViewOnce)
+            bypassViewOnce: bool(Key.bypassViewOnce, defaultValues.bypassViewOnce),
+            roundVideoCamera: (defaults.object(forKey: Key.roundVideoCamera) as? NSNumber).flatMap { ShadowgramRoundVideoCamera(rawValue: $0.int32Value) } ?? defaultValues.roundVideoCamera,
+            pictureInPictureOnBackground: bool(Key.pictureInPictureOnBackground, defaultValues.pictureInPictureOnBackground),
+            forwardSelfDestructingMedia: bool(Key.forwardSelfDestructingMedia, defaultValues.forwardSelfDestructingMedia),
+            unlockStoryTools: bool(Key.unlockStoryTools, defaultValues.unlockStoryTools),
+            unlockMediaSaving: bool(Key.unlockMediaSaving, defaultValues.unlockMediaSaving),
+            unlockChatTranslation: bool(Key.unlockChatTranslation, defaultValues.unlockChatTranslation),
+            hideAds: bool(Key.hideAds, defaultValues.hideAds),
+            unlockExtraFolders: bool(Key.unlockExtraFolders, defaultValues.unlockExtraFolders)
         )
         self.currentValues = values
         self.valuesPromise = ValuePromise(values, ignoreRepeated: true)
@@ -295,14 +347,23 @@ public final class ShadowgramSettings {
         self.defaults.set(values.hideUsernameOnCapture, forKey: Key.hideUsernameOnCapture)
         self.defaults.set(values.privateChatIds.sorted().map { NSNumber(value: $0) }, forKey: Key.privateChatIds)
         self.defaults.set(NSNumber(value: values.groupsFolderPlacement.rawValue), forKey: Key.groupsFolderPlacement)
-        self.defaults.set(NSNumber(value: values.autoReactionMode.rawValue), forKey: Key.autoReactionMode)
-        self.defaults.set(values.autoReaction, forKey: Key.autoReaction)
-        self.defaults.set(values.autoReactionAlwaysIds.sorted().map { NSNumber(value: $0) }, forKey: Key.autoReactionAlwaysIds)
-        self.defaults.set(values.autoReactionNeverIds.sorted().map { NSNumber(value: $0) }, forKey: Key.autoReactionNeverIds)
+        var encodedAutoReactions: [String: String] = [:]
+        for (peerId, reaction) in values.autoReactions {
+            encodedAutoReactions["\(peerId)"] = reaction.encoded
+        }
+        self.defaults.set(encodedAutoReactions, forKey: Key.autoReactions)
         self.defaults.set(values.chatListOldestFirst, forKey: Key.chatListOldestFirst)
         self.defaults.set(values.showExactLastSeen, forKey: Key.showExactLastSeen)
         self.defaults.set(values.bypassCopyProtection, forKey: Key.bypassCopyProtection)
         self.defaults.set(values.bypassViewOnce, forKey: Key.bypassViewOnce)
+        self.defaults.set(NSNumber(value: values.roundVideoCamera.rawValue), forKey: Key.roundVideoCamera)
+        self.defaults.set(values.pictureInPictureOnBackground, forKey: Key.pictureInPictureOnBackground)
+        self.defaults.set(values.forwardSelfDestructingMedia, forKey: Key.forwardSelfDestructingMedia)
+        self.defaults.set(values.unlockStoryTools, forKey: Key.unlockStoryTools)
+        self.defaults.set(values.unlockMediaSaving, forKey: Key.unlockMediaSaving)
+        self.defaults.set(values.unlockChatTranslation, forKey: Key.unlockChatTranslation)
+        self.defaults.set(values.hideAds, forKey: Key.hideAds)
+        self.defaults.set(values.unlockExtraFolders, forKey: Key.unlockExtraFolders)
 
         self.valuesPromise.set(values)
     }

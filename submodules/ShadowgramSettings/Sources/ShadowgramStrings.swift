@@ -97,38 +97,25 @@ extension ShadowgramStrings {
 
 extension ShadowgramStrings {
     public var autoReaction: String { return t("Авто-реакция", "Auto Reaction") }
-    public var autoReactionWhoHeader: String { return t("КОМУ СТАВИТЬ РЕАКЦИЮ", "WHO GETS THE REACTION") }
-    public var autoReactionEverybody: String { return t("Все", "Everybody") }
-    public var autoReactionContacts: String { return t("Мои контакты", "My Contacts") }
-    public var autoReactionNobody: String { return t("Никто", "Nobody") }
     public var autoReactionOff: String { return t("Выкл", "Off") }
-    public var autoReactionWhoFooter: String { return t("На каждое новое сообщение от подходящего собеседника Shadowgram сам поставит реакцию. В группах и каналах реакция ставится, только если они добавлены в «Всегда ставить». Боты пропускаются.", "Shadowgram reacts to every new message from a matching sender. In groups and channels it reacts only if they are added to \"Always React\". Bots are skipped.") }
-    public var autoReactionReactionHeader: String { return t("РЕАКЦИЯ", "REACTION") }
-    public var autoReactionReaction: String { return t("Реакция", "Reaction") }
-    public var autoReactionExceptionsHeader: String { return t("ИСКЛЮЧЕНИЯ", "EXCEPTIONS") }
-    public var autoReactionAlways: String { return t("Всегда ставить", "Always React") }
-    public var autoReactionNever: String { return t("Никогда не ставить", "Never React") }
-    public var autoReactionAdd: String { return t("Добавить", "Add") }
-    public var autoReactionExceptionsFooter: String { return t("Исключения работают так же, как в настройках приватности: «Всегда ставить» добавляет людей и группы, «Никогда не ставить» убирает их, даже если они подходят под выбор выше.", "Exceptions work like privacy settings: \"Always React\" adds people and groups, \"Never React\" removes them even if they match the choice above.") }
-    public var autoReactionSearchTitle: String { return t("Добавить исключения", "Add Exceptions") }
-    public var autoReactionSearchPlaceholder: String { return t("Пользователи и группы", "Users and groups") }
+    public var autoReactionUsersHeader: String { return t("ПОЛЬЗОВАТЕЛИ", "USERS") }
+    public var autoReactionAddUser: String { return t("Добавить пользователя", "Add User") }
+    public var autoReactionSelectUser: String { return t("Выберите пользователя", "Select User") }
+    public var autoReactionFooter: String { return t("На каждое новое сообщение от этих пользователей Shadowgram сам поставит выбранную реакцию: в личном чате и в группах, где такая реакция разрешена. Нажмите на пользователя, чтобы сменить реакцию, смахните влево, чтобы убрать. Реакции из своих эмодзи работают только с Telegram Premium.", "Shadowgram puts the chosen reaction on every new message from these users: in your private chat and in groups that allow that reaction. Tap a user to change the reaction, swipe left to remove them. Custom emoji reactions require Telegram Premium.") }
 
-    public func autoReactionPeerCount(_ count: Int) -> String {
-        if count == 0 {
-            return t("Добавить", "Add")
-        }
+    public func autoReactionUserCount(_ count: Int) -> String {
         if self.isRussian {
             let mod10 = count % 10
             let mod100 = count % 100
             if mod10 == 1 && mod100 != 11 {
-                return "\(count) чат"
+                return "\(count) пользователь"
             } else if (2 ... 4).contains(mod10) && !(12 ... 14).contains(mod100) {
-                return "\(count) чата"
+                return "\(count) пользователя"
             } else {
-                return "\(count) чатов"
+                return "\(count) пользователей"
             }
         } else {
-            return count == 1 ? "1 chat" : "\(count) chats"
+            return count == 1 ? "1 user" : "\(count) users"
         }
     }
 
@@ -166,8 +153,33 @@ extension ShadowgramStrings {
             return t("Список чатов", "Chat List")
         case 3:
             return t("Интерфейс", "Interface")
-        default:
+        case 4:
             return t("Аккаунты", "Accounts")
+        default:
+            return "Premium"
         }
     }
+}
+
+extension ShadowgramStrings {
+    public var forwardSelfDestructingMedia: String { return t("Пересылка исчезающих медиа", "Forward Self-Destructing Media") }
+    public var forwardSelfDestructingMediaFooter: String { return t("При просмотре исчезающего фото или видео появляется кнопка, которая пересылает его как обычное медиа.", "While viewing a self-destructing photo or video, a button forwards it as regular media.") }
+    public var roundVideoCameraHeader: String { return t("ВИДЕОСООБЩЕНИЯ СНИМАТЬ НА", "RECORD VIDEO MESSAGES WITH") }
+    public var roundVideoCameraFront: String { return t("Фронтальную камеру", "Front Camera") }
+    public var roundVideoCameraBack: String { return t("Основную камеру", "Back Camera") }
+    public var mediaHeader: String { return t("МЕДИА", "MEDIA") }
+    public var pictureInPictureOnBackground: String { return t("Картинка в картинке при сворачивании", "Picture in Picture on Leaving") }
+    public var pictureInPictureOnBackgroundFooter: String { return t("Видео, которое играет при сворачивании Telegram, продолжает воспроизводиться в окне поверх других приложений.", "A video that is playing when you leave Telegram keeps playing in a floating window over other apps.") }
+    public var selfDestructingMarkViewed: String { return t("Отметить просмотренным", "Mark as Viewed") }
+    public var selfDestructingMarkedViewed: String { return t("Отправитель увидит, что вы открыли медиа.", "The sender will see that you opened the media.") }
+}
+
+extension ShadowgramStrings {
+    public var premiumUnlocksHeader: String { return t("ФУНКЦИИ PREMIUM", "PREMIUM FEATURES") }
+    public var unlockStoryTools: String { return t("Сохранение и HD-качество историй", "Save Stories and HD Quality") }
+    public var unlockMediaSaving: String { return t("Сохранение видео в оригинале", "Save Videos in Original Quality") }
+    public var unlockChatTranslation: String { return t("Перевод всего чата", "Translate Entire Chats") }
+    public var hideAds: String { return t("Скрыть рекламу", "Hide Ads") }
+    public var unlockExtraFolders: String { return t("Папки сверх лимита", "Folders Over the Limit") }
+    public var premiumUnlocksFooter: String { return t("Открывает функции Telegram Premium, которые работают на устройстве. Перевод всего чата включается в Настройки ▸ Язык. Папки сверх лимита можно открывать, но новые создать нельзя: это проверяет сервер.", "Unlocks Telegram Premium features that work on the device. Turn on entire chat translation in Settings ▸ Language. Folders over the limit can be opened, but new ones can't be created: the server checks that.") }
 }

@@ -16,6 +16,7 @@ import UndoUI
 import TelegramUIPreferences
 import TranslateUI
 import PremiumUI
+import ShadowgramSettings
 
 private enum LanguageListSection: ItemListSectionId {
     case translate
@@ -477,7 +478,7 @@ final class LocalizationListControllerNode: ViewControllerTracingNode {
                 return
             }
             
-            let isPremium = peer?.isPremium ?? false
+            let isPremium = (peer?.isPremium ?? false) || ShadowgramSettings.shared.values.unlockChatTranslation
                         
             var entries: [LanguageListEntry] = []
             var activeLanguageCode: String?

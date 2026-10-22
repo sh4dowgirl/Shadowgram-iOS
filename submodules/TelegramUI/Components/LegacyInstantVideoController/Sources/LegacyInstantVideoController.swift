@@ -15,6 +15,7 @@ import AppBundle
 import LegacyMediaPickerUI
 import ChatPresentationInterfaceState
 import ChatSendButtonRadialStatusNode
+import ShadowgramSettings
 
 public final class InstantVideoController: LegacyController, StandalonePresentableController {
     private var captureController: TGVideoMessageCaptureController?
@@ -155,6 +156,7 @@ public func legacyInstantVideoController(theme: PresentationTheme, forStory: Boo
                 slowmodeValidUntil = timestamp
             }
             
+            TGVideoMessageCaptureController.defaultBackCamera = ShadowgramSettings.shared.values.roundVideoCamera == .back
             let controller = TGVideoMessageCaptureController(context: legacyController.context, forStory: forStory, assets: TGVideoMessageCaptureControllerAssets(send: PresentationResourcesChat.chatInputPanelSendButtonImage(theme)!, slideToCancel: PresentationResourcesChat.chatInputPanelMediaRecordingCancelArrowImage(theme)!, actionDelete: generateTintedImage(image: UIImage(bundleImageName: "Chat/Input/Accessory Panels/MessageSelectionTrash"), color: theme.chat.inputPanel.panelControlAccentColor))!, transitionInView: {
                 return nil
             }, parentController: baseController, controlsFrame: panelFrame, isAlreadyLocked: {

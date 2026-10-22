@@ -33,6 +33,9 @@ private enum ShadowgramExtraSettingsSection: Int32 {
     case autoReaction
     case privacy
     case chatListSort
+    case media
+    case roundVideoCamera
+    case premiumUnlocks
 }
 
 private enum ShadowgramExtraSettingsCategory: Int32, CaseIterable {
@@ -41,6 +44,7 @@ private enum ShadowgramExtraSettingsCategory: Int32, CaseIterable {
     case chatList
     case interface
     case accounts
+    case premium
 }
 
 private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
@@ -95,11 +99,28 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
     case chatListSortHeader
     case chatListSort(oldestFirst: Bool, checked: Bool)
 
+    case forwardSelfDestructingMedia(Bool)
+    case forwardSelfDestructingMediaFooter
+
+    case roundVideoCameraHeader
+    case roundVideoCamera(ShadowgramRoundVideoCamera, Bool)
+    case mediaHeader
+    case pictureInPictureOnBackground(Bool)
+    case pictureInPictureOnBackgroundFooter
+
+    case premiumUnlocksHeader
+    case unlockStoryTools(Bool)
+    case unlockMediaSaving(Bool)
+    case unlockChatTranslation(Bool)
+    case hideAds(Bool)
+    case unlockExtraFolders(Bool)
+    case premiumUnlocksFooter
+
     var category: ShadowgramExtraSettingsCategory {
         switch self {
-        case .ghostHeader, .ghostMode, .ghostFooter, .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter, .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter:
+        case .ghostHeader, .ghostMode, .ghostFooter, .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter, .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter:
             return .privacy
-        case .messagesHeader, .saveDeletedMessages, .messagesFooter, .messagesExtraHeader, .keepEditHistory, .keepEditHistoryFooter, .autoReaction:
+        case .messagesHeader, .saveDeletedMessages, .messagesFooter, .messagesExtraHeader, .keepEditHistory, .keepEditHistoryFooter, .autoReaction, .roundVideoCameraHeader, .roundVideoCamera, .mediaHeader, .pictureInPictureOnBackground, .pictureInPictureOnBackgroundFooter:
             return .messages
         case .groupsHeader, .groupsFolder, .groupsMinMembers, .groupsPlacementHeader, .groupsPlacement, .groupsFooter, .disableCameraSwipe, .disableCameraSwipeFooter, .chatListSortHeader, .chatListSort:
             return .chatList
@@ -107,6 +128,8 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return .interface
         case .accountsHeader, .unlimitedAccounts, .accountsFooter:
             return .accounts
+        case .premiumUnlocksHeader, .unlockStoryTools, .unlockMediaSaving, .unlockChatTranslation, .hideAds, .unlockExtraFolders, .premiumUnlocksFooter:
+            return .premium
         }
     }
 
@@ -139,8 +162,14 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return ShadowgramExtraSettingsSection.messagesExtra.rawValue
         case .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter:
             return ShadowgramExtraSettingsSection.capture.rawValue
-        case .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter:
+        case .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter:
             return ShadowgramExtraSettingsSection.privacy.rawValue
+        case .roundVideoCameraHeader, .roundVideoCamera:
+            return ShadowgramExtraSettingsSection.roundVideoCamera.rawValue
+        case .mediaHeader, .pictureInPictureOnBackground, .pictureInPictureOnBackgroundFooter:
+            return ShadowgramExtraSettingsSection.media.rawValue
+        case .premiumUnlocksHeader, .unlockStoryTools, .unlockMediaSaving, .unlockChatTranslation, .hideAds, .unlockExtraFolders, .premiumUnlocksFooter:
+            return ShadowgramExtraSettingsSection.premiumUnlocks.rawValue
         case .chatListSortHeader, .chatListSort:
             return ShadowgramExtraSettingsSection.chatListSort.rawValue
         }
@@ -232,6 +261,34 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return 40
         case let .chatListSort(oldestFirst, _):
             return oldestFirst ? 42 : 41
+        case .forwardSelfDestructingMedia:
+            return 37
+        case .forwardSelfDestructingMediaFooter:
+            return 38
+        case .roundVideoCameraHeader:
+            return 50
+        case let .roundVideoCamera(camera, _):
+            return 51 + camera.rawValue
+        case .mediaHeader:
+            return 53
+        case .pictureInPictureOnBackground:
+            return 54
+        case .pictureInPictureOnBackgroundFooter:
+            return 55
+        case .premiumUnlocksHeader:
+            return 60
+        case .unlockStoryTools:
+            return 61
+        case .unlockMediaSaving:
+            return 62
+        case .unlockChatTranslation:
+            return 63
+        case .hideAds:
+            return 64
+        case .unlockExtraFolders:
+            return 65
+        case .premiumUnlocksFooter:
+            return 66
         }
     }
 
@@ -392,6 +449,50 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: oldestFirst ? strings.chatListSortOldestFirst : strings.chatListSortNewestFirst, style: .left, checked: checked, zeroSeparatorInsets: false, sectionId: self.section, action: {
                 arguments.update { $0.chatListOldestFirst = oldestFirst }
             })
+        case let .forwardSelfDestructingMedia(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.forwardSelfDestructingMedia, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.forwardSelfDestructingMedia = value }
+            })
+        case .forwardSelfDestructingMediaFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.forwardSelfDestructingMediaFooter), sectionId: self.section)
+        case .roundVideoCameraHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.roundVideoCameraHeader, sectionId: self.section)
+        case let .roundVideoCamera(camera, checked):
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: camera == .back ? strings.roundVideoCameraBack : strings.roundVideoCameraFront, style: .left, checked: checked, zeroSeparatorInsets: false, sectionId: self.section, action: {
+                arguments.update { $0.roundVideoCamera = camera }
+            })
+        case .mediaHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.mediaHeader, sectionId: self.section)
+        case let .pictureInPictureOnBackground(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.pictureInPictureOnBackground, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.pictureInPictureOnBackground = value }
+            })
+        case .pictureInPictureOnBackgroundFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.pictureInPictureOnBackgroundFooter), sectionId: self.section)
+        case .premiumUnlocksHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.premiumUnlocksHeader, sectionId: self.section)
+        case let .unlockStoryTools(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.unlockStoryTools, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.unlockStoryTools = value }
+            })
+        case let .unlockMediaSaving(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.unlockMediaSaving, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.unlockMediaSaving = value }
+            })
+        case let .unlockChatTranslation(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.unlockChatTranslation, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.unlockChatTranslation = value }
+            })
+        case let .hideAds(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.hideAds, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.hideAds = value }
+            })
+        case let .unlockExtraFolders(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.unlockExtraFolders, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { $0.unlockExtraFolders = value }
+            })
+        case .premiumUnlocksFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.premiumUnlocksFooter), sectionId: self.section)
         }
     }
 }
@@ -448,6 +549,13 @@ private func shadowgramAllExtraSettingsEntries(values: ShadowgramSettingsValues,
     entries.append(.keepEditHistoryFooter)
     entries.append(.autoReaction(shadowgramAutoReactionSummary(values: values, strings: strings)))
 
+    entries.append(.roundVideoCameraHeader)
+    entries.append(.roundVideoCamera(.front, values.roundVideoCamera == .front))
+    entries.append(.roundVideoCamera(.back, values.roundVideoCamera == .back))
+    entries.append(.mediaHeader)
+    entries.append(.pictureInPictureOnBackground(values.pictureInPictureOnBackground))
+    entries.append(.pictureInPictureOnBackgroundFooter)
+
     entries.append(.captureHeader)
     entries.append(.hidePhoneOnCapture(values.hidePhoneOnCapture))
     entries.append(.hideEmailOnCapture(values.hideEmailOnCapture))
@@ -462,6 +570,16 @@ private func shadowgramAllExtraSettingsEntries(values: ShadowgramSettingsValues,
     entries.append(.bypassCopyProtectionFooter)
     entries.append(.bypassViewOnce(values.bypassViewOnce))
     entries.append(.bypassViewOnceFooter)
+    entries.append(.forwardSelfDestructingMedia(values.forwardSelfDestructingMedia))
+    entries.append(.forwardSelfDestructingMediaFooter)
+
+    entries.append(.premiumUnlocksHeader)
+    entries.append(.unlockStoryTools(values.unlockStoryTools))
+    entries.append(.unlockMediaSaving(values.unlockMediaSaving))
+    entries.append(.unlockChatTranslation(values.unlockChatTranslation))
+    entries.append(.hideAds(values.hideAds))
+    entries.append(.unlockExtraFolders(values.unlockExtraFolders))
+    entries.append(.premiumUnlocksFooter)
 
     return entries
 }
@@ -549,6 +667,8 @@ private enum ShadowgramExtraSettingsRootEntry: ItemListNodeEntry {
                 icon = PresentationResourcesSettings.appearance
             case .accounts:
                 icon = PresentationResourcesSettings.myProfile
+            case .premium:
+                icon = PresentationResourcesSettings.premium
             }
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: icon, title: strings.extraSettingsCategoryTitle(category.rawValue), label: label, sectionId: self.section, style: .blocks, action: {
                 arguments.open(category)
@@ -571,7 +691,7 @@ private func shadowgramExtraSettingsCategoryLabel(_ category: ShadowgramExtraSet
         if values.keepEditHistory {
             count += 1
         }
-        if values.autoReactionMode != .nobody || !values.autoReactionAlwaysIds.isEmpty {
+        if !values.autoReactions.isEmpty {
             count += 1
         }
         return count == 0 ? "" : "\(count)"
@@ -581,6 +701,9 @@ private func shadowgramExtraSettingsCategoryLabel(_ category: ShadowgramExtraSet
         return ""
     case .accounts:
         return values.unlimitedAccounts ? strings.unlimitedAccountsShort : ""
+    case .premium:
+        let count = [values.unlockStoryTools, values.unlockMediaSaving, values.unlockChatTranslation, values.hideAds, values.unlockExtraFolders].filter { $0 }.count
+        return count == 0 ? "" : "\(count)"
     }
 }
 
