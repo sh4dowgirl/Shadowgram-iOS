@@ -44,6 +44,49 @@ private let accountAuxiliaryMethods = AccountAuxiliaryMethods(fetchResource: { a
     return .single(nil)
 })
 
+private let notificationEpisodeMarkerDirectory = Atomic<String?>(value: nil)
+private let notificationEpisodeMarkerPrefix = "inflight-"
+
+private func notificationEpisodeMarkerPath(directory: String, episode: String) -> String {
+    return directory + "/" + notificationEpisodeMarkerPrefix + episode
+}
+
+private func beginNotificationEpisodeMarker(directory: String, episode: String) {
+    let _ = notificationEpisodeMarkerDirectory.swap(directory)
+    let now = Date()
+    if let names = try? FileManager.default.contentsOfDirectory(atPath: directory) {
+        for name in names where name.hasPrefix(notificationEpisodeMarkerPrefix) {
+            let path = directory + "/" + name
+            let startDate = (try? FileManager.default.attributesOfItem(atPath: path))?[.creationDate] as? Date
+            if let startDate, now.timeIntervalSince(startDate) < 40.0 {
+                continue
+            }
+            let previousEpisode = String(name.dropFirst(notificationEpisodeMarkerPrefix.count))
+            let lastStage = (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""
+            Logger.shared.log("NotificationService \(episode)", "Previous episode \(previousEpisode) started at \(startDate.flatMap { "\($0)" } ?? "unknown") never completed, last stage: \(lastStage.isEmpty ? "unknown" : lastStage)")
+            let _ = try? FileManager.default.removeItem(atPath: path)
+        }
+    }
+    let _ = FileManager.default.createFile(atPath: notificationEpisodeMarkerPath(directory: directory, episode: episode), contents: "started".data(using: .utf8))
+}
+
+private func noteNotificationEpisodeStage(episode: String, stage: String) {
+    guard let directory = notificationEpisodeMarkerDirectory.with({ $0 }) else {
+        return
+    }
+    let path = notificationEpisodeMarkerPath(directory: directory, episode: episode)
+    if FileManager.default.fileExists(atPath: path) {
+        let _ = try? stage.data(using: .utf8)?.write(to: URL(fileURLWithPath: path))
+    }
+}
+
+private func endNotificationEpisodeMarker(episode: String) {
+    guard let directory = notificationEpisodeMarkerDirectory.with({ $0 }) else {
+        return
+    }
+    let _ = try? FileManager.default.removeItem(atPath: notificationEpisodeMarkerPath(directory: directory, episode: episode))
+}
+
 private func rootPathForBasePath(_ appGroupPath: String) -> String {
     return appGroupPath + "/telegram-data"
 }
@@ -806,6 +849,7 @@ private final class NotificationServiceHandler {
         setupSharedLogger(rootPath: logsPath, path: logsPath)
         
         Logger.shared.log("NotificationService \(episode)", "Started handling notification")
+        beginNotificationEpisodeMarker(directory: logsPath, episode: episode)
 
         initializeAccountManagement()
 
@@ -836,6 +880,7 @@ private final class NotificationServiceHandler {
         semaphore.wait()
         
         Logger.shared.log("NotificationService \(episode)", "Logging settings: (logToFile: \(loggingSettings.logToFile))")
+        noteNotificationEpisodeStage(episode: episode, stage: "Logging settings")
         
         // Shadowgram: the extension always writes its (short, redacted) log, so a notification that
         // falls back to the server's "You have a new message" can be diagnosed without first finding
@@ -871,6 +916,7 @@ private final class NotificationServiceHandler {
         }
 
         Logger.shared.log("NotificationService \(episode)", "Begin processing payload")
+        noteNotificationEpisodeStage(episode: episode, stage: "Begin processing payload")
 
         guard var encryptedPayload = payload["p"] as? String else {
             Logger.shared.log("NotificationService \(episode)", "Invalid payload 1")
@@ -1050,6 +1096,7 @@ private final class NotificationServiceHandler {
                     }
 
                     Logger.shared.log("NotificationService \(episode)", "Decrypted payload: \(payloadJson)")
+                    noteNotificationEpisodeStage(episode: episode, stage: "Decrypted payload")
 
                     var peerId: PeerId?
                     var messageId: MessageId.Id?
@@ -1538,6 +1585,7 @@ private final class NotificationServiceHandler {
                             completed()
                         case let .poll(peerId, initialContent, messageId, reportDelivery, enableInlineEmoji):
                             Logger.shared.log("NotificationService \(episode)", "Will poll")
+                            noteNotificationEpisodeStage(episode: episode, stage: "Will poll")
                             if let stateManager = strongSelf.stateManager {
                                 let shouldKeepConnection = stateManager.network.shouldKeepConnection
 
@@ -1899,6 +1947,7 @@ private final class NotificationServiceHandler {
                                         let fetchBudget = min(10.0, remainingBudget())
 
                                         Logger.shared.log("NotificationService \(episode)", "Will fetch media")
+                                        noteNotificationEpisodeStage(episode: episode, stage: "Will fetch media")
                                         let _ = (combineLatest(queue: queue,
                                             fetchMediaSignal
                                             |> timeout(fetchBudget, queue: queue, alternate: .single(nil)),
@@ -1927,6 +1976,7 @@ private final class NotificationServiceHandler {
                                             }
 
                                             Logger.shared.log("NotificationService \(episode)", "Will get unread count")
+                                            noteNotificationEpisodeStage(episode: episode, stage: "Will get unread count")
                                             let _ = (getCurrentRenderedTotalUnreadCount(
                                                 accountManager: strongSelf.accountManager,
                                                 postbox: stateManager.postbox
@@ -2023,6 +2073,7 @@ private final class NotificationServiceHandler {
                                                 content.resolvedEmojiFiles = resolvedEmojiFiles
 
                                                 Logger.shared.log("NotificationService \(episode)", "Updating content to \(content)")
+                                                noteNotificationEpisodeStage(episode: episode, stage: "Updating content to")
 
                                                 if wasDisplayed {
                                                     content = NotificationContent(isLockedMessage: nil)
@@ -2050,6 +2101,7 @@ private final class NotificationServiceHandler {
                                     let unboundedPollSignal: Signal<Never, NoError>
                                     if peerId.namespace == Namespaces.Peer.CloudChannel {
                                         Logger.shared.log("NotificationService \(episode)", "Will poll channel \(peerId)")
+                                        noteNotificationEpisodeStage(episode: episode, stage: "Will poll")
 
                                         unboundedPollSignal = standalonePollChannelOnce(
                                             accountPeerId: stateManager.accountPeerId,
@@ -2228,6 +2280,7 @@ private final class NotificationServiceHandler {
                             }
                         case let .pollStories(peerId, initialContent, storyId, isReaction):
                             Logger.shared.log("NotificationService \(episode)", "Will poll stories for \(peerId) isReaction: \(isReaction)")
+                            noteNotificationEpisodeStage(episode: episode, stage: "Will poll")
                             if let stateManager = strongSelf.stateManager {
                                 let pollCompletion: (NotificationContent) -> Void = { content in
                                     let content = content
@@ -2407,6 +2460,7 @@ private final class NotificationServiceHandler {
                                         }
 
                                         Logger.shared.log("NotificationService \(episode)", "Will fetch media")
+                                        noteNotificationEpisodeStage(episode: episode, stage: "Will fetch media")
                                         let _ = (combineLatest(queue: queue,
                                             fetchMediaSignal
                                             |> timeout(10.0, queue: queue, alternate: .single(nil)),
@@ -2442,6 +2496,7 @@ private final class NotificationServiceHandler {
                                             }
 
                                             Logger.shared.log("NotificationService \(episode)", "Updating content to \(content)")
+                                            noteNotificationEpisodeStage(episode: episode, stage: "Updating content to")
 
                                             updateCurrentContent(content)
 
@@ -2532,6 +2587,7 @@ private final class NotificationServiceHandler {
                                             }
                                             Logger.shared.log("NotificationService \(episode)", "Unread count: \(value.0), isCurrentAccount: \(isCurrentAccount)")
                                             Logger.shared.log("NotificationService \(episode)", "Updating content to \(content)")
+                                            noteNotificationEpisodeStage(episode: episode, stage: "Updating content to")
 
                                             updateCurrentContent(content)
 
@@ -2570,6 +2626,7 @@ private final class NotificationServiceHandler {
                                 let completeRemoval: () -> Void = {
                                     let content = NotificationContent(isLockedMessage: nil)
                                     Logger.shared.log("NotificationService \(episode)", "Updating content to \(content)")
+                                    noteNotificationEpisodeStage(episode: episode, stage: "Updating content to")
                                     
                                     updateCurrentContent(content)
                                     
@@ -2627,6 +2684,7 @@ private final class NotificationServiceHandler {
 
                                             Logger.shared.log("NotificationService \(episode)", "Unread count: \(value.0), isCurrentAccount: \(isCurrentAccount)")
                                             Logger.shared.log("NotificationService \(episode)", "Updating content to \(content)")
+                                            noteNotificationEpisodeStage(episode: episode, stage: "Updating content to")
 
                                             updateCurrentContent(content)
 
@@ -2711,7 +2769,7 @@ final class NotificationService: UNNotificationServiceExtension {
     private var impl: QueueLocalObject<BoxedNotificationServiceHandler>?
 
     private var initialContent: UNNotificationContent?
-    private let content = Atomic<NotificationContent?>(value: nil)
+    private var content = Atomic<NotificationContent?>(value: nil)
     private var contentHandler: ((UNNotificationContent) -> Void)?
     private var episode: String?
     
@@ -2721,6 +2779,20 @@ final class NotificationService: UNNotificationServiceExtension {
     
     override func didReceive(_ request: UNNotificationRequest, withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void) {
         let episode = String(UInt32.random(in: 0 ..< UInt32.max), radix: 16)
+
+        if let previousContentHandler = self.contentHandler {
+            self.contentHandler = nil
+            Logger.shared.log("NotificationService \(self.episode ?? "???")", "Completing because the extension instance received another notification")
+            if let previousEpisode = self.episode {
+                endNotificationEpisodeMarker(episode: previousEpisode)
+            }
+            if let previousContent = self.content.with({ $0 }) {
+                previousContentHandler(previousContent.generate())
+            } else if let previousInitialContent = self.initialContent {
+                previousContentHandler(previousInitialContent)
+            }
+        }
+
         self.episode = episode
         
         self.initialContent = request.content
@@ -2728,7 +2800,8 @@ final class NotificationService: UNNotificationServiceExtension {
 
         self.impl = nil
 
-        let content = self.content
+        let content = Atomic<NotificationContent?>(value: nil)
+        self.content = content
 
         self.impl = QueueLocalObject(queue: queue, generate: { [weak self] in
             return BoxedNotificationServiceHandler(value: NotificationServiceHandler(
@@ -2741,10 +2814,15 @@ final class NotificationService: UNNotificationServiceExtension {
                     guard let strongSelf = self else {
                         return
                     }
+                    if strongSelf.episode != episode {
+                        Logger.shared.log("NotificationService \(episode)", "Ignoring completion of a replaced episode")
+                        return
+                    }
                     strongSelf.impl = nil
 
                     if let contentHandler = strongSelf.contentHandler {
                         Logger.shared.log("NotificationService \(episode)", "Complete handling notification")
+                        noteNotificationEpisodeStage(episode: episode, stage: "Generating content")
                         
                         strongSelf.contentHandler = nil
                         
@@ -2753,6 +2831,7 @@ final class NotificationService: UNNotificationServiceExtension {
                         } else if let initialContent = strongSelf.initialContent {
                             contentHandler(initialContent)
                         }
+                        endNotificationEpisodeMarker(episode: episode)
                     } else {
                         Logger.shared.log("NotificationService \(episode)", "Attempted to repeatedly complete handling notification")
                     }
@@ -2774,11 +2853,17 @@ final class NotificationService: UNNotificationServiceExtension {
             self.contentHandler = nil
             
             Logger.shared.log("NotificationService \(self.episode ?? "???")", "Completing due to serviceExtensionTimeWillExpire")
+            if let episode = self.episode {
+                noteNotificationEpisodeStage(episode: episode, stage: "Generating content after timeout")
+            }
             
             if let content = self.content.with({ $0 }) {
                 contentHandler(content.generate())
             } else if let initialContent = self.initialContent {
                 contentHandler(initialContent)
+            }
+            if let episode = self.episode {
+                endNotificationEpisodeMarker(episode: episode)
             }
         }
     }
