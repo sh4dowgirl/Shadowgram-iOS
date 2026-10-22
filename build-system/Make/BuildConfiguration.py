@@ -36,7 +36,7 @@ class BuildConfiguration:
         self.enable_siri = enable_siri
         self.enable_icloud = enable_icloud
 
-    def write_to_variables_file(self, bazel_path, use_xcode_managed_codesigning, aps_environment, path):
+    def write_to_variables_file(self, bazel_path, use_xcode_managed_codesigning, aps_environment, path, enable_communication_notifications=False):
         string = ''
         string += 'telegram_bazel_path = "{}"\n'.format(bazel_path)
         string += 'telegram_use_xcode_managed_codesigning = {}\n'.format('True' if use_xcode_managed_codesigning else 'False')
@@ -54,6 +54,10 @@ class BuildConfiguration:
         string += 'telegram_enable_siri = {}\n'.format(self.enable_siri)
         string += 'telegram_enable_icloud = {}\n'.format(self.enable_icloud)
         string += 'telegram_enable_watch = True\n'
+        # Shadowgram: whether the app's provisioning profile carries the Communication
+        # Notifications entitlement (sender avatars in notifications). Telegram/BUILD adds the
+        # entitlement only then, so a profile without it still signs and uploads.
+        string += 'telegram_enable_communication_notifications = {}\n'.format('True' if enable_communication_notifications else 'False')
 
         if os.path.exists(path):
             os.remove(path)
@@ -221,6 +225,31 @@ def resolve_aps_environment_from_directory(source_path, team_id, bundle_id):
     return None
 
 
+def resolve_communication_notifications_from_directory(source_path, team_id, bundle_id):
+    """Shadowgram: True when the main app's provisioning profile in `source_path` includes
+    com.apple.developer.usernotifications.communication."""
+    for file_name in os.listdir(source_path):
+        file_path = source_path + '/' + file_name
+        if not os.path.isfile(file_path) or not file_path.endswith('.mobileprovision'):
+            continue
+
+        profile_data = run_executable_with_output('openssl', arguments=[
+            'smime',
+            '-inform',
+            'der',
+            '-verify',
+            '-noverify',
+            '-in',
+            file_path
+        ], decode=False, stderr_to_stdout=False, check_result=True)
+
+        profile_dict = plistlib.loads(profile_data)
+        profile_name = profile_dict['Entitlements']['application-identifier']
+        if profile_name == team_id + '.' + bundle_id:
+            return bool(profile_dict['Entitlements'].get('com.apple.developer.usernotifications.communication', False))
+    return False
+
+
 def copy_certificates_from_directory(source_path, destination_path):
     for file_name in os.listdir(source_path):
         file_path = source_path + '/' + file_name
@@ -241,6 +270,9 @@ class CodesigningSource:
 
     def resolve_aps_environment(self):
         raise Exception('Not implemented')
+
+    def resolve_communication_notifications(self):
+        return False
 
     def use_xcode_managed_codesigning(self):
         raise Exception('Not implemented')        
@@ -283,6 +315,10 @@ class GitCodesigningSource(CodesigningSource):
         source_path = self.working_dir + '/decrypted/profiles/{}'.format(self.codesigning_type)
         return resolve_aps_environment_from_directory(source_path=source_path, team_id=self.team_id, bundle_id=self.bundle_id)
 
+    def resolve_communication_notifications(self):
+        source_path = self.working_dir + '/decrypted/profiles/{}'.format(self.codesigning_type)
+        return resolve_communication_notifications_from_directory(source_path=source_path, team_id=self.team_id, bundle_id=self.bundle_id)
+
     def use_xcode_managed_codesigning(self):
         return False
 
@@ -313,6 +349,9 @@ class DirectoryCodesigningSource(CodesigningSource):
 
     def resolve_aps_environment(self):
         return resolve_aps_environment_from_directory(source_path=self.directory_path + '/profiles', team_id=self.team_id, bundle_id=self.bundle_id)
+
+    def resolve_communication_notifications(self):
+        return resolve_communication_notifications_from_directory(source_path=self.directory_path + '/profiles', team_id=self.team_id, bundle_id=self.bundle_id)
 
     def use_xcode_managed_codesigning(self):
         return False

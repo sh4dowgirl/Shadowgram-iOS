@@ -19,9 +19,10 @@ import GenerateProfiles
 
 
 class ResolvedCodesigningData:
-    def __init__(self, aps_environment, use_xcode_managed_codesigning):
+    def __init__(self, aps_environment, use_xcode_managed_codesigning, enable_communication_notifications=False):
         self.aps_environment = aps_environment
         self.use_xcode_managed_codesigning = use_xcode_managed_codesigning
+        self.enable_communication_notifications = enable_communication_notifications
 
 
 class BazelCommandLine:
@@ -489,7 +490,8 @@ def resolve_codesigning(arguments, base_path, build_configuration, provisioning_
 
     return ResolvedCodesigningData(
         aps_environment=profile_source.resolve_aps_environment(),
-        use_xcode_managed_codesigning=profile_source.use_xcode_managed_codesigning()
+        use_xcode_managed_codesigning=profile_source.use_xcode_managed_codesigning(),
+        enable_communication_notifications=profile_source.resolve_communication_notifications()
     )
 
 
@@ -525,7 +527,7 @@ def resolve_configuration(base_path, bazel_command_line: BazelCommandLine, argum
         sys.exit(1)
 
     if bazel_command_line is not None:
-        build_configuration.write_to_variables_file(bazel_path=bazel_command_line.bazel, use_xcode_managed_codesigning=codesigning_data.use_xcode_managed_codesigning, aps_environment=codesigning_data.aps_environment, path=configuration_repository_path + '/variables.bzl')
+        build_configuration.write_to_variables_file(bazel_path=bazel_command_line.bazel, use_xcode_managed_codesigning=codesigning_data.use_xcode_managed_codesigning, aps_environment=codesigning_data.aps_environment, path=configuration_repository_path + '/variables.bzl', enable_communication_notifications=codesigning_data.enable_communication_notifications)
 
     provisioning_profile_files = []
     for file_name in os.listdir(provisioning_path):

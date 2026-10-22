@@ -54,6 +54,7 @@ load(
     "telegram_use_xcode_managed_codesigning",
     "telegram_bundle_id",
     "telegram_aps_environment",
+    "telegram_enable_communication_notifications",
     "telegram_team_id",
     "telegram_enable_icloud",
     "telegram_enable_siri",
@@ -558,11 +559,11 @@ official_communication_notifications_fragment = """
 <key>com.apple.developer.usernotifications.communication</key>
 <true/>
 """
-# Shadowgram: for every bundle id, not only the official ones. Without it iOS ignores the sender
-# (INSendMessageIntent) the notification service attaches, so notifications show no avatar. The App
-# ID needs the "Communication Notifications" capability, and its provisioning profile must be
-# generated after it was turned on, or the signed app will not install.
-communication_notifications_fragment = official_communication_notifications_fragment
+# Shadowgram: also for our own bundle id, whenever the app's provisioning profile carries the
+# entitlement (Make.py reads the profile). Without it iOS ignores the sender (INSendMessageIntent)
+# the notification service attaches, so notifications show no avatar. Signing with an entitlement
+# the profile lacks is rejected by App Store Connect (error 90163), hence the check.
+communication_notifications_fragment = official_communication_notifications_fragment if (telegram_bundle_id in official_bundle_ids or telegram_enable_communication_notifications) else ""
 
 official_notification_filtering_fragment = """
 <key>com.apple.developer.usernotifications.filtering</key>
