@@ -42,6 +42,13 @@ jobs:
           echo "Нужен Xcode $XCODE_VERSION"
           sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
           xcodebuild -version
+          if ! xcrun -f metal >/dev/null 2>&1 || ! xcrun metal --version >/dev/null 2>&1; then
+            for attempt in 1 2 3; do
+              sudo xcodebuild -downloadComponent MetalToolchain && break
+              sleep 10
+            done
+          fi
+          xcrun metal --version
           df -h /
 
       - name: Собрать configuration.json
