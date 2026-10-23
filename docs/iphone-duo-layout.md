@@ -54,6 +54,11 @@ regions are transitional for up to 0.6s after every rotation and fold, so they a
 - Side column / tab bar / lists: `layout.sideColumnFrames(...)`, `tabBarSidePlacement(layout:itemCount:)`,
   `chatInputPanelSideInsets(layout:bandMinY:bandMaxY:column:)`, `layout.listSideMargins(base:)`.
 - Legacy hosts: `reservedCornersForHostedLayout(size:orientation:)`; `LegacyComponentsContext.statusIslandTrailingInset`.
+- Status bar style: `layout.coversStatusCorner(frame:)` tells whether a surface still overlaps the status corner block;
+  `NavigationModalContainer.presentedCardFrame` is a card's frame including an interactive dismiss.
+- `deviceMetrics.isIPhoneDuoInnerScreen(size:)`: a full-screen layout on the unfolded screen (either orientation).
+- Bar buttons: `UIBarButtonItem.staysInRow` / `NavigationBarComponent.Button.staysInRow` /
+  `ItemListNavigationButton(staysInRow:)` keep a button in the row instead of the side column.
 
 ## The rules
 
@@ -80,9 +85,23 @@ These are the user's decisions; a screen that follows them is correct, one that 
    scrolling slide their top-right control clear by the row's current position.
 5. **Full-screen viewers** (browser documents, full-screen mini apps) fill the screen beside the island.
 6. **Per-corner radii** follow the screen: sheets' bottom corners, inner clips inside them, and in-progress
-   navigation transitions use `screenCornerRadii`, not one uniform radius.
-7. **Unfolded landscape is a regular-width phone**: check `deviceMetrics.isTablet`, not `widthClass == .regular`,
-   for anything meant for iPads; it also refuses programmatic rotation requests.
+   navigation transitions (and the story camera sliding the chat list aside) use `screenCornerRadii`, not one uniform
+   radius.
+7. **Unfolded landscape is a regular-width phone**: check `deviceMetrics.type == .tablet`, not
+   `widthClass == .regular`, for anything meant for iPads; it also refuses programmatic rotation requests. Modals see
+   compact metrics there (`forOptionalFloatingPresentation`). The story viewer is the exception the other way: on the
+   unfolded screen, both orientations, it uses the iPad card layout (9:16 card centred in the band, blurred backdrop),
+   kept clear of the status island in portrait and 16pt from the top and bottom in landscape, with an input row at
+   least a phone's width (375pt).
+8. **The status bar follows what covers its corner block**: with a modal up, the folded postures and unfolded
+   landscape take the style of the topmost card that still overlaps the block, else the screens behind; an
+   interactive dismiss switches it once the card has left the block entirely (not the regular phone's forced white).
+9. **Edit/Done stays in one place**: a Done that takes turns with a text Edit is marked `staysInRow`, so it stays in
+   the top row (as an accent pill) instead of jumping into the side column's trailing circle. A Done-only form keeps
+   its accent circle in the column.
+10. **Column shapes pair by position in transitions**: between two bars the side column's shapes (back circle,
+   buttons capsule, trailing circle, whichever a bar has) pair by index from the column's top, as the row's right
+   platters pair from the edge; Chats' story capsule and compose circle become the chat's back circle and avatar.
 
 ## Bug shapes (all invisible when the side insets are equal)
 
@@ -94,6 +113,11 @@ These are the user's decisions; a screen that follows them is correct, one that 
 - `UIScreen.main` used for layout while unfolded.
 - `widthClass == .regular` treated as iPad.
 - A 9:16 preview taller than the screen (UP, FP) leaving negative space below it for the bottom controls.
+- A bottom row lifted by a constant tuned for home-button phones, until the Duo the only phones whose 9:16 preview is
+  taller than the screen: measured from the screen edge, it lands on the home indicator. The indicator is
+  `layout.intrinsicInsets.bottom` (20pt); the Duo's `safeInsets.bottom` is 0. The story camera keeps its controls above
+  it; the editor's bar, the drawing screen's and the sticker frame sit 62pt above it on the folded screen. Beside the
+  unfolded island the bar mirrors the top row, which already clears it.
 - Something parked just past the content's edge, off-screen on a phone, shows in the strip beside a band: the story
   viewer's resting cube neighbours sat 40pt into FP's strip. Clip to the band (the stories turn the clip off while
   opening and closing, which can start or end at an avatar in the strip).
