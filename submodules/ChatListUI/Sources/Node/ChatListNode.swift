@@ -3295,7 +3295,8 @@ public final class ChatListNode: ListViewImpl {
     }
     
     private func resetFilter() {
-        if let chatListFilter = self.chatListFilter, chatListFilter.id != Int32.max {
+        // Shadowgram: the Groups tab is a client-side filter, so no server folder matches its id.
+        if let chatListFilter = self.chatListFilter, chatListFilter.id != Int32.max, chatListFilter.id != shadowgramGroupsTabFilterId {
             self.updatedFilterDisposable.set((self.context.engine.peers.updatedChatListFilters()
             |> map { filters -> ChatListFilter? in
                 for filter in filters {
@@ -3412,7 +3413,11 @@ public final class ChatListNode: ListViewImpl {
                     if case .chatList = strongSelf.mode {
                         let entryCount = transition.chatListView.filteredEntries.count
                         if entryCount >= 1 {
-                            for i in 0 ..< 3 {
+                            // The top of the list is the end of the entries: the header, the group rows (the archive,
+                            // and Shadowgram's groups folder) and then the first chats. Looking at three entries was
+                            // enough with one group row; with two, the first pinned chat was never reached, so the
+                            // overscroll area above the list stayed black while the rows below are the pinned colour.
+                            for i in 0 ..< 5 {
                                 if entryCount - 1 - i < 0 {
                                     continue
                                 }

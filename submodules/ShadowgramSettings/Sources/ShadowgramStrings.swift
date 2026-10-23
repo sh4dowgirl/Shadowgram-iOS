@@ -194,6 +194,8 @@ extension ShadowgramStrings {
 }
 
 extension ShadowgramStrings {
-    public var forwardProtectedAsCopy: String { return t("Пересылать копией", "Forward as a Copy") }
-    public var forwardProtectedAsCopyFooter: String { return t("Сервер не пропускает пересылку из чатов, где она запрещена. Такие сообщения отправляются копией в цитате с именем автора, как удалённые. Медиа отправляется, только если уже загружено на устройство.", "The server refuses forwards from chats where forwarding is restricted. Such messages are sent as a copy in a quote with the author's name, like deleted ones. Media is sent only if it is already downloaded to the device.") }
+}
+
+extension ShadowgramStrings {
+    public var lastSeenUnknown: String { return t("был(а): неизвестно", "last seen: unknown") }
 }

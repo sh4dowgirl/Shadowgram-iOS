@@ -110,7 +110,6 @@ public struct ShadowgramSettingsValues: Equatable {
     public var messageBlockedUsers: Bool
     /// Auto reactions also apply to messages from the chosen users in groups, not only in private chats.
     public var autoReactionsInGroups: Bool
-    public var forwardProtectedAsCopy: Bool
 
     public static let defaultValues = ShadowgramSettingsValues(
         saveDeletedMessages: false,
@@ -146,11 +145,10 @@ public struct ShadowgramSettingsValues: Equatable {
         hideAds: false,
         unlockExtraFolders: false,
         messageBlockedUsers: false,
-        autoReactionsInGroups: true,
-        forwardProtectedAsCopy: false
+        autoReactionsInGroups: true
     )
 
-    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactions: [Int64: ShadowgramAutoReactionValue], chatListOldestFirst: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool, roundVideoCamera: ShadowgramRoundVideoCamera, pictureInPictureOnBackground: Bool, forwardSelfDestructingMedia: Bool, unlockStoryTools: Bool, unlockMediaSaving: Bool, unlockChatTranslation: Bool, hideAds: Bool, unlockExtraFolders: Bool, messageBlockedUsers: Bool, autoReactionsInGroups: Bool, forwardProtectedAsCopy: Bool) {
+    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactions: [Int64: ShadowgramAutoReactionValue], chatListOldestFirst: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool, roundVideoCamera: ShadowgramRoundVideoCamera, pictureInPictureOnBackground: Bool, forwardSelfDestructingMedia: Bool, unlockStoryTools: Bool, unlockMediaSaving: Bool, unlockChatTranslation: Bool, hideAds: Bool, unlockExtraFolders: Bool, messageBlockedUsers: Bool, autoReactionsInGroups: Bool) {
         self.saveDeletedMessages = saveDeletedMessages
         self.unlimitedAccounts = unlimitedAccounts
         self.ghostModeEnabled = ghostModeEnabled
@@ -185,7 +183,6 @@ public struct ShadowgramSettingsValues: Equatable {
         self.unlockExtraFolders = unlockExtraFolders
         self.messageBlockedUsers = messageBlockedUsers
         self.autoReactionsInGroups = autoReactionsInGroups
-        self.forwardProtectedAsCopy = forwardProtectedAsCopy
     }
 
     /// What the client actually sends: everything unless ghost mode is on and hides it.
@@ -256,7 +253,6 @@ public final class ShadowgramSettings {
         static let unlockExtraFolders = "shadowgram.premium.extraFolders"
         static let messageBlockedUsers = "shadowgram.messageBlockedUsers"
         static let autoReactionsInGroups = "shadowgram.autoReaction.inGroups"
-        static let forwardProtectedAsCopy = "shadowgram.forwardProtectedAsCopy"
     }
 
     private let defaults: UserDefaults
@@ -317,8 +313,7 @@ public final class ShadowgramSettings {
             hideAds: bool(Key.hideAds, defaultValues.hideAds),
             unlockExtraFolders: bool(Key.unlockExtraFolders, defaultValues.unlockExtraFolders),
             messageBlockedUsers: bool(Key.messageBlockedUsers, defaultValues.messageBlockedUsers),
-            autoReactionsInGroups: bool(Key.autoReactionsInGroups, defaultValues.autoReactionsInGroups),
-            forwardProtectedAsCopy: bool(Key.forwardProtectedAsCopy, defaultValues.forwardProtectedAsCopy)
+            autoReactionsInGroups: bool(Key.autoReactionsInGroups, defaultValues.autoReactionsInGroups)
         )
         self.currentValues = values
         self.valuesPromise = ValuePromise(values, ignoreRepeated: true)
@@ -384,7 +379,6 @@ public final class ShadowgramSettings {
         self.defaults.set(values.unlockExtraFolders, forKey: Key.unlockExtraFolders)
         self.defaults.set(values.messageBlockedUsers, forKey: Key.messageBlockedUsers)
         self.defaults.set(values.autoReactionsInGroups, forKey: Key.autoReactionsInGroups)
-        self.defaults.set(values.forwardProtectedAsCopy, forKey: Key.forwardProtectedAsCopy)
 
         self.valuesPromise.set(values)
     }

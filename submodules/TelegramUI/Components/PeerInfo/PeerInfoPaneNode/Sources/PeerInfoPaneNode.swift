@@ -74,6 +74,8 @@ public struct PeerInfoStatusData: Equatable {
     public var isActivity: Bool
     public var isHiddenStatus: Bool
     public var hasHiddenCommunityPrefix: Bool
+    /// Shadowgram: the user's last seen is "a long time ago" (with no photo it marks a likely block).
+    public var isLongTimeAgo: Bool
     public var key: PeerInfoPaneKey?
     
     public init(
@@ -81,12 +83,14 @@ public struct PeerInfoStatusData: Equatable {
         isActivity: Bool,
         isHiddenStatus: Bool = false,
         hasHiddenCommunityPrefix: Bool = false,
+        isLongTimeAgo: Bool = false,
         key: PeerInfoPaneKey?
     ) {
         self.text = text
         self.isActivity = isActivity
         self.isHiddenStatus = isHiddenStatus
         self.hasHiddenCommunityPrefix = hasHiddenCommunityPrefix
+        self.isLongTimeAgo = isLongTimeAgo
         self.key = key
     }
 }

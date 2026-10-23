@@ -479,12 +479,7 @@ func updatePeerPresences(transaction: Transaction, accountPeerId: PeerId, peerPr
         
     parsedPresences.removeValue(forKey: accountPeerId)
         
-    transaction.updatePeerPresencesInternal(presences: parsedPresences, merge: { previous, updated in
-        if let previous = previous as? TelegramUserPresence, let updated = updated as? TelegramUserPresence, previous.lastActivity != updated.lastActivity {
-            return TelegramUserPresence(status: updated.status, lastActivity: max(previous.lastActivity, updated.lastActivity))
-        }
-        return updated
-    })
+    transaction.updatePeerPresencesInternal(presences: parsedPresences, merge: shadowgramMergedPresence)
 }
 
 func updatePeerPresencesClean(transaction: Transaction, accountPeerId: PeerId, peerPresences: [PeerId: UpdatedApiPresence]) {
@@ -506,12 +501,7 @@ func updatePeerPresencesClean(transaction: Transaction, accountPeerId: PeerId, p
         parsedPresences.removeValue(forKey: accountPeerId)
     }
     
-    transaction.updatePeerPresencesInternal(presences: parsedPresences, merge: { previous, updated in
-        if let previous = previous as? TelegramUserPresence, let updated = updated as? TelegramUserPresence, previous.lastActivity != updated.lastActivity {
-            return TelegramUserPresence(status: updated.status, lastActivity: max(previous.lastActivity, updated.lastActivity))
-        }
-        return updated
-    })
+    transaction.updatePeerPresencesInternal(presences: parsedPresences, merge: shadowgramMergedPresence)
 }
 
 func updatePeerPresenceLastActivities(transaction: Transaction, accountPeerId: PeerId, activities: [PeerId: Int32]) {
@@ -572,4 +562,29 @@ func updateContacts(transaction: Transaction, apiUsers: [Api.User]) {
     if updated {
         transaction.replaceContactPeerIds(contactIds)
     }
+}
+
+
+/// Merges a received presence into the stored one. `lastActivity` only ever grows. Shadowgram also keeps
+/// the moment a user went offline: when a user who was online turns into one with a hidden last seen
+/// ("recently", "within a week"...), the server no longer says when, so the client remembers the end of
+/// the online period itself. The value is stored with the presence, so it survives restarts.
+func shadowgramMergedPresence(previous: PeerPresence, updated: PeerPresence) -> PeerPresence {
+    guard let previous = previous as? TelegramUserPresence, let updated = updated as? TelegramUserPresence else {
+        return updated
+    }
+    var lastActivity = max(previous.lastActivity, updated.lastActivity)
+    if case let .present(until) = previous.status {
+        switch updated.status {
+        case .recently, .lastWeek, .lastMonth, .none:
+            let now = Int32(clamping: Int64(Date().timeIntervalSince1970))
+            lastActivity = max(lastActivity, min(now, until))
+        case .present:
+            break
+        }
+    }
+    if lastActivity != updated.lastActivity {
+        return TelegramUserPresence(status: updated.status, lastActivity: lastActivity)
+    }
+    return updated
 }

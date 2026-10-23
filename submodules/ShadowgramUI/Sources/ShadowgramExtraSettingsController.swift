@@ -100,8 +100,6 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
     case forwardSelfDestructingMediaFooter
     case messageBlockedUsers(Bool)
     case messageBlockedUsersFooter
-    case forwardProtectedAsCopy(Bool)
-    case forwardProtectedAsCopyFooter
 
     case roundVideoCameraHeader
     case roundVideoCamera(ShadowgramRoundVideoCamera, Bool)
@@ -119,7 +117,7 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
 
     var category: ShadowgramExtraSettingsCategory {
         switch self {
-        case .ghostHeader, .ghostMode, .ghostFooter, .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter, .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter, .messageBlockedUsers, .messageBlockedUsersFooter, .forwardProtectedAsCopy, .forwardProtectedAsCopyFooter:
+        case .ghostHeader, .ghostMode, .ghostFooter, .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter, .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter, .messageBlockedUsers, .messageBlockedUsersFooter:
             return .privacy
         case .messagesHeader, .saveDeletedMessages, .messagesFooter, .messagesExtraHeader, .keepEditHistory, .keepEditHistoryFooter, .autoReaction, .roundVideoCameraHeader, .roundVideoCamera, .mediaHeader, .pictureInPictureOnBackground, .pictureInPictureOnBackgroundFooter:
             return .messages
@@ -163,7 +161,7 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return ShadowgramExtraSettingsSection.messagesExtra.rawValue
         case .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter:
             return ShadowgramExtraSettingsSection.capture.rawValue
-        case .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter, .messageBlockedUsers, .messageBlockedUsersFooter, .forwardProtectedAsCopy, .forwardProtectedAsCopyFooter:
+        case .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter, .messageBlockedUsers, .messageBlockedUsersFooter:
             return ShadowgramExtraSettingsSection.privacy.rawValue
         case .roundVideoCameraHeader, .roundVideoCamera:
             return ShadowgramExtraSettingsSection.roundVideoCamera.rawValue
@@ -268,10 +266,6 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return 2400
         case .messageBlockedUsersFooter:
             return 2401
-        case .forwardProtectedAsCopy:
-            return 2410
-        case .forwardProtectedAsCopyFooter:
-            return 2411
         case .roundVideoCameraHeader:
             return 50
         case let .roundVideoCamera(camera, _):
@@ -302,10 +296,6 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
     /// Display order; stable ids added later sort into their sections by this.
     private var sortKey: Int32 {
         switch self {
-        case .forwardProtectedAsCopy:
-            return 34 * 100 + 50
-        case .forwardProtectedAsCopyFooter:
-            return 34 * 100 + 51
         case .groupsPlacementHeader:
             return 12 * 100 + 50
         case let .groupsPlacement(placement, _):
@@ -468,12 +458,6 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             })
         case .messageBlockedUsersFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain(strings.messageBlockedUsersFooter), sectionId: self.section)
-        case let .forwardProtectedAsCopy(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.forwardProtectedAsCopy, value: value, sectionId: self.section, style: .blocks, updated: { value in
-                arguments.update { $0.forwardProtectedAsCopy = value }
-            })
-        case .forwardProtectedAsCopyFooter:
-            return ItemListTextItem(presentationData: presentationData, text: .plain(strings.forwardProtectedAsCopyFooter), sectionId: self.section)
         case .roundVideoCameraHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.roundVideoCameraHeader, sectionId: self.section)
         case let .roundVideoCamera(camera, checked):
@@ -585,8 +569,6 @@ private func shadowgramAllExtraSettingsEntries(values: ShadowgramSettingsValues,
     entries.append(.bypassCopyProtection(values.bypassCopyProtection))
     entries.append(.bypassCopyProtectionFooter)
     if values.bypassCopyProtection {
-        entries.append(.forwardProtectedAsCopy(values.forwardProtectedAsCopy))
-        entries.append(.forwardProtectedAsCopyFooter)
     }
     entries.append(.bypassViewOnce(values.bypassViewOnce))
     entries.append(.bypassViewOnceFooter)

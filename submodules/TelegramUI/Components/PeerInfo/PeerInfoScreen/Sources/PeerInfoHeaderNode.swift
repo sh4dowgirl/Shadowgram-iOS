@@ -1271,6 +1271,9 @@ final class PeerInfoHeaderNode: ASDisplayNode {
                 }
             }
 
+            if !self.isSettings, !self.isMyProfile, shadowgramLooksLikeBlockedMe(peer: peer, isLongTimeAgo: statusData?.isLongTimeAgo ?? false, accountPeerId: self.context.account.peerId) {
+                title = shadowgramBlockedMeMarker + title
+            }
             titleStringText = title
             titleAttributes = MultiScaleTextState.Attributes(font: Font.medium(28.0), color: .white)
             smallTitleAttributes = MultiScaleTextState.Attributes(font: Font.medium(28.0), color: .white, shadowColor: titleShadowColor)

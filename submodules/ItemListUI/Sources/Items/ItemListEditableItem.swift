@@ -299,9 +299,15 @@ open class ItemListRevealOptionsItemNode: ListViewItemNode, ASGestureRecognizerD
     override open func selected() {
         super.selected()
         // Hold only accepted taps, never touches cancelled by scrolling or a swipe.
-        if !self.isRevealOptionsActive && !UIAccessibility.isReduceMotionEnabled {
+        if !self.isRevealOptionsActive && !UIAccessibility.isReduceMotionEnabled && self.holdsHighlightAfterSelection {
             self.selectionHighlightEndTime = CACurrentMediaTime() + 0.5
         }
+    }
+
+    /// Whether the highlight of a tapped row is held for half a second before it fades (0.5s + 0.4s in
+    /// total). Rows that only toggle a value in place fade right away, like the other list rows do.
+    open var holdsHighlightAfterSelection: Bool {
+        return true
     }
 
     override open var canBeSelected: Bool {

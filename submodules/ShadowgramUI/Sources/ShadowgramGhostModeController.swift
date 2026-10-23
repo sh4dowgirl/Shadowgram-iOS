@@ -112,13 +112,24 @@ public func shadowgramGhostModeController(context: AccountContext) -> ViewContro
     powerNode.contentMode = .center
     powerNode.frame = CGRect(origin: CGPoint(), size: CGSize(width: 24.0, height: 24.0))
     var powerColor: UIColor?
+    var modalThemeCache: (base: PresentationTheme, modal: PresentationTheme)?
 
     let signal = combineLatest(queue: .mainQueue(),
         context.sharedContext.presentationData,
         ShadowgramSettings.shared.valuesSignal
     )
     |> map { presentationData, values -> (ItemListControllerState, (ItemListNodeState, Any)) in
-        let presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
+        // withModalBlocksBackground() returns a new theme object on every call, and ItemListController
+        // treats a different theme object as a theme change: it rebuilds (and animates) both navigation
+        // buttons. The derived theme is reused for as long as the base theme is the same.
+        let modalTheme: PresentationTheme
+        if let cached = modalThemeCache, cached.base === presentationData.theme {
+            modalTheme = cached.modal
+        } else {
+            modalTheme = presentationData.theme.withModalBlocksBackground()
+            modalThemeCache = (presentationData.theme, modalTheme)
+        }
+        let presentationData = presentationData.withUpdated(theme: modalTheme)
 
         let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
         let closeButton = ItemListNavigationButton(content: .text(strings.close), style: .regular, enabled: true, action: {

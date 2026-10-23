@@ -391,7 +391,15 @@ public class ItemListCheckboxItemNode: ItemListRevealOptionsItemNode {
                         strongSelf.imageNode.image = nil
                     }
                     
-                    strongSelf.updateRevealOptionsHighlightedBackgroundFrame(strongSelf.highlightedBackgroundNode, frame: CGRect(origin: CGPoint(x: 0.0, y: -UIScreenPixel), size: CGSize(width: params.width, height: strongSelf.backgroundNode.frame.height + UIScreenPixel + UIScreenPixel)), aboveNodes: [strongSelf.bottomStripeNode, strongSelf.topStripeNode, strongSelf.backgroundNode])
+                    // In rounded block layouts the highlight must not leave the row's background frame: the corner mask
+                    // only covers that frame, so a highlight reaching a pixel above it showed as a thin strip over the corners.
+                    let highlightedFrame: CGRect
+                    if hasCorners {
+                        highlightedFrame = CGRect(origin: CGPoint(x: 0.0, y: strongSelf.backgroundNode.frame.minY), size: CGSize(width: params.width, height: strongSelf.backgroundNode.frame.height))
+                    } else {
+                        highlightedFrame = CGRect(origin: CGPoint(x: 0.0, y: -UIScreenPixel), size: CGSize(width: params.width, height: strongSelf.backgroundNode.frame.height + UIScreenPixel + UIScreenPixel))
+                    }
+                    strongSelf.updateRevealOptionsHighlightedBackgroundFrame(strongSelf.highlightedBackgroundNode, frame: highlightedFrame, aboveNodes: [strongSelf.bottomStripeNode, strongSelf.topStripeNode, strongSelf.backgroundNode])
                     
                     strongSelf.updateLayout(size: layout.contentSize, leftInset: params.leftInset, rightInset: params.rightInset)
                     
@@ -405,6 +413,10 @@ public class ItemListCheckboxItemNode: ItemListRevealOptionsItemNode {
         }
     }
     
+    override public var holdsHighlightAfterSelection: Bool {
+        return false
+    }
+
     override public func setHighlighted(_ highlighted: Bool, at point: CGPoint, animated: Bool) {
         super.setHighlighted(highlighted, at: point, animated: animated)
         

@@ -616,28 +616,42 @@ public func stringAndActivityForUserPresence(strings: PresentationStrings, dateT
                 }
             }
         }
-    case let .recently(isHidden):
+    case .recently:
         let activeUntil = presence.lastActivity + 30
         if activeUntil >= timestamp {
             return (strings.Presence_online, true)
-        } else if isHidden, ShadowgramSettings.shared.values.showExactLastSeen, presence.lastActivity > 0 {
-            return (shadowgramLastSeenString(strings: strings, dateTimeFormat: dateTimeFormat, timestamp: presence.lastActivity, relativeTo: timestamp), false)
+        } else if let exact = shadowgramHiddenLastSeen(strings: strings, dateTimeFormat: dateTimeFormat, presence: presence, relativeTo: timestamp) {
+            return (exact, false)
         } else {
             return (strings.LastSeen_Lately, false)
         }
-    case let .lastWeek(isHidden):
-        if isHidden, ShadowgramSettings.shared.values.showExactLastSeen, presence.lastActivity > 0 {
-            return (shadowgramLastSeenString(strings: strings, dateTimeFormat: dateTimeFormat, timestamp: presence.lastActivity, relativeTo: timestamp), false)
+    case .lastWeek:
+        if let exact = shadowgramHiddenLastSeen(strings: strings, dateTimeFormat: dateTimeFormat, presence: presence, relativeTo: timestamp) {
+            return (exact, false)
         }
         return (strings.LastSeen_WithinAWeek, false)
-    case let .lastMonth(isHidden):
-        if isHidden, ShadowgramSettings.shared.values.showExactLastSeen, presence.lastActivity > 0 {
-            return (shadowgramLastSeenString(strings: strings, dateTimeFormat: dateTimeFormat, timestamp: presence.lastActivity, relativeTo: timestamp), false)
+    case .lastMonth:
+        if let exact = shadowgramHiddenLastSeen(strings: strings, dateTimeFormat: dateTimeFormat, presence: presence, relativeTo: timestamp) {
+            return (exact, false)
         }
         return (strings.LastSeen_WithinAMonth, false)
     case .longTimeAgo:
         return (strings.LastSeen_ALongTimeAgo, false)
     }
+}
+
+/// Exact Last Seen for a user whose last seen is hidden from this account. The server sends no time
+/// for such a user, so the time comes from what the client has seen of them (their last message, a read
+/// of this account's message, the end of an online period; see `shadowgramMergedPresence`). Nil when
+/// the feature is off. When no time has ever been seen, the answer says so instead of giving a range.
+private func shadowgramHiddenLastSeen(strings: PresentationStrings, dateTimeFormat: PresentationDateTimeFormat, presence: EnginePeer.Presence, relativeTo timestamp: Int32) -> String? {
+    guard ShadowgramSettings.shared.values.showExactLastSeen else {
+        return nil
+    }
+    if presence.lastActivity > 0 {
+        return shadowgramLastSeenString(strings: strings, dateTimeFormat: dateTimeFormat, timestamp: presence.lastActivity, relativeTo: timestamp)
+    }
+    return ShadowgramStrings(languageCode: strings.primaryComponent.languageCode).lastSeenUnknown
 }
 
 private func shadowgramLastSeenString(strings: PresentationStrings, dateTimeFormat: PresentationDateTimeFormat, timestamp: Int32, relativeTo now: Int32) -> String {

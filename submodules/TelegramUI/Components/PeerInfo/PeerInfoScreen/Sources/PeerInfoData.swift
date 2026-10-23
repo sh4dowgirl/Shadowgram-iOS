@@ -1254,7 +1254,11 @@ func peerInfoScreenData(
                             default:
                                 break
                             }
-                            return PeerInfoStatusData(text: text, isActivity: isActivity, isHiddenStatus: isHiddenStatus, key: nil)
+                            var isLongTimeAgo = false
+                            if case .longTimeAgo = EnginePeer.Presence(presence).status {
+                                isLongTimeAgo = true
+                            }
+                            return PeerInfoStatusData(text: text, isActivity: isActivity, isHiddenStatus: isHiddenStatus, isLongTimeAgo: isLongTimeAgo, key: nil)
                         } else {
                             return nil
                         }

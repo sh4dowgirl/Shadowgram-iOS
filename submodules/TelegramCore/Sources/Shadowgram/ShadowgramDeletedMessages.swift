@@ -225,8 +225,9 @@ private func shadowgramUploadableMediaCopy(mediaBox: MediaBox, media: Media) -> 
 }
 
 func shadowgramForwardsProtectedMessageAsCopy(_ message: Message) -> Bool {
-    let values = ShadowgramSettings.shared.values
-    guard values.bypassCopyProtection && values.forwardProtectedAsCopy else {
+    // The server refuses forwards from chats that restrict them, so with the bypass on such a message
+    // is always sent as a copy, the way a kept deleted message is.
+    guard ShadowgramSettings.shared.values.bypassCopyProtection else {
         return false
     }
     return message.isCopyProtected()

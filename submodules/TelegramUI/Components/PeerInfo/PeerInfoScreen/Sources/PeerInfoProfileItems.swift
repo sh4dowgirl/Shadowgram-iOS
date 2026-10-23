@@ -908,7 +908,16 @@ func infoItems(
     if ShadowgramSettings.shared.values.showPeerIds, let peer = data.peer {
         switch peer {
         case .user, .channel, .legacyGroup:
-            items[.peerInfo]!.append(shadowgramPeerIdInfoItem(peerId: peer.id, interaction: interaction))
+            // Right after the last labelled value (username, phone, bio...), so it stays in that box. A bot's
+            // section goes on with action rows and a footer text, which the ID must not come after.
+            var infoItems = items[.peerInfo]!
+            let idItem = shadowgramPeerIdInfoItem(peerId: peer.id, interaction: interaction)
+            if let lastLabeledIndex = infoItems.lastIndex(where: { $0 is PeerInfoScreenLabeledValueItem }) {
+                infoItems.insert(idItem, at: lastLabeledIndex + 1)
+            } else {
+                infoItems.insert(idItem, at: 0)
+            }
+            items[.peerInfo] = infoItems
         case .community, .secretChat:
             break
         }

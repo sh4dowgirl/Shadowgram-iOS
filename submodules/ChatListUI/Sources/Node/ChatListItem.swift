@@ -3333,6 +3333,10 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                                 } else {
                                     textColor = theme.titleColor
                                 }
+                                var displayTitle = displayTitle
+                                if case let .peer(shadowgramPeerData) = item.content, shadowgramLooksLikeBlockedMe(peer: itemPeer.chatMainPeer, presence: shadowgramPeerData.presence, accountPeerId: item.context.account.peerId) {
+                                    displayTitle = shadowgramBlockedMeMarker + displayTitle
+                                }
                                 titleAttributedString = NSAttributedString(string: displayTitle, font: titleFont, textColor: textColor)
                                 
                                 if case let .channel(channel) = itemPeer.peer, channel.flags.contains(.isMonoforum) {
