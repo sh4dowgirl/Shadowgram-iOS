@@ -44,15 +44,19 @@ func shadowgramPeersMatchingId(context: AccountContext, query: String) -> Signal
     return local
     |> mapToSignal { found -> Signal<[EngineRenderedPeer], NoError> in
         let localPeers = found.map { EngineRenderedPeer(peer: $0) }
-        guard let channelId = candidates.first(where: { $0.namespace == Namespaces.Peer.CloudChannel }), !found.contains(where: { $0.id == channelId }) else {
+        var remoteSignals: [Signal<EnginePeer?, NoError>] = []
+        if let channelId = candidates.first(where: { $0.namespace == Namespaces.Peer.CloudChannel }), !found.contains(where: { $0.id == channelId }) {
+            remoteSignals.append(context.engine.peers.findChannelById(channelId: channelId.id._internalGetInt64Value()))
+        }
+        if let userId = candidates.first(where: { $0.namespace == Namespaces.Peer.CloudUser }), !found.contains(where: { $0.id == userId }) {
+            remoteSignals.append(context.engine.peers.findUserById(userId: userId.id._internalGetInt64Value()))
+        }
+        if remoteSignals.isEmpty {
             return .single(localPeers)
         }
-        let remote: Signal<[EngineRenderedPeer], NoError> = context.engine.peers.findChannelById(channelId: channelId.id._internalGetInt64Value())
-        |> map { peer -> [EngineRenderedPeer] in
-            if let peer {
-                return localPeers + [EngineRenderedPeer(peer: peer)]
-            }
-            return localPeers
+        let remote: Signal<[EngineRenderedPeer], NoError> = combineLatest(remoteSignals)
+        |> map { peers -> [EngineRenderedPeer] in
+            return localPeers + peers.compactMap { $0 }.map { EngineRenderedPeer(peer: $0) }
         }
         return .single(localPeers) |> then(remote)
     }

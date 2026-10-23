@@ -214,6 +214,13 @@ public extension TelegramEngine {
             }
         }
 
+        public func findUserById(userId: Int64) -> Signal<EnginePeer?, NoError> {
+            return _internal_findUserById(accountPeerId: self.account.peerId, postbox: self.account.postbox, network: self.account.network, userId: userId)
+            |> map { peer in
+                return peer.flatMap(EnginePeer.init)
+            }
+        }
+
         public func supportPeerId() -> Signal<PeerId?, NoError> {
             return _internal_supportPeerId(account: self.account)
         }

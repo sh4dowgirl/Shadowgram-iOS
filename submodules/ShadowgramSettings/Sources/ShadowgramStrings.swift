@@ -76,11 +76,6 @@ extension ShadowgramStrings {
 }
 
 extension ShadowgramStrings {
-    public var openByPeerIdAction: String { return t("Открыть чат по ID…", "Open Chat by ID…") }
-    public var openByPeerIdPrompt: String { return t("Введите числовой ID пользователя или чата. Чат можно открыть только если этот ID уже встречался этому аккаунту (общий чат, контакт, упоминание).", "Enter the numeric ID of a user or chat. A chat can be opened only if this ID has already been seen by this account (a shared chat, contact or mention).") }
-    public var openByPeerIdOk: String { return t("Открыть", "Open") }
-    public var openByPeerIdCancel: String { return t("Отмена", "Cancel") }
-    public var openByPeerIdNotFound: String { return t("Чат с таким ID не найден на этом аккаунте.", "No chat with this ID was found on this account.") }
 }
 
 extension ShadowgramStrings {

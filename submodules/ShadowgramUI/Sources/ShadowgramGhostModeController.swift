@@ -107,6 +107,12 @@ public func shadowgramGhostModeController(context: AccountContext) -> ViewContro
         ShadowgramSettings.shared.update(f)
     })
 
+    let powerNode = ASImageNode()
+    powerNode.displaysAsynchronously = false
+    powerNode.contentMode = .center
+    powerNode.frame = CGRect(origin: CGPoint(), size: CGSize(width: 24.0, height: 24.0))
+    var powerColor: UIColor?
+
     let signal = combineLatest(queue: .mainQueue(),
         context.sharedContext.presentationData,
         ShadowgramSettings.shared.valuesSignal
@@ -119,11 +125,11 @@ public func shadowgramGhostModeController(context: AccountContext) -> ViewContro
             dismissImpl?()
         })
         // ⏻ flips every function at once: all on if any is off, otherwise all off.
-        let powerNode = ASImageNode()
-        powerNode.displaysAsynchronously = false
-        powerNode.image = shadowgramPowerIcon(color: presentationData.theme.rootController.navigationBar.accentTextColor)
-        powerNode.contentMode = .center
-        powerNode.frame = CGRect(origin: CGPoint(), size: CGSize(width: 24.0, height: 24.0))
+        let accentColor = presentationData.theme.rootController.navigationBar.accentTextColor
+        if powerColor != accentColor {
+            powerColor = accentColor
+            powerNode.image = shadowgramPowerIcon(color: accentColor)
+        }
         let powerButton = ItemListNavigationButton(content: .node(powerNode), style: .regular, enabled: true, action: {
             ShadowgramSettings.shared.update { values in
                 let allOn = values.sendReadReceipts && values.sendTyping && values.sendOnlineStatus && values.sendStoryViews

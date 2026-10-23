@@ -11,12 +11,10 @@ import ShadowgramSettings
 
 private final class ShadowgramExtraSettingsArguments {
     let update: ((inout ShadowgramSettingsValues) -> Void) -> Void
-    let openByPeerIdPrompt: () -> Void
     let openAutoReaction: () -> Void
 
-    init(update: @escaping ((inout ShadowgramSettingsValues) -> Void) -> Void, openByPeerIdPrompt: @escaping () -> Void, openAutoReaction: @escaping () -> Void) {
+    init(update: @escaping ((inout ShadowgramSettingsValues) -> Void) -> Void, openAutoReaction: @escaping () -> Void) {
         self.update = update
-        self.openByPeerIdPrompt = openByPeerIdPrompt
         self.openAutoReaction = openAutoReaction
     }
 }
@@ -71,7 +69,6 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
     case showPeerIds(Bool)
     case showPeerIdsFooter
     case openByPeerId(Bool)
-    case openByPeerIdAction
     case openByPeerIdFooter
     case disableCameraSwipe(Bool)
     case disableCameraSwipeFooter
@@ -128,7 +125,7 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return .messages
         case .groupsHeader, .groupsFolder, .groupsMinMembers, .groupsPlacementHeader, .groupsPlacement, .groupsFooter, .disableCameraSwipe, .disableCameraSwipeFooter, .chatListSortHeader, .chatListSort:
             return .chatList
-        case .interfaceHeader, .showPeerIds, .showPeerIdsFooter, .openByPeerId, .openByPeerIdAction, .openByPeerIdFooter:
+        case .interfaceHeader, .showPeerIds, .showPeerIdsFooter, .openByPeerId, .openByPeerIdFooter:
             return .interface
         case .accountsHeader, .unlimitedAccounts, .accountsFooter:
             return .accounts
@@ -160,7 +157,7 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return ShadowgramExtraSettingsSection.groupsPlacement.rawValue
         case .autoReaction:
             return ShadowgramExtraSettingsSection.autoReaction.rawValue
-        case .interfaceHeader, .showPeerIds, .showPeerIdsFooter, .openByPeerId, .openByPeerIdAction, .openByPeerIdFooter, .disableCameraSwipe, .disableCameraSwipeFooter:
+        case .interfaceHeader, .showPeerIds, .showPeerIdsFooter, .openByPeerId, .openByPeerIdFooter, .disableCameraSwipe, .disableCameraSwipeFooter:
             return ShadowgramExtraSettingsSection.interface.rawValue
         case .messagesExtraHeader, .keepEditHistory, .keepEditHistoryFooter:
             return ShadowgramExtraSettingsSection.messagesExtra.rawValue
@@ -215,8 +212,6 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return 15
         case .openByPeerId:
             return 16
-        case .openByPeerIdAction:
-            return 17
         case .openByPeerIdFooter:
             return 18
         case .disableCameraSwipe:
@@ -395,10 +390,6 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: strings.openByPeerId, value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { $0.openByPeerId = value }
             })
-        case .openByPeerIdAction:
-            return ItemListDisclosureItem(presentationData: presentationData, title: strings.openByPeerIdAction, label: "", sectionId: self.section, style: .blocks, action: {
-                arguments.openByPeerIdPrompt()
-            })
         case .openByPeerIdFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain(strings.openByPeerIdFooter), sectionId: self.section)
         case let .disableCameraSwipe(value):
@@ -562,9 +553,6 @@ private func shadowgramAllExtraSettingsEntries(values: ShadowgramSettingsValues,
     entries.append(.showPeerIds(values.showPeerIds))
     entries.append(.showPeerIdsFooter)
     entries.append(.openByPeerId(values.openByPeerId))
-    if values.openByPeerId {
-        entries.append(.openByPeerIdAction)
-    }
     entries.append(.openByPeerIdFooter)
     entries.append(.chatListSortHeader)
     entries.append(.chatListSort(oldestFirst: false, checked: !values.chatListOldestFirst))
@@ -622,11 +610,6 @@ private func shadowgramExtraSettingsCategoryController(context: AccountContext, 
     weak var weakController: ViewController?
     let arguments = ShadowgramExtraSettingsArguments(update: { f in
         ShadowgramSettings.shared.update(f)
-    }, openByPeerIdPrompt: { [weak context] in
-        guard let context, let controller = weakController else {
-            return
-        }
-        shadowgramPresentOpenByPeerIdPrompt(context: context, from: controller)
     }, openAutoReaction: { [weak context] in
         guard let context, let controller = weakController else {
             return
@@ -641,7 +624,7 @@ private func shadowgramExtraSettingsCategoryController(context: AccountContext, 
     |> map { presentationData, values -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.extraSettingsCategoryTitle(category.rawValue)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: shadowgramExtraSettingsEntries(values: values, strings: strings, category: category), style: .blocks, animateChanges: true)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: shadowgramExtraSettingsEntries(values: values, strings: strings, category: category), style: .blocks, animateChanges: false)
         return (controllerState, (listState, arguments))
     }
 
@@ -769,52 +752,4 @@ public func shadowgramExtraSettingsController(context: AccountContext) -> ViewCo
     let controller = ItemListController(context: context, state: signal)
     weakController = controller
     return controller
-}
-
-// MARK: - Open chat by peer ID
-
-private func shadowgramPresentOpenByPeerIdPrompt(context: AccountContext, from presentingController: ViewController) {
-    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-    let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
-    let alert = UIAlertController(title: strings.openByPeerIdAction, message: strings.openByPeerIdPrompt, preferredStyle: .alert)
-    alert.addTextField { textField in
-        textField.keyboardType = .numberPad
-        textField.placeholder = "1234567890"
-    }
-    alert.addAction(UIAlertAction(title: strings.openByPeerIdCancel, style: .cancel, handler: nil))
-    alert.addAction(UIAlertAction(title: strings.openByPeerIdOk, style: .default, handler: { [weak presentingController] _ in
-        guard let text = alert.textFields?.first?.text, let value = Int64(text.trimmingCharacters(in: .whitespaces)), value > 0 else {
-            return
-        }
-        shadowgramResolveAndOpenPeerId(context: context, idValue: value, from: presentingController)
-    }))
-    if let hostingController = presentingController.view.window?.rootViewController {
-        hostingController.present(alert, animated: true, completion: nil)
-    }
-}
-
-private func shadowgramResolveAndOpenPeerId(context: AccountContext, idValue: Int64, from presentingController: ViewController?) {
-    // Try user, channel, and group namespaces in turn; the first one with a known peer wins.
-    let candidates: [EnginePeer.Id] = [
-        EnginePeer.Id(namespace: Namespaces.Peer.CloudUser, id: EnginePeer.Id.Id._internalFromInt64Value(idValue)),
-        EnginePeer.Id(namespace: Namespaces.Peer.CloudChannel, id: EnginePeer.Id.Id._internalFromInt64Value(idValue)),
-        EnginePeer.Id(namespace: Namespaces.Peer.CloudGroup, id: EnginePeer.Id.Id._internalFromInt64Value(idValue))
-    ]
-    let lookups = candidates.map { id in
-        context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: id))
-    }
-    let _ = (combineLatest(lookups)
-    |> take(1)
-    |> deliverOnMainQueue).start(next: { [weak presentingController] peers in
-        let found = peers.compactMap({ $0 }).first
-        if let peer = found, let presentingController, let navigationController = presentingController.navigationController as? NavigationController {
-            context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, context: context, chatLocation: .peer(peer), keepStack: .default))
-        } else {
-            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-            let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
-            let errorAlert = UIAlertController(title: nil, message: strings.openByPeerIdNotFound, preferredStyle: .alert)
-            errorAlert.addAction(UIAlertAction(title: presentationData.strings.Common_OK, style: .default, handler: nil))
-            presentingController?.view.window?.rootViewController?.present(errorAlert, animated: true, completion: nil)
-        }
-    })
 }

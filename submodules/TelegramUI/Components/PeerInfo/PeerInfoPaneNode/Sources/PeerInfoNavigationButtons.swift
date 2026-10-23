@@ -93,7 +93,7 @@ public func peerInfoNavigationButtonSets(_ flags: PeerInfoNavigationFlags) -> (n
     if flags.isSettings {
         normal.left.append(.qrCode)
         if flags.showsGhost {
-            normal.right.append(.ghost)
+            normal.left.append(.ghost)
         }
         normal.right.append(.search)
         normal.right.append(.edit)
