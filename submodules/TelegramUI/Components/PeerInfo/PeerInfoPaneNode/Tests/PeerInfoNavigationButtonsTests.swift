@@ -25,6 +25,10 @@ final class PeerInfoNavigationButtonSetsTests: XCTestCase {
         XCTAssertEqual(self.sets({ $0.isSettings = true }).normal, PeerInfoNavigationButtonSet(left: [.qrCode], right: [.search, .edit]))
     }
 
+    func test_settingsWithGhost() {
+        XCTAssertEqual(self.sets({ $0.isSettings = true; $0.showsGhost = true }).normal, PeerInfoNavigationButtonSet(left: [.qrCode, .ghost], right: [.search, .edit]))
+    }
+
     func test_editing_hasNoPaneSet() {
         let sets = self.sets({ $0.isEditing = true; $0.isSettings = true; $0.paneKey = .media })
         XCTAssertEqual(sets.normal, PeerInfoNavigationButtonSet(left: [.cancel], right: [.done]))

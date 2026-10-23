@@ -5561,6 +5561,9 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
         }
         self.navigationItems.apply(set, resources: self.navigationItemResources(), to: controller.navigationItem, animated: self.didApplyNavigationButtons && controller.didAppear)
         self.didApplyNavigationButtons = true
+        if let navigationButtonColor = self.navigationButtonColor {
+            self.navigationItems.updateContentsColor(navigationButtonColor)
+        }
         if let slotKey = self.navigationItems.appliedSlotKey {
             self.navigationIconButton.update(key: slotKey, strings: self.presentationData.strings)
             // Only while it is shown: a node leaving with the glass's change keeps its colour as the bar's own leaving

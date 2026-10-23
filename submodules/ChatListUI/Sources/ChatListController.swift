@@ -4223,7 +4223,11 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
             case let .filter(id):
                 var found = false
                 var foundValue: ChatListFilter?
-                for filter in filters {
+                if id == shadowgramGroupsTabFilterId {
+                    foundValue = shadowgramGroupsTabFilter(languageCode: strongSelf.presentationData.strings.primaryComponent.languageCode)
+                    found = true
+                }
+                for filter in filters where !found {
                     if filter.id == id {
                         foundValue = filter
                         found = true

@@ -48,6 +48,10 @@ public final class PeerInfoNavigationItems {
     private var resources: PeerInfoNavigationItemResources?
     private var items: [PeerInfoHeaderNavigationButtonKey: UIBarButtonItem] = [:]
     private var appliedSet: PeerInfoNavigationButtonSet?
+    private var leftGroupNode: PeerInfoNavigationGroupNode?
+    private var leftGroupItem: UIBarButtonItem?
+    private var leftGroupKeys: [PeerInfoHeaderNavigationButtonKey] = []
+    private var contentsColor: UIColor = .white
 
     public init(slotNode: ASDisplayNode) {
         self.slotNode = slotNode
@@ -69,11 +73,19 @@ public final class PeerInfoNavigationItems {
             // and its label is set below.
             self.resources = resources
             self.items = self.items.filter { $0.key == .moreSearchSort }
+            self.leftGroupNode = nil
+            self.leftGroupItem = nil
+            self.leftGroupKeys = []
             animated = false
         }
         self.appliedSet = set
 
-        let left = set.left.first.flatMap { self.item(for: $0, resources: resources) }
+        let left: UIBarButtonItem?
+        if set.left.count > 1 {
+            left = self.groupItem(for: set.left, resources: resources)
+        } else {
+            left = set.left.first.flatMap { self.item(for: $0, resources: resources) }
+        }
         if navigationItem.leftBarButtonItem !== left {
             navigationItem.setLeftBarButton(left, animated: animated)
         }
@@ -137,9 +149,99 @@ public final class PeerInfoNavigationItems {
         return item
     }
 
+    public func updateContentsColor(_ color: UIColor) {
+        self.contentsColor = color
+        self.leftGroupNode?.updateColor(color)
+    }
+
+    private func groupItem(for keys: [PeerInfoHeaderNavigationButtonKey], resources: PeerInfoNavigationItemResources) -> UIBarButtonItem? {
+        if let item = self.leftGroupItem, self.leftGroupKeys == keys {
+            return item
+        }
+        var buttons: [(image: UIImage?, label: String, action: () -> Void)] = []
+        for key in keys {
+            let image: UIImage?
+            let label: String
+            switch key {
+            case .qrCode:
+                image = resources.qrCodeImage
+                label = resources.qrCodeLabel
+            case .ghost:
+                image = resources.ghostImage
+                label = resources.ghostLabel
+            default:
+                continue
+            }
+            buttons.append((image, label, { [weak self] in
+                self?.performAction?(key)
+            }))
+        }
+        let node = PeerInfoNavigationGroupNode(buttons: buttons, color: self.contentsColor)
+        guard let item = UIBarButtonItem(customDisplayNode: node) else {
+            return nil
+        }
+        self.leftGroupNode = node
+        self.leftGroupItem = item
+        self.leftGroupKeys = keys
+        return item
+    }
+
     private func imageItem(_ image: UIImage?, label: String) -> UIBarButtonItem {
         let item = UIBarButtonItem(image: image?.withRenderingMode(.alwaysTemplate), style: .plain, target: nil, action: nil)
         item.accessibilityLabel = label
         return item
+    }
+}
+
+
+private final class PeerInfoNavigationGroupButtonNode: ASButtonNode {
+    var onTap: (() -> Void)?
+
+    override init() {
+        super.init()
+        self.addTarget(self, action: #selector(self.tapped), forControlEvents: .touchUpInside)
+    }
+
+    @objc private func tapped() {
+        self.onTap?()
+    }
+}
+
+final class PeerInfoNavigationGroupNode: ASDisplayNode {
+    private let buttons: [(node: PeerInfoNavigationGroupButtonNode, image: UIImage?)]
+
+    init(buttons: [(image: UIImage?, label: String, action: () -> Void)], color: UIColor) {
+        self.buttons = buttons.map { button in
+            let node = PeerInfoNavigationGroupButtonNode()
+            node.onTap = button.action
+            node.isAccessibilityElement = true
+            node.accessibilityLabel = button.label
+            node.accessibilityTraits = .button
+            return (node, button.image)
+        }
+        super.init()
+        for button in self.buttons {
+            self.addSubnode(button.node)
+        }
+        self.updateColor(color)
+    }
+
+    func updateColor(_ color: UIColor) {
+        for button in self.buttons {
+            button.node.setImage(generateTintedImage(image: button.image, color: color), for: .normal)
+        }
+    }
+
+    override func calculateSizeThatFits(_ constrainedSize: CGSize) -> CGSize {
+        return CGSize(width: 44.0 * CGFloat(self.buttons.count), height: 44.0)
+    }
+
+    override func layout() {
+        super.layout()
+        var x: CGFloat = 0.0
+        for button in self.buttons {
+            button.node.frame = CGRect(x: x, y: 0.0, width: 44.0, height: self.bounds.height)
+            x += 44.0
+        }
     }
 }
