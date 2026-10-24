@@ -685,6 +685,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
     private let backgroundNode: ChatMessageBackground
     /// Shadowgram: whether the bubble shows the deleted-message tint; nil before the first layout.
     private var shadowgramDisplaysDeletedTint: Bool?
+    private var shadowgramDeletedOverlayView: UIImageView?
     private var backgroundHighlightNode: ChatMessageBackground?
     private let shadowNode: ChatMessageShadowNode
     private var clippingNode: ChatMessageBubbleClippingNode
@@ -4037,8 +4038,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         strongSelf.backgroundWallpaperNode.setType(type: backgroundType, theme: item.presentationData.theme, essentialGraphics: graphics, maskMode: strongSelf.backgroundMaskMode, backgroundNode: presentationContext.backgroundNode)
         strongSelf.shadowNode.setType(type: backgroundType, hasWallpaper: hasWallpaper, graphics: graphics)
         
-        // Shadowgram: a message someone else deleted gets a soft red bubble. The tint fades in when
-        // the deletion arrives while the message is on screen.
+        // Shadowgram: a message someone else deleted gets a dark-red bubble overlay. Two layers: the
+        // background tint (visible for text-only messages) and an overlay above the clipping node
+        // (visible for media messages whose content covers the background).
         var shadowgramIsDeleted = false
         for (contentMessage, _) in item.content {
             if contentMessage.shadowgramIsDeleted {
@@ -4048,12 +4050,38 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         }
         let shadowgramWasDeleted = strongSelf.shadowgramDisplaysDeletedTint
         strongSelf.shadowgramDisplaysDeletedTint = shadowgramIsDeleted
-        let shadowgramTintColor: UIColor? = shadowgramIsDeleted ? UIColor(red: 1.0, green: 0.27, blue: 0.23, alpha: item.presentationData.theme.theme.overallDarkAppearance ? 0.3 : 0.2) : nil
+        let shadowgramTintColor: UIColor? = shadowgramIsDeleted ? UIColor(red: 0.55, green: 0.0, blue: 0.0, alpha: item.presentationData.theme.theme.overallDarkAppearance ? 0.35 : 0.25) : nil
         var shadowgramAnimateTint = false
         if shadowgramIsDeleted && shadowgramWasDeleted == false {
             shadowgramAnimateTint = shadowgramMarkDeletedTintAnimated(stableId: item.message.stableId)
         }
         strongSelf.backgroundNode.setShadowgramDeletedTint(color: shadowgramTintColor, animated: shadowgramAnimateTint)
+
+        if let shadowgramTintColor {
+            let overlayView: UIImageView
+            var isNewOverlay = false
+            if let existing = strongSelf.shadowgramDeletedOverlayView {
+                overlayView = existing
+            } else {
+                isNewOverlay = true
+                overlayView = UIImageView()
+                overlayView.isUserInteractionEnabled = false
+                strongSelf.shadowgramDeletedOverlayView = overlayView
+                strongSelf.mainContextSourceNode.contentNode.view.addSubview(overlayView)
+            }
+            overlayView.image = strongSelf.backgroundNode.shadowgramTintShapeImage
+            overlayView.tintColor = shadowgramTintColor
+            let overlayFrame = backgroundFrame.insetBy(dx: -1.0, dy: -1.0)
+            overlayView.frame = overlayFrame
+            overlayView.layer.removeAllAnimations()
+            overlayView.alpha = 1.0
+            if shadowgramAnimateTint && isNewOverlay {
+                overlayView.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.6, timingFunction: CAMediaTimingFunctionName.easeOut.rawValue)
+            }
+        } else if let overlayView = strongSelf.shadowgramDeletedOverlayView {
+            strongSelf.shadowgramDeletedOverlayView = nil
+            overlayView.removeFromSuperview()
+        }
         
         strongSelf.backgroundType = backgroundType
         

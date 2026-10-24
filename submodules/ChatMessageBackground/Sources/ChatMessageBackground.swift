@@ -78,7 +78,7 @@ public class ChatMessageBackground: ASDisplayNode {
     
     // Shadowgram: soft red tint over the bubble of a message someone else deleted. It is the
     // bubble's own image drawn as a template, so it follows the shape, tail and merge state.
-    private var shadowgramTintShapeImage: UIImage?
+    public private(set) var shadowgramTintShapeImage: UIImage?
     private var shadowgramTintColor: UIColor?
     private var shadowgramTintView: UIImageView?
     
