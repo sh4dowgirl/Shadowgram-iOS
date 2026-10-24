@@ -4692,10 +4692,10 @@ func replayFinalState(
                     // helper. The check against the new text means a pure media or reaction edit
                     // does not add a bogus duplicate entry.
                     if previousMessage.text != message.text {
-                        mergedMessage = mergedMessage.withUpdatedAttributes(shadowgramAppendEditHistory(previousText: previousMessage.text, previousDate: previousMessage.editedTime ?? previousMessage.timestamp, attributes: mergedMessage.attributes))
+                        mergedMessage = mergedMessage.withUpdatedAttributes(shadowgramAppendEditHistory(previousEntries: previousMessage.shadowgramEditHistory, previousText: previousMessage.text, previousDate: previousMessage.editedTime ?? previousMessage.timestamp, attributes: mergedMessage.attributes))
                     } else if let kept = previousMessage.attributes.first(where: { $0 is ShadowgramEditHistoryMessageAttribute }) {
-                        // Carry the history forward unchanged for media-only edits.
-                        mergedMessage = mergedMessage.withUpdatedAttributes(mergedMessage.attributes + [kept])
+                        // Carry the history forward unchanged for media-only edits, dropping any stale copy first.
+                        mergedMessage = mergedMessage.withUpdatedAttributes(mergedMessage.attributes.filter { !($0 is ShadowgramEditHistoryMessageAttribute) } + [kept])
                     }
 
                     if let message = locallyRenderedMessage(message: message, peers: peers) {

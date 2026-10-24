@@ -61,24 +61,30 @@ public final class ShadowgramEditHistoryMessageAttribute: MessageAttribute {
     }
 }
 
-/// If `previousText` is a real previous version (different, non-empty), returns the message
-/// attributes extended with that version. Otherwise returns `attributes` unchanged.
-public func shadowgramAppendEditHistory(previousText: String, previousDate: Int32, attributes: [MessageAttribute]) -> [MessageAttribute] {
+/// Returns `attributes` extended so that the message's edit history holds every prior version.
+///
+/// `previousEntries` is the history already kept on the message before this edit — it must be read
+/// from the *previous* stored message, because the server's updated message (whose `attributes` are
+/// passed here) never carries this client-only attribute. Seeding from it is what makes the history
+/// accumulate instead of resetting to a single entry on every edit. `previousText` is the text the
+/// message had before this edit; it is appended as the newest kept version, so the full list is
+/// every version except the current (live) one.
+public func shadowgramAppendEditHistory(previousEntries: [ShadowgramEditHistoryEntry], previousText: String, previousDate: Int32, attributes: [MessageAttribute]) -> [MessageAttribute] {
     if !ShadowgramSettings.shared.values.keepEditHistory {
         return attributes
     }
     if previousText.isEmpty {
         return attributes
     }
-    var existing: [ShadowgramEditHistoryEntry] = []
+    var existing = previousEntries
     var result: [MessageAttribute] = []
-    result.reserveCapacity(attributes.count)
+    result.reserveCapacity(attributes.count + 1)
     for attribute in attributes {
-        if let historyAttribute = attribute as? ShadowgramEditHistoryMessageAttribute {
-            existing = historyAttribute.entries
-        } else {
-            result.append(attribute)
+        // Drop any stale history copy in the passed attributes; previousEntries is authoritative.
+        if attribute is ShadowgramEditHistoryMessageAttribute {
+            continue
         }
+        result.append(attribute)
     }
     if existing.last?.text == previousText {
         // Media edit without a text change; nothing new to keep.
