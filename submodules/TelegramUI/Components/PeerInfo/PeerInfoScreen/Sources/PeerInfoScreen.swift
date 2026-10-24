@@ -2462,6 +2462,12 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
                 self.context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, context: self.context, chatLocation: .peer(peer)))
             }
 
+            self.headerNode.shadowgramDisplayBlockedAlert = { [weak self] in
+                guard let self else { return }
+                let sg = ShadowgramStrings(lang: self.presentationData.strings.baseLanguageCode)
+                self.controller?.present(textAlertController(context: self.context, updatedPresentationData: self.controller?.updatedPresentationData, title: sg.blockedMeAlertTitle, text: sg.blockedMeAlertText, actions: [TextAlertAction(type: .defaultAction, title: self.presentationData.strings.Common_OK, action: {})]), in: .window(.root))
+            }
+
             if [Namespaces.Peer.CloudGroup, Namespaces.Peer.CloudChannel].contains(peerId.namespace) {
                 self.displayAsPeersPromise.set(context.engine.calls.cachedGroupCallDisplayAsAvailablePeers(peerId: peerId))
             }

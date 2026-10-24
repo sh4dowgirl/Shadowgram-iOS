@@ -31,6 +31,7 @@ import MultilineTextWithEntitiesComponent
 import ShimmerEffect
 import GlassBackgroundComponent
 import ShadowgramSettings
+import ShadowgramUI
 
 public enum ChatListItemContent {
     public final class ThreadInfo: Equatable {
@@ -3333,11 +3334,14 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                                 } else {
                                     textColor = theme.titleColor
                                 }
-                                var displayTitle = displayTitle
                                 if case let .peer(shadowgramPeerData) = item.content, shadowgramLooksLikeBlockedMe(peer: itemPeer.chatMainPeer, presence: shadowgramPeerData.presence, accountPeerId: item.context.account.peerId) {
-                                    displayTitle = shadowgramBlockedMeMarker + displayTitle
+                                    let mutable = NSMutableAttributedString()
+                                    mutable.append(shadowgramBlockedIconAttachment(font: titleFont))
+                                    mutable.append(NSAttributedString(string: displayTitle, font: titleFont, textColor: textColor))
+                                    titleAttributedString = mutable
+                                } else {
+                                    titleAttributedString = NSAttributedString(string: displayTitle, font: titleFont, textColor: textColor)
                                 }
-                                titleAttributedString = NSAttributedString(string: displayTitle, font: titleFont, textColor: textColor)
                                 
                                 if case let .channel(channel) = itemPeer.peer, channel.flags.contains(.isMonoforum) {
                                     titleBadgeText = item.presentationData.strings.ChatList_MonoforumLabel

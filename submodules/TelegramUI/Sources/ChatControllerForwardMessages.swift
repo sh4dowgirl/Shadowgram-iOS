@@ -13,6 +13,7 @@ import PremiumUI
 import ReactionSelectionNode
 import TopMessageReactions
 import ChatMessagePaymentAlertController
+import ShadowgramSettings
 
 extension ChatControllerImpl {
     func forwardMessages(messageIds: [EngineMessage.Id], options: ChatInterfaceForwardOptionsState? = nil, resetCurrent: Bool = false) {
@@ -158,8 +159,16 @@ extension ChatControllerImpl {
                         
                         var attributes: [EngineMessage.Attribute] = []
                         attributes.append(ForwardOptionsMessageAttribute(hideNames: forwardOptions?.hideNames == true, hideCaptions: forwardOptions?.hideCaptions == true))
-                        
+
+                        let shadowgramSendAsCopy = ShadowgramSettings.shared.values.bypassCopyProtection && messages.contains(where: { msg in
+                            msg.peers[msg.id.peerId]?.isCopyProtectionEnabled == true
+                        })
+
                         result.append(contentsOf: messages.map { message -> EnqueueMessage in
+                            if shadowgramSendAsCopy {
+                                let mediaRef = message.media.first.flatMap { AnyMediaReference.standalone(media: $0) }
+                                return .message(text: message.text, attributes: [], inlineStickers: [:], mediaReference: mediaRef, threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: [])
+                            }
                             return .forward(source: message.id, threadId: nil, grouping: .auto, attributes: attributes, correlationId: nil)
                         })
                         
@@ -395,9 +404,16 @@ extension ChatControllerImpl {
                     }
                     
                     var correlationIds: [Int64] = []
+                    let shadowgramSendAsCopySelf = ShadowgramSettings.shared.values.bypassCopyProtection && messages.contains(where: { msg in
+                        msg.peers[msg.id.peerId]?.isCopyProtectionEnabled == true
+                    })
                     let mappedMessages = messages.map { message -> EnqueueMessage in
                         let correlationId = Int64.random(in: Int64.min ... Int64.max)
                         correlationIds.append(correlationId)
+                        if shadowgramSendAsCopySelf {
+                            let mediaRef = message.media.first.flatMap { AnyMediaReference.standalone(media: $0) }
+                            return .message(text: message.text, attributes: [], inlineStickers: [:], mediaReference: mediaRef, threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: correlationId, bubbleUpEmojiOrStickersets: [])
+                        }
                         return .forward(source: message.id, threadId: nil, grouping: .auto, attributes: [], correlationId: correlationId)
                     }
                     

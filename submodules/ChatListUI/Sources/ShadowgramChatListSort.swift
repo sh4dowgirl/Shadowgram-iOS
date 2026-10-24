@@ -52,8 +52,8 @@ func shadowgramOldestFirstChatListUpdate(_ update: ChatListNodeViewUpdate) -> Ch
             read.append(item)
         }
     }
-    unread.sort(by: { $0.index > $1.index })
-    read.sort(by: { $0.index < $1.index })
+    unread.sort(by: { $0.index < $1.index })
+    read.sort(by: { $0.index > $1.index })
 
     var items = fixed
     for (rank, item) in (unread + read).enumerated() {

@@ -22,6 +22,7 @@ import MultiAnimationRenderer
 import ComponentDisplayAdapters
 import GlassBackgroundComponent
 import AnimatedTextComponent
+import ShadowgramUI
 
 private let titleFont = Font.with(size: 17.0, design: .regular, weight: .semibold, traits: [.monospacedNumbers])
 private let subtitleFont = Font.regular(13.0)
@@ -320,6 +321,16 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
                                     if let verificationIconFileId = peer.verificationIconFileId {
                                         titleVerifiedIcon = .emojiStatus(PeerEmojiStatus(content: .emoji(fileId: verificationIconFileId), expirationDate: nil))
                                     }
+                                }
+                            }
+                            if let peer = peerView.peer {
+                                var isLongTimeAgo = false
+                                if let presence = peerView.peerPresences[peerView.peerId], case .longTimeAgo = EnginePeer.Presence(presence).status {
+                                    isLongTimeAgo = true
+                                }
+                                if shadowgramLooksLikeBlockedMe(peer: EnginePeer(peer), isLongTimeAgo: isLongTimeAgo, accountPeerId: self.context.account.peerId) {
+                                    let icon = shadowgramBlockedIconAttachment(font: titleFont)
+                                    segments.insert(.text(100, icon), at: 0)
                                 }
                             }
                             if peerView.peerId.namespace == Namespaces.Peer.SecretChat {

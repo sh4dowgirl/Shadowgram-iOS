@@ -77,6 +77,46 @@ public let shadowgramExtraSettingsIcon: UIImage = {
     }
 }()
 
+/// A small red no-entry circle for the "likely blocked" marker. Drawn as a filled red circle
+/// with a white horizontal bar, sized to sit inline with the peer name.
+public func shadowgramBlockedIcon(height: CGFloat) -> UIImage {
+    let size = CGSize(width: height, height: height)
+    let renderer = UIGraphicsImageRenderer(size: size)
+    return renderer.image { rendererContext in
+        let context = rendererContext.cgContext
+        let inset: CGFloat = 0.5
+        let rect = CGRect(x: inset, y: inset, width: size.width - inset * 2.0, height: size.height - inset * 2.0)
+        let radius = rect.width / 2.0
+
+        context.setFillColor(UIColor(red: 0.9, green: 0.22, blue: 0.21, alpha: 1.0).cgColor)
+        context.fillEllipse(in: rect)
+
+        let barHeight = max(1.5, rect.height * 0.18)
+        let barInset = rect.width * 0.2
+        let barRect = CGRect(x: rect.minX + barInset, y: rect.midY - barHeight / 2.0, width: rect.width - barInset * 2.0, height: barHeight)
+        context.setFillColor(UIColor.white.cgColor)
+        let angle: CGFloat = -CGFloat.pi / 4.0
+        context.saveGState()
+        context.translateBy(x: rect.midX, y: rect.midY)
+        context.rotate(by: angle)
+        context.fill(CGRect(x: -barRect.width / 2.0, y: -barHeight / 2.0, width: barRect.width, height: barHeight))
+        context.restoreGState()
+    }
+}
+
+/// Returns an `NSAttributedString` containing just the blocked icon as an inline image attachment,
+/// sized to match the given font, with a trailing space.
+public func shadowgramBlockedIconAttachment(font: UIFont) -> NSAttributedString {
+    let height = round(font.capHeight * 0.85)
+    let image = shadowgramBlockedIcon(height: height)
+    let attachment = NSTextAttachment()
+    attachment.image = image
+    attachment.bounds = CGRect(x: 0.0, y: (font.capHeight - height) / 2.0 - 1.0, width: height, height: height)
+    let result = NSMutableAttributedString(attachment: attachment)
+    result.append(NSAttributedString(string: " "))
+    return result
+}
+
 /// The ⏻ power glyph (an open ring with a bar through the gap), drawn here because the system font has
 /// no reliable glyph for U+23FB. Template-tinted by the caller.
 public func shadowgramPowerIcon(color: UIColor) -> UIImage {

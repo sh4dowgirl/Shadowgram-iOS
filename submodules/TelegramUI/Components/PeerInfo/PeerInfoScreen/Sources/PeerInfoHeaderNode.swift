@@ -45,6 +45,7 @@ import BundleIconComponent
 import MarqueeComponent
 import EdgeEffect
 import ShadowgramCapture
+import ShadowgramUI
 
 final class PeerInfoHeaderRegularContentNode: SparseNode {
 }
@@ -120,6 +121,9 @@ final class PeerInfoHeaderNode: ASDisplayNode {
     let titleExpandedStatusIconView: ComponentHostView<Empty>
     var titleExpandedStatusIconSize: CGSize?
     
+    let shadowgramBlockedIconView: UIImageView
+    let shadowgramBlockedExpandedIconView: UIImageView
+
     var subtitleRating: ComponentView<Empty>?
     
     let subtitleNodeContainer: ASDisplayNode
@@ -236,6 +240,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
     var openUniqueGift: ((UIView, String) -> Void)?
     
     var navigateToForum: (() -> Void)?
+    var shadowgramDisplayBlockedAlert: (() -> Void)?
     
     var backgroundAlpha: CGFloat = 1.0
     var updateHeaderAlpha: ((CGFloat, ContainedViewLayoutTransition) -> Void)?
@@ -304,7 +309,21 @@ final class PeerInfoHeaderNode: ASDisplayNode {
         
         self.titleExpandedStatusIconView = ComponentHostView<Empty>()
         self.titleNode.stateNode(forKey: TitleNodeStateExpanded)?.view.addSubview(self.titleExpandedStatusIconView)
-        
+
+        self.shadowgramBlockedIconView = UIImageView()
+        self.shadowgramBlockedIconView.contentMode = .scaleAspectFit
+        self.shadowgramBlockedIconView.isHidden = true
+        self.shadowgramBlockedIconView.isUserInteractionEnabled = true
+        self.shadowgramBlockedIconView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.shadowgramBlockedIconTapped)))
+        self.titleNode.stateNode(forKey: TitleNodeStateRegular)?.view.addSubview(self.shadowgramBlockedIconView)
+
+        self.shadowgramBlockedExpandedIconView = UIImageView()
+        self.shadowgramBlockedExpandedIconView.contentMode = .scaleAspectFit
+        self.shadowgramBlockedExpandedIconView.isHidden = true
+        self.shadowgramBlockedExpandedIconView.isUserInteractionEnabled = true
+        self.shadowgramBlockedExpandedIconView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.shadowgramBlockedIconTapped)))
+        self.titleNode.stateNode(forKey: TitleNodeStateExpanded)?.view.addSubview(self.shadowgramBlockedExpandedIconView)
+
         self.subtitleNodeContainer = ASDisplayNode()
         self.subtitleNodeRawContainer = ASDisplayNode()
         self.subtitleNode = MultiScaleTextNode(stateKeys: [TitleNodeStateRegular, TitleNodeStateExpanded])
@@ -461,6 +480,10 @@ final class PeerInfoHeaderNode: ASDisplayNode {
     
     @objc private func subtitleBackgroundPressed() {
         self.navigateToForum?()
+    }
+
+    @objc private func shadowgramBlockedIconTapped() {
+        self.shadowgramDisplayBlockedAlert?()
     }
     
     func invokeDisplayPremiumIntro() {
@@ -1271,8 +1294,13 @@ final class PeerInfoHeaderNode: ASDisplayNode {
                 }
             }
 
-            if !self.isSettings, !self.isMyProfile, shadowgramLooksLikeBlockedMe(peer: peer, isLongTimeAgo: statusData?.isLongTimeAgo ?? false, accountPeerId: self.context.account.peerId) {
-                title = shadowgramBlockedMeMarker + title
+            let shadowgramIsBlocked = !self.isSettings && !self.isMyProfile && shadowgramLooksLikeBlockedMe(peer: peer, isLongTimeAgo: statusData?.isLongTimeAgo ?? false, accountPeerId: self.context.account.peerId)
+            self.shadowgramBlockedIconView.isHidden = !shadowgramIsBlocked
+            self.shadowgramBlockedExpandedIconView.isHidden = !shadowgramIsBlocked
+            if shadowgramIsBlocked {
+                let iconImage = shadowgramBlockedIcon(height: 20.0)
+                self.shadowgramBlockedIconView.image = iconImage
+                self.shadowgramBlockedExpandedIconView.image = iconImage
             }
             titleStringText = title
             titleAttributes = MultiScaleTextState.Attributes(font: Font.medium(28.0), color: .white)
@@ -1732,11 +1760,21 @@ final class PeerInfoHeaderNode: ASDisplayNode {
             }
         }
         
+        if !self.shadowgramBlockedIconView.isHidden {
+            let iconSize = CGSize(width: 20.0, height: 20.0)
+            titleHorizontalOffset += (iconSize.width + 4.0) / 2.0
+            titleExpandedHorizontalOffset += iconSize.width - 2.0
+            let leftOffset = -iconSize.width - 4.0
+            let leftExpandedOffset = -iconSize.width - 4.0
+            transition.updateFrame(view: self.shadowgramBlockedIconView, frame: CGRect(origin: CGPoint(x: leftOffset, y: floor((titleSize.height - iconSize.height) / 2.0)), size: iconSize))
+            transition.updateFrame(view: self.shadowgramBlockedExpandedIconView, frame: CGRect(origin: CGPoint(x: leftExpandedOffset, y: floor((titleExpandedSize.height - iconSize.height) / 2.0) + 1.0), size: iconSize))
+        }
+
         var titleFrame: CGRect
         var subtitleFrame: CGRect
         let usernameFrame: CGRect
         let usernameSpacing: CGFloat = 4.0
-        
+
         let expandedTitleScale: CGFloat = 0.8
         
         var bottomShadowHeight: CGFloat = 88.0

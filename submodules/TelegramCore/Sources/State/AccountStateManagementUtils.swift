@@ -4686,16 +4686,13 @@ func replayFinalState(
                     
                     var mergedMessage = mergedServerMessageUpdate(previous: previousMessage, updated: message)
                     
-                    // Shadowgram: keep the previous version of the message's text, so the whole
-                    // edit history can be opened later. Previous versions that this client has
-                    // kept are already in `previousMessage.attributes` and are preserved by the
-                    // helper. The check against the new text means a pure media or reaction edit
-                    // does not add a bogus duplicate entry.
+                    // Shadowgram: carry the stored edit history into the merged message first —
+                    // the server update never includes our client-only attribute.
+                    if let existingHistory = previousMessage.attributes.first(where: { $0 is ShadowgramEditHistoryMessageAttribute }) {
+                        mergedMessage = mergedMessage.withUpdatedAttributes(mergedMessage.attributes + [existingHistory])
+                    }
                     if previousMessage.text != message.text {
                         mergedMessage = mergedMessage.withUpdatedAttributes(shadowgramAppendEditHistory(previousText: previousMessage.text, previousDate: previousMessage.editedTime ?? previousMessage.timestamp, attributes: mergedMessage.attributes))
-                    } else if let kept = previousMessage.attributes.first(where: { $0 is ShadowgramEditHistoryMessageAttribute }) {
-                        // Carry the history forward unchanged for media-only edits.
-                        mergedMessage = mergedMessage.withUpdatedAttributes(mergedMessage.attributes + [kept])
                     }
 
                     if let message = locallyRenderedMessage(message: message, peers: peers) {

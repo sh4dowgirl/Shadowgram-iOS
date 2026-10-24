@@ -186,6 +186,9 @@ extension ShadowgramStrings {
     public var autoReactionInGroups: String { return t("В группах", "In Groups") }
     public var autoReactionInGroupsFooter: String { return t("Если включено, реакция ставится на сообщения выбранных пользователей и в группах (где такая реакция разрешена). Если выключено — только в личных чатах.", "When on, the reaction is also put on messages from the chosen users in groups (where that reaction is allowed). When off, only in private chats.") }
 
+    public var blockedMeAlertTitle: String { return t("Возможно, вы заблокированы", "Possibly Blocked") }
+    public var blockedMeAlertText: String { return t("У этого пользователя нет фото и он был в сети «давно». Это совпадает с тем, как выглядит заблокировавший вас контакт, но также бывает у неактивных аккаунтов.", "This user has no photo and was last seen \"a long time ago\". This matches how a contact who blocked you looks, but it can also be an inactive account.") }
+
     public var ghostModeToggleAll: String { return t("Переключить все", "Toggle All") }
     public var sendReadReceiptsInfo: String { return t("Собеседник не увидит, что вы прочитали его сообщения. Чат отмечается прочитанным только на этом устройстве.", "Others won't see that you read their messages. The chat is marked read on this device only.") }
     public var sendTypingInfo: String { return t("Собеседник не увидит, что вы печатаете, записываете голосовое или выбираете файл.", "Others won't see that you are typing, recording a voice message or choosing a file.") }
