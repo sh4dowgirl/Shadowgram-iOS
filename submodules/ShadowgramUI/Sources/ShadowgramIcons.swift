@@ -86,8 +86,6 @@ public func shadowgramBlockedIcon(height: CGFloat) -> UIImage {
         let context = rendererContext.cgContext
         let inset: CGFloat = 0.5
         let rect = CGRect(x: inset, y: inset, width: size.width - inset * 2.0, height: size.height - inset * 2.0)
-        let radius = rect.width / 2.0
-
         context.setFillColor(UIColor(red: 0.9, green: 0.22, blue: 0.21, alpha: 1.0).cgColor)
         context.fillEllipse(in: rect)
 
