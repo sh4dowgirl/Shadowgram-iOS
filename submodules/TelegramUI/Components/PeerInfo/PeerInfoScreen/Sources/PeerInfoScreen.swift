@@ -2464,7 +2464,7 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
 
             self.headerNode.shadowgramDisplayBlockedAlert = { [weak self] in
                 guard let self else { return }
-                let sg = ShadowgramStrings(lang: self.presentationData.strings.baseLanguageCode)
+                let sg = ShadowgramStrings(languageCode: self.presentationData.strings.primaryComponent.languageCode)
                 self.controller?.present(textAlertController(context: self.context, updatedPresentationData: self.controller?.updatedPresentationData, title: sg.blockedMeAlertTitle, text: sg.blockedMeAlertText, actions: [TextAlertAction(type: .defaultAction, title: self.presentationData.strings.Common_OK, action: {})]), in: .window(.root))
             }
 
