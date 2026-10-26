@@ -314,14 +314,12 @@ final class PeerInfoHeaderNode: ASDisplayNode {
         self.shadowgramBlockedIconView.contentMode = .scaleAspectFit
         self.shadowgramBlockedIconView.isHidden = true
         self.shadowgramBlockedIconView.isUserInteractionEnabled = true
-        self.shadowgramBlockedIconView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.shadowgramBlockedIconTapped)))
         self.titleNode.stateNode(forKey: TitleNodeStateRegular)?.view.addSubview(self.shadowgramBlockedIconView)
 
         self.shadowgramBlockedExpandedIconView = UIImageView()
         self.shadowgramBlockedExpandedIconView.contentMode = .scaleAspectFit
         self.shadowgramBlockedExpandedIconView.isHidden = true
         self.shadowgramBlockedExpandedIconView.isUserInteractionEnabled = true
-        self.shadowgramBlockedExpandedIconView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.shadowgramBlockedIconTapped)))
         self.titleNode.stateNode(forKey: TitleNodeStateExpanded)?.view.addSubview(self.shadowgramBlockedExpandedIconView)
 
         self.subtitleNodeContainer = ASDisplayNode()
@@ -377,6 +375,9 @@ final class PeerInfoHeaderNode: ASDisplayNode {
         self.animationRenderer = context.animationRenderer
         
         super.init()
+
+        self.shadowgramBlockedIconView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.shadowgramBlockedIconTapped)))
+        self.shadowgramBlockedExpandedIconView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.shadowgramBlockedIconTapped)))
                 
         requestUpdateLayoutImpl = { [weak self] in
             self?.requestUpdateLayout?(false)
