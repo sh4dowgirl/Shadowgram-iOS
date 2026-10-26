@@ -26,7 +26,6 @@ swift_library(
         "//submodules/AppBundle:AppBundle",
         "//submodules/LegacyComponents:LegacyComponents",
         "//submodules/ShadowgramSettings:ShadowgramSettings",
-        "//submodules/SettingsUI:SettingsUI",
     ],
     visibility = [
         "//visibility:public",
