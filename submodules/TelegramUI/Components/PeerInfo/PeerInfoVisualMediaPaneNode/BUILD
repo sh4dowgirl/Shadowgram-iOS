@@ -62,6 +62,8 @@ swift_library(
         "//submodules/TelegramUI/Components/PeerInfo/CollectionTabItemComponent",
         "//submodules/TelegramUI/Components/EdgeEffect",
         "//submodules/ShadowgramSettings",
+        "//submodules/LocalizedPeerData",
+        "//submodules/TelegramUI/Components/ItemListDatePickerItem",
         "//submodules/ItemListUI",
         "//submodules/ItemListPeerItem",
         "//submodules/PresentationDataUtils",

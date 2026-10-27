@@ -568,6 +568,7 @@ private final class StarsContextImpl {
     
     private let disposable = MetaDisposable()
     private var updateDisposable: Disposable?
+    private var shadowgramOverrideDisposable: Disposable?
     
     init(account: Account, ton: Bool) {
         assert(Queue.mainQueue().isCurrent())
@@ -589,12 +590,23 @@ private final class StarsContextImpl {
             self.updateState(StarsContext.State(flags: [], balance: balance, subscriptions: state.subscriptions, canLoadMoreSubscriptions: state.canLoadMoreSubscriptions, transactions: state.transactions, canLoadMoreTransactions: state.canLoadMoreTransactions, isLoading: false))
             self.load(force: true)
         })
+        
+        if !ton {
+            self.shadowgramOverrideDisposable = (shadowgramStarsOverrideSignal(peerId: self.peerId)
+            |> deliverOnMainQueue).startStrict(next: { [weak self] _ in
+                guard let self, let state = self._state else {
+                    return
+                }
+                self.updateState(state)
+            })
+        }
     }
     
     deinit {
         assert(Queue.mainQueue().isCurrent())
         self.disposable.dispose()
         self.updateDisposable?.dispose()
+        self.shadowgramOverrideDisposable?.dispose()
     }
     
     private var previousLoadTimestamp: Double?

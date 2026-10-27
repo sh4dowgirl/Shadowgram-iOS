@@ -9,6 +9,37 @@ import PeerInfoVisualMediaPaneNode
 import ShadowgramSettings
 
 extension PeerInfoScreenNode {
+    /// Gift Editing (local only): the gifts pane's "+" button.
+    func shadowgramOpenGiftEditor() {
+        guard let peerId = self.data?.peer?.id, let controller = self.controller else {
+            return
+        }
+        shadowgramPresentGiftEditorScreen(context: self.context, peerId: peerId, present: { c in
+            controller.push(c)
+        })
+    }
+
+    /// Gift Editing: the pencil / Done button. The bar's set depends on the mode, so it is laid out again.
+    func shadowgramToggleGiftEditing() {
+        guard let pane = self.paneContainerNode.currentPane?.node as? PeerInfoGiftsPaneNode else {
+            return
+        }
+        pane.updateIsEditingGifts(isEditingGifts: !pane.isEditingGifts, animated: true)
+        if let (layout, navigationHeight) = self.validLayout {
+            self.containerLayoutUpdated(layout: layout, navigationHeight: navigationHeight, transition: .animated(duration: 0.4, curve: .spring), additive: false)
+        }
+    }
+
+    /// Gift Editing: the restore button, a list of the real gifts hidden on this device.
+    func shadowgramOpenRemovedGifts() {
+        guard let peerId = self.data?.peer?.id, let controller = self.controller else {
+            return
+        }
+        shadowgramPresentRemovedGiftsScreen(context: self.context, peerId: peerId, present: { c in
+            controller.push(c)
+        })
+    }
+
     func displayGiftsContextMenu(source: ContextReferenceContentNode, gesture: ContextGesture?) {
         guard let currentPaneKey = self.paneContainerNode.currentPaneKey, case .gifts = currentPaneKey else {
             return
@@ -55,41 +86,6 @@ extension PeerInfoScreenNode {
         |> map { [weak pane, weak giftsContext, weak self] filter, sorting, canReorder -> ContextController.Items in
             var items: [ContextMenuItem] = []
 
-            // "Gift Editing": purely local, works on any peer's gifts (not gated on
-            // hasVisibility like the server-backed actions below), and never touches the server.
-            if let peerId = data.peer?.id {
-                items.append(.action(ContextMenuActionItem(text: ShadowgramStrings(languageCode: strings.primaryComponent.languageCode).shadowgramGiftEditingAddGift, icon: { theme in
-                    return generateTintedImage(image: UIImage(bundleImageName: "Peer Info/Gifts/AddGift"), color: theme.contextMenu.primaryColor)
-                }, action: { [weak self] _, f in
-                    f(.default)
-                    guard let self, let controller = self.controller else {
-                        return
-                    }
-                    shadowgramPresentGiftEditorScreen(context: self.context, peerId: peerId, present: { c in
-                        controller.push(c)
-                    })
-                })))
-                items.append(.action(ContextMenuActionItem(text: pane?.isEditingGifts == true ? ShadowgramStrings(languageCode: strings.primaryComponent.languageCode).shadowgramGiftEditingDoneEditing : ShadowgramStrings(languageCode: strings.primaryComponent.languageCode).shadowgramGiftEditingEditGifts, icon: { theme in
-                    return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Edit"), color: theme.contextMenu.primaryColor)
-                }, action: { [weak pane] _, f in
-                    f(.default)
-                    if let pane {
-                        pane.updateIsEditingGifts(isEditingGifts: !pane.isEditingGifts, animated: true)
-                    }
-                })))
-                items.append(.action(ContextMenuActionItem(text: ShadowgramStrings(languageCode: strings.primaryComponent.languageCode).shadowgramGiftEditingRemovedGifts, icon: { theme in
-                    return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Unarchive"), color: theme.contextMenu.primaryColor)
-                }, action: { [weak self] _, f in
-                    f(.default)
-                    guard let self, let controller = self.controller else {
-                        return
-                    }
-                    shadowgramPresentRemovedGiftsScreen(context: self.context, peerId: peerId, present: { c in
-                        controller.push(c)
-                    })
-                })))
-                items.append(.separator)
-            }
 
             if hasVisibility {
                 if let pane, case .all = pane.currentCollection {

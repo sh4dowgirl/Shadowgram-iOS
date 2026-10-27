@@ -30,8 +30,21 @@ import ContextUI
 
 /// Plain `UIButton` with a closure instead of target/action - simplest way to wire the red
 /// minus badge without worrying about leftover targets across layout passes.
+private let shadowgramMinusGlyph: UIImage? = generateImage(CGSize(width: 10.0, height: 2.0), rotatedContext: { size, context in
+    context.clear(CGRect(origin: CGPoint(), size: size))
+    context.setFillColor(UIColor.white.cgColor)
+    context.addPath(UIBezierPath(roundedRect: CGRect(origin: CGPoint(), size: size), cornerRadius: 1.0).cgPath)
+    context.fillPath()
+})
+
 private final class ShadowgramClosureButton: UIButton {
     var pressed: (() -> Void)?
+    /// Extra tappable margin around the small badge.
+    var hitTestSlop: CGFloat = 0.0
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        return self.bounds.insetBy(dx: -self.hitTestSlop, dy: -self.hitTestSlop).contains(point)
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -131,6 +144,8 @@ final class GiftsListView: UIView {
     private var isEditingGifts: Bool = false
     private var shadowgramEditOverlays: [AnyHashable: (dot: UIView, minusButton: ShadowgramClosureButton)] = [:]
     var shadowgramRemoveGift: ((ProfileGiftsContext.State.StarGift) -> Void)?
+    /// Set by a minus press: the next state update (the gift leaving) animates like a reorder.
+    private var shadowgramPendingAnimatedUpdate = false
     private var reorderingItem: (id: AnyHashable, initialPosition: CGPoint, position: CGPoint)?
     private var reorderedReferences: [StarGiftReference]? {
         didSet {
@@ -225,7 +240,16 @@ final class GiftsListView: UIView {
                 self.ready.set(.single(true))
             }
             
-            let _ = self.updateScrolling(transition: isFirstTime ? .immediate : .easeInOut(duration: 0.25))
+            let transition: ComponentTransition
+            if isFirstTime {
+                transition = .immediate
+            } else if self.shadowgramPendingAnimatedUpdate {
+                transition = .spring(duration: 0.4)
+            } else {
+                transition = .easeInOut(duration: 0.25)
+            }
+            self.shadowgramPendingAnimatedUpdate = false
+            let _ = self.updateScrolling(transition: transition)
             
             Queue.mainQueue().justDispatch {
                 self.onContentUpdated()
@@ -317,7 +341,7 @@ final class GiftsListView: UIView {
                 if let collectionId = self.profileGifts.collectionId {
                     var orderedReferences: [StarGiftReference] = []
                     for gift in starsProducts {
-                        if let reference = gift.reference {
+                        if let reference = gift.reference, !shadowgramIsLocalGift(reference: reference) {
                             orderedReferences.append(reference)
                         }
                     }
@@ -325,7 +349,7 @@ final class GiftsListView: UIView {
                 } else {
                     var pinnedReferences: [StarGiftReference] = []
                     for gift in starsProducts.prefix(self.maxPinnedCount) {
-                        if gift.pinnedToTop, let reference = gift.reference {
+                        if gift.pinnedToTop, let reference = gift.reference, !shadowgramIsLocalGift(reference: reference) {
                             pinnedReferences.append(reference)
                         }
                     }
@@ -593,10 +617,14 @@ final class GiftsListView: UIView {
                             isEditing: self.isReordering && !self.isCollection,
                             mode: self.canSelect && !isAdded ? .select : .profile,
                             action: { [weak self] in
-                                guard let self, !isAdded, let presentationData = self.currentParams?.presentationData else {
+                                guard let self, !isAdded, !self.isEditingGifts, let presentationData = self.currentParams?.presentationData else {
                                     return
                                 }
                                 if self.canSelect {
+                                    // A gift added on this device does not exist on the server, so it cannot go into a collection.
+                                    if shadowgramGiftIsLocallyAdded(product) {
+                                        return
+                                    }
                                     if self.selectedItemIds.contains(itemReferenceId) {
                                         self.selectedItemIds.remove(itemReferenceId)
                                     } else {
@@ -648,30 +676,33 @@ final class GiftsListView: UIView {
                                         index: index,
                                         profileGiftsContext: self.profileGifts,
                                         updateSavedToProfile: { [weak self] reference, added in
-                                            guard let self else {
+                                            guard let self, !shadowgramIsLocalGift(reference: reference) else {
                                                 return
                                             }
                                             self.profileGifts.updateStarGiftAddedToProfile(reference: reference, added: added)
                                         },
                                         convertToStars: { [weak self] reference in
-                                            guard let self else {
+                                            guard let self, !shadowgramIsLocalGift(reference: reference) else {
                                                 return
                                             }
                                             self.profileGifts.convertStarGift(reference: reference)
                                         },
                                         dropOriginalDetails: { [weak self] reference in
-                                            guard let self else {
+                                            guard let self, !shadowgramIsLocalGift(reference: reference) else {
                                                 return .complete()
                                             }
                                             return self.profileGifts.dropOriginalDetails(reference: reference)
                                         },
                                         transferGift: { [weak self] prepaid, reference, peerId in
-                                            guard let self else {
+                                            guard let self, !shadowgramIsLocalGift(reference: reference) else {
                                                 return .complete()
                                             }
                                             return self.profileGifts.transferStarGift(prepaid: prepaid, reference: reference, peerId: peerId)
                                         },
                                         upgradeGift: { [weak self] formId, reference, keepOriginalInfo in
+                                            if shadowgramIsLocalGift(reference: reference) {
+                                                return .complete()
+                                            }
                                             guard let self else {
                                                 return .never()
                                             }
@@ -684,13 +715,16 @@ final class GiftsListView: UIView {
                                             return self.profileGifts.buyStarGift(slug: slug, peerId: peerId, price: price, hideName: hideName, text: text, entities: entities)
                                         },
                                         updateResellStars: { [weak self] reference, price in
+                                            if shadowgramIsLocalGift(reference: reference) {
+                                                return .complete()
+                                            }
                                             guard let self else {
                                                 return .never()
                                             }
                                             return self.profileGifts.updateStarGiftResellPrice(reference: reference, price: price)
                                         },
                                         togglePinnedToTop: { [weak self] reference, pinnedToTop in
-                                            guard let self else {
+                                            guard let self, !shadowgramIsLocalGift(reference: reference) else {
                                                 return false
                                             }
                                             if pinnedToTop && self.pinnedReferences.count >= self.maxPinnedCount {
@@ -731,7 +765,7 @@ final class GiftsListView: UIView {
                                     self.parentController?.push(controller)
                                 }
                             },
-                            contextAction: self.isReordering || self.canSelect || self.isEditingGifts ? nil : { [weak self] view, gesture in
+                            contextAction: self.isReordering || self.canSelect || self.isEditingGifts || shadowgramGiftIsLocallyAdded(product) ? nil : { [weak self] view, gesture in
                                 guard let self else {
                                     return
                                 }
@@ -779,16 +813,21 @@ final class GiftsListView: UIView {
                     }
 
                     if self.isEditingGifts {
-                        itemView.isUserInteractionEnabled = false
                         if itemView.layer.animation(forKey: "shaking_position") == nil {
                             itemView.layer.addReorderingShaking()
                         }
 
+                        // Inside the item's view, so they shake with it.
                         let overlay: (dot: UIView, minusButton: ShadowgramClosureButton)
-                        if let current = self.shadowgramEditOverlays[itemId] {
+                        if let current = self.shadowgramEditOverlays[itemId], current.minusButton.superview === itemView {
                             overlay = current
                         } else {
+                            if let current = self.shadowgramEditOverlays[itemId] {
+                                current.dot.removeFromSuperview()
+                                current.minusButton.removeFromSuperview()
+                            }
                             let dot = UIView()
+                            dot.isUserInteractionEnabled = false
                             dot.layer.cornerRadius = 6.0
                             dot.layer.borderWidth = 1.5
                             dot.layer.borderColor = UIColor.white.cgColor
@@ -796,7 +835,7 @@ final class GiftsListView: UIView {
                             dot.layer.shadowOpacity = 0.3
                             dot.layer.shadowRadius = 2.0
                             dot.layer.shadowOffset = CGSize(width: 0.0, height: 1.0)
-                            self.addSubview(dot)
+                            itemView.addSubview(dot)
                             dot.layer.animateScale(from: 0.01, to: 1.0, duration: 0.2)
                             dot.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
 
@@ -805,13 +844,9 @@ final class GiftsListView: UIView {
                             minusButton.layer.cornerRadius = 11.0
                             minusButton.layer.borderWidth = 1.5
                             minusButton.layer.borderColor = UIColor.white.cgColor
-                            minusButton.setTitle("–", for: .normal)
-                            minusButton.titleLabel?.font = Font.bold(18.0)
-                            minusButton.setTitleColor(.white, for: .normal)
-                            if let titleLabel = minusButton.titleLabel {
-                                titleLabel.transform = CGAffineTransform(translationX: 0.0, y: -2.0)
-                            }
-                            self.addSubview(minusButton)
+                            minusButton.setImage(shadowgramMinusGlyph, for: .normal)
+                            minusButton.hitTestSlop = 10.0
+                            itemView.addSubview(minusButton)
                             minusButton.layer.animateScale(from: 0.01, to: 1.0, duration: 0.2)
                             minusButton.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
 
@@ -820,13 +855,18 @@ final class GiftsListView: UIView {
                         }
 
                         overlay.dot.backgroundColor = shadowgramGiftIsLocallyAdded(product) ? UIColor(red: 1.0, green: 0.78, blue: 0.0, alpha: 1.0) : UIColor(red: 0.3, green: 0.85, blue: 0.4, alpha: 1.0)
-                        overlay.dot.frame = CGRect(origin: CGPoint(x: itemFrame.minX + 6.0, y: itemFrame.minY + 6.0), size: CGSize(width: 12.0, height: 12.0))
-                        overlay.minusButton.frame = CGRect(origin: CGPoint(x: itemFrame.maxX - 22.0 - 6.0, y: itemFrame.minY + 6.0), size: CGSize(width: 22.0, height: 22.0))
+                        overlay.dot.frame = CGRect(origin: CGPoint(x: 8.0, y: itemFrame.height - 12.0 - 8.0), size: CGSize(width: 12.0, height: 12.0))
+                        overlay.minusButton.frame = CGRect(origin: CGPoint(x: 6.0, y: 6.0), size: CGSize(width: 22.0, height: 22.0))
+                        itemView.bringSubviewToFront(overlay.dot)
+                        itemView.bringSubviewToFront(overlay.minusButton)
                         overlay.minusButton.pressed = { [weak self] in
-                            self?.shadowgramRemoveGift?(product)
+                            guard let self else {
+                                return
+                            }
+                            self.shadowgramPendingAnimatedUpdate = true
+                            self.shadowgramRemoveGift?(product)
                         }
                     } else {
-                        itemView.isUserInteractionEnabled = true
                         if let overlay = self.shadowgramEditOverlays.removeValue(forKey: itemId) {
                             overlay.dot.removeFromSuperview()
                             overlay.minusButton.removeFromSuperview()
@@ -860,10 +900,8 @@ final class GiftsListView: UIView {
         }
         for id in removeIds {
             self.starsItems.removeValue(forKey: id)
-            if let overlay = self.shadowgramEditOverlays.removeValue(forKey: id) {
-                overlay.dot.removeFromSuperview()
-                overlay.minusButton.removeFromSuperview()
-            }
+            // The badges are inside the item's view and leave with its own animation.
+            self.shadowgramEditOverlays.removeValue(forKey: id)
         }
         
         var contentHeight = ceil(CGFloat(starsProducts.count) / CGFloat(defaultItemsInRow)) * (starsOptionSize.height + optionSpacing) - optionSpacing + topInset + 16.0

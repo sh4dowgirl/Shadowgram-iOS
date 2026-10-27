@@ -1969,6 +1969,8 @@ private final class ProfileGiftsContextImpl {
     private let cacheDisposable = MetaDisposable()
     private let actionDisposable = MetaDisposable()
     private let shadowgramOverrideDisposable = MetaDisposable()
+    private let shadowgramPeersDisposable = MetaDisposable()
+    private var shadowgramPeers: [EnginePeer.Id: EnginePeer] = [:]
 
     private var sorting: ProfileGiftsContext.Sorting
     private var filter: ProfileGiftsContext.Filters
@@ -2011,9 +2013,12 @@ private final class ProfileGiftsContextImpl {
 
         // "Gift Editing" is local-only and never touches the network, so the usual loadMore/
         // reload path never runs for it - re-push whenever the local overlay changes instead.
-        self.shadowgramOverrideDisposable.set((ShadowgramGiftOverrides.shared.changeSignal
-        |> deliverOn(queue)).start(next: { [weak self] in
-            self?.pushState()
+        self.shadowgramOverrideDisposable.set((combineLatest(
+            ShadowgramGiftOverrides.shared.changeSignal,
+            ShadowgramSettings.shared.valuesSignal |> map { $0.giftEditingEnabled } |> distinctUntilChanged
+        )
+        |> deliverOn(queue)).start(next: { [weak self] _ in
+            self?.shadowgramRefreshOverlay()
         }))
     }
 
@@ -2022,6 +2027,7 @@ private final class ProfileGiftsContextImpl {
         self.cacheDisposable.dispose()
         self.actionDisposable.dispose()
         self.shadowgramOverrideDisposable.dispose()
+        self.shadowgramPeersDisposable.dispose()
     }
     
     func reload() {
@@ -2779,8 +2785,9 @@ private final class ProfileGiftsContextImpl {
         // "Gift Editing": a local-only, per-device overlay - fake gifts added on top, real ones
         // hidden - applied here, the one place this context's list gets published, so it stays
         // in effect across every reload/filter/sort change without needing its own cache logic.
-        let overlaidAllGifts = shadowgramOverlayGifts(peerId: self.peerId, base: self.gifts)
-        let overlaidFilteredGifts = shadowgramOverlayGifts(peerId: self.peerId, base: effectiveGifts)
+        // A collection lists only what was put into it, so added gifts appear in the main grid only.
+        let overlaidAllGifts = shadowgramOverlayGifts(peerId: self.peerId, base: self.gifts, includeAdded: self.collectionId == nil, peers: self.shadowgramPeers)
+        let overlaidFilteredGifts = shadowgramOverlayGifts(peerId: self.peerId, base: effectiveGifts, includeAdded: self.collectionId == nil, peers: self.shadowgramPeers)
         let countDelta = Int32(overlaidFilteredGifts.count - effectiveGifts.count)
 
         let state = ProfileGiftsContext.State(
@@ -2794,6 +2801,78 @@ private final class ProfileGiftsContextImpl {
         )
         self._state = state
         self.stateValue.set(.single(state))
+    }
+
+    /// Re-publishes with the local overlay, first loading the senders of added gifts: a stored gift
+    /// keeps only its sender's id, so the peer is looked up here before the grid shows it.
+    private func shadowgramRefreshOverlay() {
+        let senderIds = shadowgramAddedGiftSenderIds(peerId: self.peerId).filter { self.shadowgramPeers[$0] == nil }
+        if senderIds.isEmpty {
+            self.pushState()
+            return
+        }
+        self.shadowgramPeersDisposable.set((self.account.postbox.transaction { transaction -> [EnginePeer.Id: EnginePeer] in
+            var peers: [EnginePeer.Id: EnginePeer] = [:]
+            for id in senderIds {
+                if let peer = transaction.getPeer(id) {
+                    peers[id] = EnginePeer(peer)
+                }
+            }
+            return peers
+        }
+        |> deliverOn(self.queue)).start(next: { [weak self] peers in
+            guard let self else {
+                return
+            }
+            self.shadowgramPeers.merge(peers, uniquingKeysWith: { _, rhs in rhs })
+            self.pushState()
+        }))
+    }
+}
+
+extension ProfileGiftsContext.State.StarGift {
+    /// The sender's id, also when the peer itself was not decoded (a stored gift keeps only the id).
+    var shadowgramFromPeerId: EnginePeer.Id? {
+        return self.fromPeer?.id ?? self._fromPeerId
+    }
+
+    /// This gift with another reference and, when given, the sender filled in.
+    func shadowgramWith(reference: StarGiftReference?, fromPeer: EnginePeer?) -> ProfileGiftsContext.State.StarGift {
+        var result = ProfileGiftsContext.State.StarGift(
+            gift: self.gift,
+            reference: reference,
+            fromPeer: fromPeer ?? self.fromPeer,
+            date: self.date,
+            text: self.text,
+            entities: self.entities,
+            nameHidden: self.nameHidden,
+            savedToProfile: self.savedToProfile,
+            pinnedToTop: self.pinnedToTop,
+            convertStars: self.convertStars,
+            canUpgrade: self.canUpgrade,
+            canExportDate: self.canExportDate,
+            upgradeStars: self.upgradeStars,
+            transferStars: self.transferStars,
+            canTransferDate: self.canTransferDate,
+            canResaleDate: self.canResaleDate,
+            collectionIds: self.collectionIds,
+            prepaidUpgradeHash: self.prepaidUpgradeHash,
+            upgradeSeparate: self.upgradeSeparate,
+            dropOriginalDetailsStars: self.dropOriginalDetailsStars,
+            number: self.number,
+            isRefunded: self.isRefunded,
+            canCraftAt: self.canCraftAt
+        )
+        if result.fromPeer == nil {
+            result = result.shadowgramKeepingFromPeerId(self._fromPeerId)
+        }
+        return result
+    }
+
+    private func shadowgramKeepingFromPeerId(_ fromPeerId: EnginePeer.Id?) -> ProfileGiftsContext.State.StarGift {
+        var copy = self
+        copy._fromPeerId = fromPeerId
+        return copy
     }
 }
 
@@ -2877,7 +2956,7 @@ public final class ProfileGiftsContext {
             public let isRefunded: Bool
             public let canCraftAt: Int32?
             
-            fileprivate let _fromPeerId: EnginePeer.Id?
+            fileprivate var _fromPeerId: EnginePeer.Id?
             
             public enum DecodingError: Error {
                 case generic

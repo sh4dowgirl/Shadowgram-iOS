@@ -19,8 +19,16 @@ public struct PeerInfoNavigationItemResources: Equatable {
     public var moreLabel: String
     public var ghostImage: UIImage?
     public var ghostLabel: String
+    public var giftAddImage: UIImage?
+    public var giftAddLabel: String
+    public var giftEditImage: UIImage?
+    public var giftEditLabel: String
+    public var giftEditDoneImage: UIImage?
+    public var giftEditDoneLabel: String
+    public var giftRemovedImage: UIImage?
+    public var giftRemovedLabel: String
 
-    public init(edit: String, cancel: String, done: String, qrCodeImage: UIImage?, qrCodeLabel: String, postStoryImage: UIImage?, postStoryLabel: String, standaloneSearchImage: UIImage?, searchWithTagsImage: UIImage?, searchLabel: String, moreLabel: String, ghostImage: UIImage? = nil, ghostLabel: String = "") {
+    public init(edit: String, cancel: String, done: String, qrCodeImage: UIImage?, qrCodeLabel: String, postStoryImage: UIImage?, postStoryLabel: String, standaloneSearchImage: UIImage?, searchWithTagsImage: UIImage?, searchLabel: String, moreLabel: String, ghostImage: UIImage? = nil, ghostLabel: String = "", giftAddImage: UIImage? = nil, giftAddLabel: String = "", giftEditImage: UIImage? = nil, giftEditLabel: String = "", giftEditDoneImage: UIImage? = nil, giftEditDoneLabel: String = "", giftRemovedImage: UIImage? = nil, giftRemovedLabel: String = "") {
         self.edit = edit
         self.cancel = cancel
         self.done = done
@@ -34,6 +42,14 @@ public struct PeerInfoNavigationItemResources: Equatable {
         self.moreLabel = moreLabel
         self.ghostImage = ghostImage
         self.ghostLabel = ghostLabel
+        self.giftAddImage = giftAddImage
+        self.giftAddLabel = giftAddLabel
+        self.giftEditImage = giftEditImage
+        self.giftEditLabel = giftEditLabel
+        self.giftEditDoneImage = giftEditDoneImage
+        self.giftEditDoneLabel = giftEditDoneLabel
+        self.giftRemovedImage = giftRemovedImage
+        self.giftRemovedLabel = giftRemovedLabel
     }
 }
 
@@ -131,6 +147,14 @@ public final class PeerInfoNavigationItems {
             item = self.imageItem(resources.ghostImage, label: resources.ghostLabel)
         case .postStory:
             item = self.imageItem(resources.postStoryImage, label: resources.postStoryLabel)
+        case .giftAdd:
+            item = self.imageItem(resources.giftAddImage, label: resources.giftAddLabel)
+        case .giftEdit:
+            item = self.imageItem(resources.giftEditImage, label: resources.giftEditLabel)
+        case .giftEditDone:
+            item = self.imageItem(resources.giftEditDoneImage, label: resources.giftEditDoneLabel)
+        case .giftRemoved:
+            item = self.imageItem(resources.giftRemovedImage, label: resources.giftRemovedLabel)
         case .standaloneSearch, .searchWithTags:
             item = self.imageItem(itemKey == .searchWithTags ? resources.searchWithTagsImage : resources.standaloneSearchImage, label: resources.searchLabel)
             // A pill of its own beside the "…": a pane without search (Media) keeps the "…" pill as it is, and only

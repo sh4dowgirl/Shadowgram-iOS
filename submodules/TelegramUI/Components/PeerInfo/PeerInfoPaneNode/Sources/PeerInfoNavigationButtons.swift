@@ -22,13 +22,17 @@ public enum PeerInfoHeaderNavigationButtonKey {
     case ghost
     case moreSearchSort
     case postStory
+    case giftAdd
+    case giftEdit
+    case giftEditDone
+    case giftRemoved
 }
 
 /// iPhone Duo: whether a navigation button is an icon (it goes into the side column); text buttons stay in the row
 /// (Apple: text-only items stay horizontal).
 public func peerInfoNavigationButtonIsIcon(_ key: PeerInfoHeaderNavigationButtonKey) -> Bool {
     switch key {
-    case .back, .qrCode, .ghost, .search, .searchWithTags, .standaloneSearch, .more, .sort, .moreSearchSort, .postStory:
+    case .back, .qrCode, .ghost, .search, .searchWithTags, .standaloneSearch, .more, .sort, .moreSearchSort, .postStory, .giftAdd, .giftEdit, .giftEditDone, .giftRemoved:
         return true
     case .edit, .done, .cancel, .select, .selectionDone, .editPhoto, .editVideo:
         return false
@@ -75,6 +79,10 @@ public struct PeerInfoNavigationFlags: Equatable {
     /// The stories pane shows the account's own stories.
     public var isOwnStories = false
     public var showsGhost = false
+    /// Shadowgram Gift Editing is on: the gifts pane's set gets its add / edit / removed buttons.
+    public var showsGiftEditing = false
+    /// The gifts grid is in its editing mode (the edit button shows Done).
+    public var isEditingGifts = false
 
     public init() {
     }
@@ -125,7 +133,18 @@ public func peerInfoNavigationButtonSets(_ flags: PeerInfoNavigationFlags) -> (n
                 expanded.right.append(.more)
             }
         case .gifts:
-            expanded.right.append(.sort)
+            if flags.showsGiftEditing {
+                if flags.isEditingGifts {
+                    expanded.right.append(.giftEditDone)
+                } else {
+                    expanded.right.append(.giftAdd)
+                    expanded.right.append(.giftEdit)
+                    expanded.right.append(.giftRemoved)
+                }
+            }
+            if !flags.isEditingGifts {
+                expanded.right.append(.sort)
+            }
         default:
             break
         }

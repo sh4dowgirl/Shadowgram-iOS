@@ -4,80 +4,50 @@ import Display
 import SwiftSignalKit
 import TelegramCore
 import TelegramPresentationData
-import PresentationDataUtils
-import ItemListUI
 import AccountContext
+import GiftItemComponent
 import ShadowgramSettings
 import UndoUI
 
-/// "Gift Editing" - the "removed gifts" screen the arrow button opens: every real gift hidden
-/// locally from this profile (via the minus button in edit mode), each restorable.
-
-private struct ShadowgramRemovedGiftEntry: ItemListNodeEntry {
-    let index: Int
-    let gift: ProfileGiftsContext.State.StarGift
-    let restore: (Int) -> Void
-
-    var section: ItemListSectionId { return 0 }
-    var stableId: Int { return self.index }
-
-    static func ==(lhs: ShadowgramRemovedGiftEntry, rhs: ShadowgramRemovedGiftEntry) -> Bool {
-        return lhs.index == rhs.index
-    }
-
-    static func <(lhs: ShadowgramRemovedGiftEntry, rhs: ShadowgramRemovedGiftEntry) -> Bool {
-        return lhs.index < rhs.index
-    }
-
-    func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
-        let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
-        var title = ""
-        switch self.gift.gift {
-        case let .generic(generic):
-            title = generic.title ?? "Gift"
-        case let .unique(unique):
-            title = unique.title
-        }
-        if let number = self.gift.number {
-            title += " #\(number)"
-        }
-        return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: title, label: strings.shadowgramGiftEditingRestore, sectionId: self.section, style: .blocks, action: { [index = self.index, restore = self.restore] in
-            restore(index)
-        })
-    }
-}
-
+/// "Gift Editing": the real gifts hidden on this device with the grid's minus button, drawn as
+/// the profile draws them. Tapping one puts it back.
 public func shadowgramPresentRemovedGiftsScreen(context: AccountContext, peerId: EnginePeer.Id, present: @escaping (ViewController) -> Void) {
-    let changeTick = ValuePromise<Int>(0, ignoreRepeated: false)
+    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+    let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
 
-    weak var weakController: ItemListController?
-
-    let signal: Signal<(ItemListControllerState, (ItemListNodeState, Any)), NoError> = combineLatest(queue: .mainQueue(),
-        context.sharedContext.presentationData,
-        changeTick.get()
-    )
-    |> map { presentationData, _ -> (ItemListControllerState, (ItemListNodeState, Any)) in
-        let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
-        let removed = shadowgramRemovedGifts(peerId: peerId)
-
-        var entries: [ShadowgramRemovedGiftEntry] = []
-        for (index, gift) in removed {
-            entries.append(ShadowgramRemovedGiftEntry(index: index, gift: gift, restore: { index in
-                shadowgramRestoreRemovedGift(peerId: peerId, index: index)
-                changeTick.set(0)
-                let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-                let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
-                weakController?.present(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: strings.shadowgramGiftRestored, timeout: nil, customUndoText: nil), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return false }), in: .window(.root))
-            }))
+    let items: Signal<[ShadowgramGiftGridItem]?, NoError> = ShadowgramGiftOverrides.shared.changeSignal
+    |> map { _ -> [ShadowgramGiftGridItem]? in
+        var result: [ShadowgramGiftGridItem] = []
+        for (index, gift) in shadowgramRemovedGifts(peerId: peerId) {
+            let id = gift.reference?.stringValue ?? "index_\(index)"
+            let subject: GiftItemComponent.Subject
+            var ribbon: GiftItemComponent.Ribbon?
+            switch gift.gift {
+            case let .generic(generic):
+                subject = .starGift(gift: generic, price: "# \(generic.price)")
+            case let .unique(unique):
+                subject = .uniqueGift(gift: unique, price: nil)
+                var ribbonColor: GiftItemComponent.Ribbon.Color = .blue
+                for attribute in unique.attributes {
+                    if case let .backdrop(_, _, innerColor, outerColor, _, _, _) = attribute {
+                        ribbonColor = .custom(outerColor, innerColor)
+                        break
+                    }
+                }
+                ribbon = GiftItemComponent.Ribbon(text: "#\(unique.number)", font: .monospaced, color: ribbonColor)
+            }
+            result.append(ShadowgramGiftGridItem(id: id, subject: subject, ribbon: ribbon))
         }
-
-        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.shadowgramGiftEditingRemovedGifts), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
-        let emptyStateItem: ItemListControllerEmptyStateItem? = entries.isEmpty ? ItemListTextEmptyStateItem(text: strings.shadowgramGiftEditingRemovedGiftsEmpty) : nil
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: entries, style: .blocks, emptyStateItem: emptyStateItem, animateChanges: true)
-        return (controllerState, (listState, 0 as Any))
+        return result
     }
 
-    let controller = ItemListController(context: context, state: signal)
-    weakController = controller
+    let controller = ShadowgramGiftGridController(context: context, title: strings.shadowgramGiftEditingRemovedGifts, style: .profile, emptyText: strings.shadowgramGiftEditingRemovedGiftsEmpty, footerText: strings.shadowgramGiftEditingRemovedFooter, items: items, selected: { controller, item in
+        guard let entry = shadowgramRemovedGifts(peerId: peerId).first(where: { ($0.gift.reference?.stringValue ?? "index_\($0.index)") == item.id }) else {
+            return
+        }
+        shadowgramRestoreRemovedGift(peerId: peerId, index: entry.index)
+        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+        controller.present(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: strings.shadowgramGiftRestored, timeout: nil, customUndoText: nil), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return false }), in: .window(.root))
+    })
     present(controller)
 }

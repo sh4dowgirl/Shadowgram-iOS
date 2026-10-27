@@ -26,6 +26,9 @@ import StarsWithdrawalScreen
 import PremiumDiamondComponent
 import StatisticsUI
 import EdgeEffect
+import AppBundle
+import ShadowgramSettings
+import ShadowgramUI
 
 private let initialSubscriptionsDisplayedLimit: Int32 = 3
 
@@ -607,9 +610,11 @@ final class StarsTransactionsScreenComponent: Component {
             )
             
             let topBalanceOriginY = navigationTitleCenterY - (topBalanceTitleSize.height + topBalanceValueSize.height) / 2.0
+            // Shadowgram: the Stars Editing pencil takes the bar's trailing slot, so the balance moves left of it.
+            let shadowgramPencilInset: CGFloat = shadowgramShowsStarsEditing(starsContext: component.starsContext) ? 52.0 : 0.0
             // iPhone Duo, unfolded portrait: the balance sits in the bar's top row, so it moves left of the status island
             // as the bar's trailing buttons do (0 elsewhere).
-            let topBalanceTitleFrame = CGRect(origin: CGPoint(x: availableSize.width - topBalanceTitleSize.width - 16.0 - environment.safeInsets.right - environment.navigationBarTrailingButtonsInset, y: topBalanceOriginY), size: topBalanceTitleSize)
+            let topBalanceTitleFrame = CGRect(origin: CGPoint(x: availableSize.width - topBalanceTitleSize.width - 16.0 - environment.safeInsets.right - environment.navigationBarTrailingButtonsInset - shadowgramPencilInset, y: topBalanceOriginY), size: topBalanceTitleSize)
             if let topBalanceTitleView = self.topBalanceTitleView.view {
                 if topBalanceTitleView.superview == nil {
                     topBalanceTitleView.alpha = 0.0
@@ -624,7 +629,7 @@ final class StarsTransactionsScreenComponent: Component {
                 starTransition.setFrame(view: topBalanceTitleView, frame: topBalanceTitleFrame)
             }
     
-            let topBalanceValueFrame = CGRect(origin: CGPoint(x: availableSize.width - topBalanceValueSize.width - 16.0 - environment.safeInsets.right - environment.navigationBarTrailingButtonsInset, y: topBalanceTitleFrame.maxY), size: topBalanceValueSize)
+            let topBalanceValueFrame = CGRect(origin: CGPoint(x: availableSize.width - topBalanceValueSize.width - 16.0 - environment.safeInsets.right - environment.navigationBarTrailingButtonsInset - shadowgramPencilInset, y: topBalanceTitleFrame.maxY), size: topBalanceValueSize)
             if let topBalanceValueView = self.topBalanceValueView.view {
                 if topBalanceValueView.superview == nil {
                     topBalanceValueView.alpha = 0.0
@@ -1284,6 +1289,10 @@ public final class StarsTransactionsScreen: ViewControllerComponentContainer {
         
         self.navigationPresentation = .modalInLargeLayout
         
+        if shadowgramShowsStarsEditing(starsContext: starsContext) {
+            self.navigationItem.rightBarButtonItem = UIBarButtonItem(image: UIImage(bundleImageName: "Chat/Context Menu/Edit")?.withRenderingMode(.alwaysTemplate), style: .plain, target: self, action: #selector(self.shadowgramEditStarsPressed))
+        }
+        
         self.options.set(.single([]) |> then(context.engine.payments.starsTopUpOptions()))
         
         openTransactionImpl = { [weak self] transaction in
@@ -1551,6 +1560,12 @@ public final class StarsTransactionsScreen: ViewControllerComponentContainer {
         }
     }
     
+    @objc private func shadowgramEditStarsPressed() {
+        if let controller = shadowgramStarsEditingController(context: self.context) {
+            self.push(controller)
+        }
+    }
+    
     required public init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
@@ -1572,4 +1587,9 @@ public final class StarsTransactionsScreen: ViewControllerComponentContainer {
             height: min(layout.size.width, layout.size.height) - 88.0
         )
     }
+}
+
+/// Stars Editing applies to the account's own Stars balance only (not TON).
+private func shadowgramShowsStarsEditing(starsContext: StarsContext) -> Bool {
+    return !starsContext.ton && ShadowgramSettings.shared.values.starsEditingEnabled
 }

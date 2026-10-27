@@ -224,13 +224,21 @@ private func shadowgramUploadableMediaCopy(mediaBox: MediaBox, media: Media) -> 
     }
 }
 
-func shadowgramForwardsProtectedMessageAsCopy(_ message: Message) -> Bool {
+func shadowgramForwardsProtectedMessageAsCopy(transaction: Transaction, message: Message) -> Bool {
     // The server refuses forwards from chats that restrict them, so with the bypass on such a message
     // is always sent as a copy, the way a kept deleted message is.
     guard ShadowgramSettings.shared.values.bypassCopyProtection else {
         return false
     }
-    return message.isCopyProtected()
+    if message.isCopyProtected() {
+        return true
+    }
+    // A private chat's restriction is not a peer flag: it lives in the user's cached data, set by
+    // either side ("my" is the account's own toggle).
+    if message.id.peerId.namespace == Namespaces.Peer.CloudUser, let cachedUserData = transaction.getPeerCachedData(peerId: message.id.peerId) as? CachedUserData {
+        return cachedUserData.flags.contains(.copyProtectionEnabled) || cachedUserData.flags.contains(.myCopyProtectionEnabled)
+    }
+    return false
 }
 
 func shadowgramForwardCopyOfProtectedMessage(sourceMessage: Message, mediaBox: MediaBox, peerId: PeerId, threadId: Int64?, forwardAttributes: [MessageAttribute], localGroupingKey: Int64?) -> EnqueueMessage {

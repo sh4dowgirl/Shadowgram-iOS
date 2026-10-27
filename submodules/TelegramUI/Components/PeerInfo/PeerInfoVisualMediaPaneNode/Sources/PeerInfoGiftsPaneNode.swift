@@ -465,6 +465,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
             let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
             self.parentController?.present(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: shadowgramGiftIsLocallyAdded(gift) ? strings.shadowgramGiftDeleted : strings.shadowgramGiftHidden, timeout: nil, customUndoText: nil), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return false }), in: .window(.root))
         }
+        self.giftsListView.updateIsEditingGifts(isEditingGifts: self.isEditingGifts, animated: false)
         self.giftsListView.addToCollection = { [weak self] in
             guard let self else {
                 return

@@ -1,15 +1,28 @@
 import Foundation
 import Postbox
+import SwiftSignalKit
 import ShadowgramSettings
 
 /// "Stars Editing": a purely local, per-device display override of the account's Stars
 /// balance (never touches the server - nothing is actually credited or debited). `ton`
 /// balances are left alone; only the Stars currency is spoofed.
 func shadowgramApplyStarsOverride(ton: Bool, peerId: PeerId, state: StarsContext.State) -> StarsContext.State {
-    guard !ton, let override = ShadowgramSettings.shared.values.starsOverrides[peerId.toInt64()] else {
+    let values = ShadowgramSettings.shared.values
+    guard !ton, values.starsEditingEnabled, let override = values.starsOverrides[peerId.toInt64()] else {
         return state
     }
     return StarsContext.State(flags: state.flags, balance: StarsAmount(value: override, nanos: 0), subscriptions: state.subscriptions, canLoadMoreSubscriptions: state.canLoadMoreSubscriptions, transactions: state.transactions, canLoadMoreTransactions: state.canLoadMoreTransactions, isLoading: state.isLoading)
+}
+
+/// What the override for `peerId` currently resolves to; the context re-publishes when it changes
+/// (the feature switched on or off, or an edit made elsewhere).
+func shadowgramStarsOverrideSignal(peerId: PeerId) -> Signal<Int64?, NoError> {
+    let key = peerId.toInt64()
+    return ShadowgramSettings.shared.valuesSignal
+    |> map { values -> Int64? in
+        return values.starsEditingEnabled ? values.starsOverrides[key] : nil
+    }
+    |> distinctUntilChanged
 }
 
 public enum ShadowgramStarsOverrideOperation {

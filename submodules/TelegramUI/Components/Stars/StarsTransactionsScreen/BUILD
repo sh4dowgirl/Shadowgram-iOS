@@ -54,6 +54,8 @@ swift_library(
         "//submodules/TelegramUI/Components/Gifts/GiftAnimationComponent",
         "//submodules/TelegramUI/Components/Premium/PremiumCoinComponent",
         "//submodules/TelegramUI/Components/Premium/PremiumDiamondComponent",
+        "//submodules/ShadowgramSettings",
+        "//submodules/ShadowgramUI",
     ],
     visibility = [
         "//visibility:public",

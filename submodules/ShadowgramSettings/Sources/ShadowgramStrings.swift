@@ -145,13 +145,17 @@ extension ShadowgramStrings {
         case 1:
             return t("Сообщения", "Messages")
         case 2:
-            return t("Список чатов", "Chat List")
+            return t("Обход ограничений", "Bypass Restrictions")
         case 3:
-            return t("Интерфейс", "Interface")
+            return t("Список чатов", "Chat List")
         case 4:
-            return t("Аккаунты", "Accounts")
+            return t("Медиа", "Media")
+        case 5:
+            return t("Интерфейс", "Interface")
+        case 6:
+            return t("Локальные правки", "Local Edits")
         default:
-            return "Premium"
+            return t("Premium и аккаунты", "Premium & Accounts")
         }
     }
 }
@@ -177,19 +181,39 @@ extension ShadowgramStrings {
     public var shadowgramGiftHidden: String { return t("Подарок скрыт локально. Его можно вернуть в разделе «Удалённые подарки».", "The gift was hidden on this device. It can be brought back from the Removed Gifts screen.") }
     public var shadowgramGiftRestored: String { return t("Подарок возвращён.", "The gift was restored.") }
     public var shadowgramGiftEditingAddTitle: String { return t("Новый подарок", "New Gift") }
-    public var shadowgramGiftEditingPickBase: String { return t("Выберите подарок из каталога", "Pick a Gift from the Catalog") }
-    public var shadowgramGiftEditingMakeUnique: String { return t("Сделать NFT (уникальным)", "Make It NFT (Unique)") }
+    public var shadowgramGiftEditingPickBase: String { return t("Подарок", "Gift") }
+    public var shadowgramGiftEditingMakeUnique: String { return t("Уникальный (NFT)", "Unique (NFT)") }
     public var shadowgramGiftEditingModel: String { return t("Модель", "Model") }
     public var shadowgramGiftEditingBackdrop: String { return t("Фон", "Backdrop") }
     public var shadowgramGiftEditingPattern: String { return t("Узор", "Pattern") }
     public var shadowgramGiftEditingNumber: String { return t("Номер экземпляра", "Instance Number") }
-    public var shadowgramGiftEditingText: String { return t("Текст / сообщение", "Text / Message") }
-    public var shadowgramGiftEditingSender: String { return t("Отправитель (имя)", "Sender (Name)") }
-    public var shadowgramGiftEditingDate: String { return t("Дата (ГГГГ-ММ-ДД)", "Date (YYYY-MM-DD)") }
+    public var shadowgramGiftEditingText: String { return t("Сообщение к подарку", "Message with the Gift") }
+    public var shadowgramGiftEditingSender: String { return t("Отправитель", "Sender") }
+    public var shadowgramGiftEditingDate: String { return t("Дата получения", "Date Received") }
     public var shadowgramGiftEditingUpgraded: String { return t("Можно конвертировать в звёзды", "Convertible to Stars") }
-    public var shadowgramGiftEditingSave: String { return t("Добавить", "Add") }
-    public var shadowgramGiftEditingRemovedGiftsEmpty: String { return t("Здесь появятся подарки, скрытые через «Редактировать подарки».", "Gifts hidden through Edit Gifts show up here.") }
+    public var shadowgramGiftEditingSave: String { return t("Добавить в профиль", "Add to Profile") }
+    public var shadowgramGiftEditingRemovedGiftsEmpty: String { return t("Здесь появятся настоящие подарки, которые вы убрали в режиме редактирования. Нажмите на подарок, чтобы вернуть его в профиль.", "Real gifts you remove in edit mode show up here. Tap a gift to put it back on the profile.") }
     public var shadowgramGiftEditingRestore: String { return t("Вернуть", "Restore") }
+    public var shadowgramGiftEditingRemovedFooter: String { return t("Нажмите на подарок, чтобы вернуть его. Скрыты они только на этом устройстве.", "Tap a gift to put it back. They are hidden on this device only.") }
+    public var shadowgramGiftEditingGiftHeader: String { return t("ПОДАРОК", "GIFT") }
+    public var shadowgramGiftEditingNotChosen: String { return t("Выбрать", "Choose") }
+    public var shadowgramGiftEditingGiftFooter: String { return t("Выберите подарок из каталога, как при отправке. Потом можно сделать его уникальным и настроить всё остальное.", "Choose a gift from the catalog, as when sending one. Then you can make it unique and set up the rest.") }
+    public var shadowgramGiftEditingNumberPlaceholder: String { return t("Номер (случайный, если пусто)", "Number (random if empty)") }
+    public var shadowgramGiftEditingNftFooter: String { return t("Модель, фон и узор берутся из настоящей коллекции этого подарка. Подарок будет выглядеть как улучшенный и принадлежать этому профилю.", "The model, backdrop and pattern come from this gift's real collection. The gift looks upgraded and owned by this profile.") }
+    public var shadowgramGiftEditingRegularFooter: String { return t("Обычный подарок, как купленный в каталоге.", "A regular gift, as if bought from the catalog.") }
+    public var shadowgramGiftEditingSenderHeader: String { return t("ОТ КОГО", "FROM") }
+    public var shadowgramGiftEditingSenderNone: String { return t("Не указан", "None") }
+    public var shadowgramGiftEditingSenderClear: String { return t("Убрать отправителя", "Remove Sender") }
+    public var shadowgramGiftEditingHideSender: String { return t("Скрыть имя отправителя", "Hide Sender's Name") }
+    public var shadowgramGiftEditingMessageHeader: String { return t("СООБЩЕНИЕ И ДАТА", "MESSAGE AND DATE") }
+    public var shadowgramGiftEditingOptionsHeader: String { return t("В ПРОФИЛЕ", "ON THE PROFILE") }
+    public var shadowgramGiftEditingPinned: String { return t("Закрепить сверху", "Pin to Top") }
+    public var shadowgramGiftEditingCanUpgrade: String { return t("Можно улучшить", "Can Be Upgraded") }
+    public var shadowgramGiftEditingPreview: String { return t("Посмотреть, как будет выглядеть", "Preview") }
+    public var shadowgramGiftEditingCatalogEmpty: String { return t("Каталог подарков ещё не загружен. Откройте экран отправки подарка один раз и попробуйте снова.", "The gift catalog has not loaded yet. Open the Send Gift screen once and try again.") }
+    public var shadowgramGiftEditingAttributesEmpty: String { return t("У этого подарка нет вариантов улучшения.", "This gift has no upgrade variants.") }
+    public var shadowgramGiftEditingAttributesFooter: String { return t("Процент — редкость, как у настоящих подарков.", "The percentage is the rarity, as on real gifts.") }
+
 }
 
 extension ShadowgramStrings {
@@ -224,4 +248,31 @@ extension ShadowgramStrings {
 
 extension ShadowgramStrings {
     public var lastSeenUnknown: String { return t("был(а): неизвестно", "last seen: unknown") }
+}
+
+extension ShadowgramStrings {
+    public var messagesDeletedEditedHeader: String { return t("УДАЛЁННЫЕ И ИЗМЕНЁННЫЕ", "DELETED AND EDITED") }
+    public var messagesSendingHeader: String { return t("ОТПРАВКА", "SENDING") }
+    public var restrictionsProtectedHeader: String { return t("ЗАЩИЩЁННЫЕ ЧАТЫ", "PROTECTED CHATS") }
+    public var restrictionsSelfDestructingHeader: String { return t("ИСЧЕЗАЮЩИЕ МЕДИА", "SELF-DESTRUCTING MEDIA") }
+    public var chatListSortFooter: String { return t("Порядок меняется только у непрочитанных чатов, прочитанные остаются на своих местах.", "Only unread chats are reordered; read chats keep their places.") }
+    public var peerIdsHeader: String { return t("ID ПОЛЬЗОВАТЕЛЕЙ И ЧАТОВ", "USER AND CHAT IDS") }
+    public var localEditsStarsHeader: String { return t("ЗВЁЗДЫ", "STARS") }
+    public var localEditsGiftsHeader: String { return t("ПОДАРКИ", "GIFTS") }
+    public var starsEditing: String { return t("Редактирование звёзд", "Stars Editing") }
+    public var starsEditingFooter: String { return t("На экране звёзд появится карандаш справа сверху: им можно поменять показываемый баланс. Меняется только отображение на этом устройстве, настоящий баланс не затрагивается. Если выключить, снова виден настоящий баланс, а правка сохраняется до следующего включения.", "A pencil appears top right on the Stars screen to change the balance shown. Only what this device displays changes; the real balance is untouched. Turning this off shows the real balance again and keeps your edit for next time.") }
+    public var giftEditing: String { return t("Редактирование подарков", "Gift Editing") }
+    public var giftEditingFooter: String { return t("Во вкладке «Подарки» любого профиля рядом с сортировкой появятся кнопки: добавить подарок, редактировать (удаление прямо в сетке) и удалённые подарки. Всё видно только на этом устройстве, на сервер ничего не отправляется. Если выключить, профиль снова показывает настоящие подарки, а правки сохраняются.", "The Gifts tab of any profile gets buttons next to sorting: add a gift, edit (remove right in the grid), and removed gifts. Everything is visible on this device only; nothing is sent to the server. Turning this off shows the real gifts again and keeps your edits.") }
+
+    public var starsEditingTitle: String { return t("Баланс звёзд", "Stars Balance") }
+    public var starsEditingAmountHeader: String { return t("КОЛИЧЕСТВО", "AMOUNT") }
+    public var starsEditingAmountPlaceholder: String { return t("Число звёзд", "Number of Stars") }
+    public var starsEditingAdd: String { return t("Добавить", "Add") }
+    public var starsEditingSubtract: String { return t("Вычесть", "Subtract") }
+    public var starsEditingSet: String { return t("Установить", "Set") }
+    public var starsEditingReset: String { return t("Показать настоящий баланс", "Show Real Balance") }
+    public var starsEditingCurrentHeader: String { return t("СЕЙЧАС ПОКАЗЫВАЕТСЯ", "CURRENTLY SHOWN") }
+    public var starsEditingOverridden: String { return t("Изменён на этом устройстве", "Changed on this device") }
+    public var starsEditingReal: String { return t("Настоящий баланс", "Real balance") }
+    public var starsEditingFooterNote: String { return t("Меняется только то, что показывает это устройство. Настоящие звёзды не начисляются и не списываются.", "Only what this device shows changes. No real Stars are credited or debited.") }
 }

@@ -2154,6 +2154,12 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
                     sourceFrame = view.convert(view.bounds, to: strongSelf.view)
                 }
                 strongSelf.openPostStory(sourceFrame: sourceFrame)
+            case .giftAdd:
+                strongSelf.shadowgramOpenGiftEditor()
+            case .giftEdit, .giftEditDone:
+                strongSelf.shadowgramToggleGiftEditing()
+            case .giftRemoved:
+                strongSelf.shadowgramOpenRemovedGifts()
             case .editPhoto, .editVideo, .moreSearchSort:
                 break
             }
@@ -5540,6 +5546,7 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
         if let cached = self.cachedNavigationItemResources, cached.theme === theme, cached.strings === strings {
             return cached.resources
         }
+        let shadowgramStrings = ShadowgramStrings(languageCode: strings.primaryComponent.languageCode)
         let resources = PeerInfoNavigationItemResources(
             edit: strings.Common_Edit,
             cancel: strings.Common_Cancel,
@@ -5553,7 +5560,15 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
             searchLabel: strings.Common_Search,
             moreLabel: strings.Common_More,
             ghostImage: shadowgramGhostNavigationIcon(),
-            ghostLabel: "Ghost Mode"
+            ghostLabel: "Ghost Mode",
+            giftAddImage: UIImage(bundleImageName: "Chat/Context Menu/Add"),
+            giftAddLabel: shadowgramStrings.shadowgramGiftEditingAddGift,
+            giftEditImage: UIImage(bundleImageName: "Chat/Context Menu/Edit"),
+            giftEditLabel: shadowgramStrings.shadowgramGiftEditingEditGifts,
+            giftEditDoneImage: UIImage(bundleImageName: "Chat/Context Menu/Check"),
+            giftEditDoneLabel: shadowgramStrings.shadowgramGiftEditingDoneEditing,
+            giftRemovedImage: UIImage(bundleImageName: "Chat/Context Menu/Unarchive"),
+            giftRemovedLabel: shadowgramStrings.shadowgramGiftEditingRemovedGifts
         )
         self.cachedNavigationItemResources = (theme, strings, resources)
         return resources
@@ -6170,6 +6185,8 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
             }
             navigationFlags.isOwnStories = self.data?.peer?.id == self.context.account.peerId
             navigationFlags.showsGhost = self.isSettings && ShadowgramSettings.shared.values.ghostModeEnabled
+            navigationFlags.showsGiftEditing = ShadowgramSettings.shared.values.giftEditingEnabled
+            navigationFlags.isEditingGifts = (self.paneContainerNode.currentPane?.node as? PeerInfoGiftsPaneNode)?.isEditingGifts ?? false
             let navigationSets = peerInfoNavigationButtonSets(navigationFlags)
             let showsPaneSet = self.paneSetLatch.update(fraction: effectiveAreaExpansionFraction)
 

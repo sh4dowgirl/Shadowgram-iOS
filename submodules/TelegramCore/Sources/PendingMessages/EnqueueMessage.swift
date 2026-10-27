@@ -947,7 +947,7 @@ func enqueueMessages(transaction: Transaction, account: Account, peerId: PeerId,
                     }
                     continue outer
                 }
-                if let sourceMessage = transaction.getMessage(sourceId), shadowgramForwardsProtectedMessageAsCopy(sourceMessage) {
+                if let sourceMessage = transaction.getMessage(sourceId), shadowgramForwardsProtectedMessageAsCopy(transaction: transaction, message: sourceMessage) {
                     let replacement = shadowgramForwardCopyOfProtectedMessage(
                         sourceMessage: sourceMessage,
                         mediaBox: account.postbox.mediaBox,
