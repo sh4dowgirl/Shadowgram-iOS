@@ -36,6 +36,7 @@ import TextFormat
 import PromptUI
 import CollectionTabItemComponent
 import EdgeEffect
+import ShadowgramSettings
 
 public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScrollViewDelegate {
     public enum GiftCollection: Equatable {
@@ -107,6 +108,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
     private var collections: [StarGiftCollection]?
     private var reorderedCollectionIds: [Int32]?
     private var isReordering = false
+    public private(set) var isEditingGifts = false
     
     private let ready = Promise<Bool>()
     private var didSetReady: Bool = false
@@ -151,15 +153,25 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
         self.backgroundNode = ASDisplayNode()
         self.scrollNode = ASScrollNode()
         self.giftsListView = GiftsListView(context: context, peerId: peerId, profileGifts: profileGifts, giftsCollections: profileGiftsCollections, canSelect: false)
-                
+
         super.init()
-                
+
         self.addSubnode(self.backgroundNode)
         self.addSubnode(self.scrollNode)
-        
+
         self.statusPromise.set(self.giftsListView.status)
         self.ready.set(self.giftsListView.isReady)
-        
+
+        self.giftsListView.shadowgramRemoveGift = { [weak self] gift in
+            guard let self else {
+                return
+            }
+            shadowgramRemoveEditedGift(peerId: peerId, gift: gift)
+            let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
+            let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
+            self.parentController?.present(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: shadowgramGiftIsLocallyAdded(gift) ? strings.shadowgramGiftDeleted : strings.shadowgramGiftHidden, timeout: nil, customUndoText: nil), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return false }), in: .window(.root))
+        }
+
         self.giftsListView.onContentUpdated = { [weak self] in
             guard let self else {
                 return
@@ -347,6 +359,14 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
             self.updateScrolling(transition: .easeInOut(duration: 0.2))
         }
     }
+
+    public func updateIsEditingGifts(isEditingGifts: Bool, animated: Bool) {
+        if self.isEditingGifts != isEditingGifts {
+            self.isEditingGifts = isEditingGifts
+            self.giftsListView.updateIsEditingGifts(isEditingGifts: isEditingGifts, animated: animated)
+            self.updateScrolling(transition: .easeInOut(duration: 0.2))
+        }
+    }
     
     public func ensureMessageIsVisible(id: EngineMessage.Id) {
     }
@@ -436,6 +456,15 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
         }
 
         self.giftsListView = GiftsListView(context: self.context, peerId: self.peerId, profileGifts: profileGifts, giftsCollections: self.profileGiftsCollections, canSelect: false)
+        self.giftsListView.shadowgramRemoveGift = { [weak self] gift in
+            guard let self else {
+                return
+            }
+            shadowgramRemoveEditedGift(peerId: self.peerId, gift: gift)
+            let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
+            let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
+            self.parentController?.present(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: shadowgramGiftIsLocallyAdded(gift) ? strings.shadowgramGiftDeleted : strings.shadowgramGiftHidden, timeout: nil, customUndoText: nil), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return false }), in: .window(.root))
+        }
         self.giftsListView.addToCollection = { [weak self] in
             guard let self else {
                 return

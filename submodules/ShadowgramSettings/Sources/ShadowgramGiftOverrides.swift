@@ -19,7 +19,11 @@ public final class ShadowgramGiftOverrides {
     private let lock = NSLock()
     private var added: [Int64: [Data]]
     private var removed: [Int64: [Data]]
-    private let changePromise = ValuePromise<Void>(Void(), ignoreRepeated: false)
+    // ValuePromise requires an Equatable payload - Void isn't one, so Int stands in; with
+    // ignoreRepeated: false every `set` is delivered regardless of value, so the number itself
+    // is never read, only the fact that it fired.
+    private let changePromise = ValuePromise<Int>(0, ignoreRepeated: false)
+    private var nextChangeTick = 0
 
     private init() {
         let defaults = ShadowgramGiftOverrides.appGroupSuiteName().flatMap({ UserDefaults(suiteName: $0) }) ?? UserDefaults.standard
@@ -51,13 +55,14 @@ public final class ShadowgramGiftOverrides {
         }
         self.defaults.set(encodedRemoved, forKey: Key.removed)
 
-        self.changePromise.set(Void())
+        self.nextChangeTick += 1
+        self.changePromise.set(self.nextChangeTick)
     }
 
     /// Fires once on subscription and again after every change (to any peer - cheap to
     /// re-filter, and keeps every open gifts view in sync without threading peer ids through).
     public var changeSignal: Signal<Void, NoError> {
-        return self.changePromise.get()
+        return self.changePromise.get() |> map { _ in Void() }
     }
 
     public func addedGifts(peerId: Int64) -> [Data] {

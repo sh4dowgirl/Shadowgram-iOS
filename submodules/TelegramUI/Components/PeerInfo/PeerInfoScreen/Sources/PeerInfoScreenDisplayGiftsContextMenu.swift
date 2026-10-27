@@ -6,6 +6,7 @@ import SwiftSignalKit
 import TelegramCore
 import ContextUI
 import PeerInfoVisualMediaPaneNode
+import ShadowgramSettings
 
 extension PeerInfoScreenNode {
     func displayGiftsContextMenu(source: ContextReferenceContentNode, gesture: ContextGesture?) {
@@ -53,7 +54,43 @@ extension PeerInfoScreenNode {
         })
         |> map { [weak pane, weak giftsContext, weak self] filter, sorting, canReorder -> ContextController.Items in
             var items: [ContextMenuItem] = []
-                        
+
+            // "Gift Editing": purely local, works on any peer's gifts (not gated on
+            // hasVisibility like the server-backed actions below), and never touches the server.
+            if let peerId = data.peer?.id {
+                items.append(.action(ContextMenuActionItem(text: ShadowgramStrings(languageCode: strings.primaryComponent.languageCode).shadowgramGiftEditingAddGift, icon: { theme in
+                    return generateTintedImage(image: UIImage(bundleImageName: "Peer Info/Gifts/AddGift"), color: theme.contextMenu.primaryColor)
+                }, action: { [weak self] _, f in
+                    f(.default)
+                    guard let self, let controller = self.controller else {
+                        return
+                    }
+                    shadowgramPresentGiftEditorScreen(context: self.context, peerId: peerId, present: { c in
+                        controller.push(c)
+                    })
+                })))
+                items.append(.action(ContextMenuActionItem(text: pane?.isEditingGifts == true ? ShadowgramStrings(languageCode: strings.primaryComponent.languageCode).shadowgramGiftEditingDoneEditing : ShadowgramStrings(languageCode: strings.primaryComponent.languageCode).shadowgramGiftEditingEditGifts, icon: { theme in
+                    return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Edit"), color: theme.contextMenu.primaryColor)
+                }, action: { [weak pane] _, f in
+                    f(.default)
+                    if let pane {
+                        pane.updateIsEditingGifts(isEditingGifts: !pane.isEditingGifts, animated: true)
+                    }
+                })))
+                items.append(.action(ContextMenuActionItem(text: ShadowgramStrings(languageCode: strings.primaryComponent.languageCode).shadowgramGiftEditingRemovedGifts, icon: { theme in
+                    return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Unarchive"), color: theme.contextMenu.primaryColor)
+                }, action: { [weak self] _, f in
+                    f(.default)
+                    guard let self, let controller = self.controller else {
+                        return
+                    }
+                    shadowgramPresentRemovedGiftsScreen(context: self.context, peerId: peerId, present: { c in
+                        controller.push(c)
+                    })
+                })))
+                items.append(.separator)
+            }
+
             if hasVisibility {
                 if let pane, case .all = pane.currentCollection {
                     items.append(.action(ContextMenuActionItem(text: strings.PeerInfo_Gifts_AddCollection, icon: { theme in

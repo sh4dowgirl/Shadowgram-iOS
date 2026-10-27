@@ -124,6 +124,13 @@ final class GiftsListView: UIView {
     
     private(set) var pinnedReferences: [StarGiftReference] = []
     private var isReordering: Bool = false
+    // "Gift Editing": shakes every item (like iOS's own home-screen jiggle) and overlays a red
+    // minus badge plus an origin dot (green = real/server, yellow = client-added). Deliberately
+    // separate from `isReordering` - editing never touches the server, and the two must never
+    // run their own shake animations on the same item at once.
+    private var isEditingGifts: Bool = false
+    private var shadowgramEditOverlays: [AnyHashable: (dot: UIView, minusButton: ShadowgramClosureButton)] = [:]
+    var shadowgramRemoveGift: ((ProfileGiftsContext.State.StarGift) -> Void)?
     private var reorderingItem: (id: AnyHashable, initialPosition: CGPoint, position: CGPoint)?
     private var reorderedReferences: [StarGiftReference]? {
         didSet {
@@ -334,7 +341,21 @@ final class GiftsListView: UIView {
             self.updateScrolling(transition: animated ? .spring(duration: 0.4) : .immediate)
         }
     }
-    
+
+    func updateIsEditingGifts(isEditingGifts: Bool, animated: Bool) {
+        if self.isEditingGifts != isEditingGifts {
+            self.isEditingGifts = isEditingGifts
+            if !isEditingGifts {
+                for (_, overlay) in self.shadowgramEditOverlays {
+                    overlay.dot.removeFromSuperview()
+                    overlay.minusButton.removeFromSuperview()
+                }
+                self.shadowgramEditOverlays.removeAll()
+            }
+            self.updateScrolling(transition: animated ? .spring(duration: 0.4) : .immediate)
+        }
+    }
+
     func setReorderingItem(item: AnyHashable?) {
         var mappedItem: (AnyHashable, ComponentView<Empty>)?
         for (id, visibleItem) in self.starsItems {
@@ -710,7 +731,7 @@ final class GiftsListView: UIView {
                                     self.parentController?.push(controller)
                                 }
                             },
-                            contextAction: self.isReordering || self.canSelect ? nil : { [weak self] view, gesture in
+                            contextAction: self.isReordering || self.canSelect || self.isEditingGifts ? nil : { [weak self] view, gesture in
                                 guard let self else {
                                     return
                                 }
@@ -750,10 +771,63 @@ final class GiftsListView: UIView {
                         if itemView.layer.animation(forKey: "shaking_position") == nil {
                             itemView.layer.addReorderingShaking()
                         }
-                    } else {
+                    } else if !self.isEditingGifts {
                         if itemView.layer.animation(forKey: "shaking_position") != nil {
                             itemView.layer.removeAnimation(forKey: "shaking_position")
                             itemView.layer.removeAnimation(forKey: "shaking_rotation")
+                        }
+                    }
+
+                    if self.isEditingGifts {
+                        itemView.isUserInteractionEnabled = false
+                        if itemView.layer.animation(forKey: "shaking_position") == nil {
+                            itemView.layer.addReorderingShaking()
+                        }
+
+                        let overlay: (dot: UIView, minusButton: ShadowgramClosureButton)
+                        if let current = self.shadowgramEditOverlays[itemId] {
+                            overlay = current
+                        } else {
+                            let dot = UIView()
+                            dot.layer.cornerRadius = 6.0
+                            dot.layer.borderWidth = 1.5
+                            dot.layer.borderColor = UIColor.white.cgColor
+                            dot.layer.shadowColor = UIColor.black.cgColor
+                            dot.layer.shadowOpacity = 0.3
+                            dot.layer.shadowRadius = 2.0
+                            dot.layer.shadowOffset = CGSize(width: 0.0, height: 1.0)
+                            self.addSubview(dot)
+                            dot.layer.animateScale(from: 0.01, to: 1.0, duration: 0.2)
+                            dot.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
+
+                            let minusButton = ShadowgramClosureButton(type: .custom)
+                            minusButton.backgroundColor = UIColor(red: 1.0, green: 0.23, blue: 0.19, alpha: 1.0)
+                            minusButton.layer.cornerRadius = 11.0
+                            minusButton.layer.borderWidth = 1.5
+                            minusButton.layer.borderColor = UIColor.white.cgColor
+                            minusButton.setTitle("–", for: .normal)
+                            minusButton.titleLabel?.font = Font.bold(18.0)
+                            minusButton.setTitleColor(.white, for: .normal)
+                            minusButton.titleEdgeInsets = UIEdgeInsets(top: -2.0, left: 0.0, right: 0.0, bottom: 0.0)
+                            self.addSubview(minusButton)
+                            minusButton.layer.animateScale(from: 0.01, to: 1.0, duration: 0.2)
+                            minusButton.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
+
+                            overlay = (dot, minusButton)
+                            self.shadowgramEditOverlays[itemId] = overlay
+                        }
+
+                        overlay.dot.backgroundColor = shadowgramGiftIsLocallyAdded(product) ? UIColor(red: 1.0, green: 0.78, blue: 0.0, alpha: 1.0) : UIColor(red: 0.3, green: 0.85, blue: 0.4, alpha: 1.0)
+                        overlay.dot.frame = CGRect(origin: CGPoint(x: itemFrame.minX + 6.0, y: itemFrame.minY + 6.0), size: CGSize(width: 12.0, height: 12.0))
+                        overlay.minusButton.frame = CGRect(origin: CGPoint(x: itemFrame.maxX - 22.0 - 6.0, y: itemFrame.minY + 6.0), size: CGSize(width: 22.0, height: 22.0))
+                        overlay.minusButton.pressed = { [weak self] in
+                            self?.shadowgramRemoveGift?(product)
+                        }
+                    } else {
+                        itemView.isUserInteractionEnabled = true
+                        if let overlay = self.shadowgramEditOverlays.removeValue(forKey: itemId) {
+                            overlay.dot.removeFromSuperview()
+                            overlay.minusButton.removeFromSuperview()
                         }
                     }
                 }
@@ -784,6 +858,10 @@ final class GiftsListView: UIView {
         }
         for id in removeIds {
             self.starsItems.removeValue(forKey: id)
+            if let overlay = self.shadowgramEditOverlays.removeValue(forKey: id) {
+                overlay.dot.removeFromSuperview()
+                overlay.minusButton.removeFromSuperview()
+            }
         }
         
         var contentHeight = ceil(CGFloat(starsProducts.count) / CGFloat(defaultItemsInRow)) * (starsOptionSize.height + optionSpacing) - optionSpacing + topInset + 16.0

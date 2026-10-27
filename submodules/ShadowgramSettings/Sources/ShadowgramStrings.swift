@@ -167,6 +167,29 @@ extension ShadowgramStrings {
     public var pictureInPictureOnBackgroundFooter: String { return t("Видео, которое играет при сворачивании Telegram, продолжает воспроизводиться в окне поверх других приложений.", "A video that is playing when you leave Telegram keeps playing in a floating window over other apps.") }
     public var selfDestructingMarkViewed: String { return t("Отметить просмотренным", "Mark as Viewed") }
     public var selfDestructingMarkedViewed: String { return t("Отправитель увидит, что вы открыли медиа.", "The sender will see that you opened the media.") }
+
+    // Gift Editing - a purely local, per-device overlay on a profile's gift grid.
+    public var shadowgramGiftEditingAddGift: String { return t("Добавить подарок", "Add Gift") }
+    public var shadowgramGiftEditingEditGifts: String { return t("Редактировать подарки", "Edit Gifts") }
+    public var shadowgramGiftEditingDoneEditing: String { return t("Готово", "Done") }
+    public var shadowgramGiftEditingRemovedGifts: String { return t("Удалённые подарки", "Removed Gifts") }
+    public var shadowgramGiftDeleted: String { return t("Добавленный подарок удалён.", "The added gift was deleted.") }
+    public var shadowgramGiftHidden: String { return t("Подарок скрыт локально. Его можно вернуть в разделе «Удалённые подарки».", "The gift was hidden on this device. It can be brought back from the Removed Gifts screen.") }
+    public var shadowgramGiftRestored: String { return t("Подарок возвращён.", "The gift was restored.") }
+    public var shadowgramGiftEditingAddTitle: String { return t("Новый подарок", "New Gift") }
+    public var shadowgramGiftEditingPickBase: String { return t("Выберите подарок из каталога", "Pick a Gift from the Catalog") }
+    public var shadowgramGiftEditingMakeUnique: String { return t("Сделать NFT (уникальным)", "Make It NFT (Unique)") }
+    public var shadowgramGiftEditingModel: String { return t("Модель", "Model") }
+    public var shadowgramGiftEditingBackdrop: String { return t("Фон", "Backdrop") }
+    public var shadowgramGiftEditingPattern: String { return t("Узор", "Pattern") }
+    public var shadowgramGiftEditingNumber: String { return t("Номер экземпляра", "Instance Number") }
+    public var shadowgramGiftEditingText: String { return t("Текст / сообщение", "Text / Message") }
+    public var shadowgramGiftEditingSender: String { return t("Отправитель (имя)", "Sender (Name)") }
+    public var shadowgramGiftEditingDate: String { return t("Дата (ГГГГ-ММ-ДД)", "Date (YYYY-MM-DD)") }
+    public var shadowgramGiftEditingUpgraded: String { return t("Можно конвертировать в звёзды", "Convertible to Stars") }
+    public var shadowgramGiftEditingSave: String { return t("Добавить", "Add") }
+    public var shadowgramGiftEditingRemovedGiftsEmpty: String { return t("Здесь появятся подарки, скрытые через «Редактировать подарки».", "Gifts hidden through Edit Gifts show up here.") }
+    public var shadowgramGiftEditingRestore: String { return t("Вернуть", "Restore") }
 }
 
 extension ShadowgramStrings {
