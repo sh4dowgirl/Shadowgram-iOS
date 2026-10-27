@@ -41,7 +41,7 @@ enum ShadowgramGiftGridStyle {
 
 private final class ShadowgramGiftGridNode: ASDisplayNode, UIScrollViewDelegate {
     private let context: AccountContext
-    private let style: ShadowgramGiftGridStyle
+    private let gridStyle: ShadowgramGiftGridStyle
     private let emptyText: String
     private let footerText: String?
     private let selected: (ShadowgramGiftGridItem) -> Void
@@ -59,7 +59,7 @@ private final class ShadowgramGiftGridNode: ASDisplayNode, UIScrollViewDelegate 
     init(context: AccountContext, presentationData: PresentationData, style: ShadowgramGiftGridStyle, emptyText: String, footerText: String?, selected: @escaping (ShadowgramGiftGridItem) -> Void) {
         self.context = context
         self.presentationData = presentationData
-        self.style = style
+        self.gridStyle = style
         self.emptyText = emptyText
         self.footerText = footerText
         self.selected = selected
@@ -115,7 +115,7 @@ private final class ShadowgramGiftGridNode: ASDisplayNode, UIScrollViewDelegate 
         let itemWidth = floor((layout.size.width - sideInset * 2.0 - spacing * CGFloat(columns - 1)) / CGFloat(columns))
         let itemHeight: CGFloat
         let mode: GiftItemComponent.Mode
-        switch self.style {
+        switch self.gridStyle {
         case .catalog:
             itemHeight = 154.0
             mode = .generic
@@ -255,7 +255,7 @@ private final class ShadowgramGiftGridNode: ASDisplayNode, UIScrollViewDelegate 
 /// A screen with a grid of gifts to pick from, in the app's own gift cells.
 final class ShadowgramGiftGridController: ViewController {
     private let context: AccountContext
-    private let style: ShadowgramGiftGridStyle
+    private let gridStyle: ShadowgramGiftGridStyle
     private let emptyText: String
     private let footerText: String?
     private let items: Signal<[ShadowgramGiftGridItem]?, NoError>
@@ -269,7 +269,7 @@ final class ShadowgramGiftGridController: ViewController {
 
     init(context: AccountContext, title: String, style: ShadowgramGiftGridStyle, emptyText: String, footerText: String? = nil, items: Signal<[ShadowgramGiftGridItem]?, NoError>, selected: @escaping (ShadowgramGiftGridController, ShadowgramGiftGridItem) -> Void) {
         self.context = context
-        self.style = style
+        self.gridStyle = style
         self.emptyText = emptyText
         self.footerText = footerText
         self.items = items
@@ -291,7 +291,7 @@ final class ShadowgramGiftGridController: ViewController {
     }
 
     override func loadDisplayNode() {
-        self.displayNode = ShadowgramGiftGridNode(context: self.context, presentationData: self.presentationData, style: self.style, emptyText: self.emptyText, footerText: self.footerText, selected: { [weak self] item in
+        self.displayNode = ShadowgramGiftGridNode(context: self.context, presentationData: self.presentationData, style: self.gridStyle, emptyText: self.emptyText, footerText: self.footerText, selected: { [weak self] item in
             guard let self else {
                 return
             }

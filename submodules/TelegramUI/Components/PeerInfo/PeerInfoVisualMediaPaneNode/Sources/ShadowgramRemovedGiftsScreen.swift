@@ -9,6 +9,19 @@ import GiftItemComponent
 import ShadowgramSettings
 import UndoUI
 
+private func shadowgramRemovedGiftId(_ gift: ProfileGiftsContext.State.StarGift, index: Int) -> String {
+    switch gift.reference {
+    case let .message(messageId):
+        return "m_\(messageId.id)"
+    case let .peer(peerId, id):
+        return "p_\(peerId.toInt64())_\(id)"
+    case let .slug(slug):
+        return "s_\(slug)"
+    case .none:
+        return "index_\(index)"
+    }
+}
+
 /// "Gift Editing": the real gifts hidden on this device with the grid's minus button, drawn as
 /// the profile draws them. Tapping one puts it back.
 public func shadowgramPresentRemovedGiftsScreen(context: AccountContext, peerId: EnginePeer.Id, present: @escaping (ViewController) -> Void) {
@@ -19,7 +32,7 @@ public func shadowgramPresentRemovedGiftsScreen(context: AccountContext, peerId:
     |> map { _ -> [ShadowgramGiftGridItem]? in
         var result: [ShadowgramGiftGridItem] = []
         for (index, gift) in shadowgramRemovedGifts(peerId: peerId) {
-            let id = gift.reference?.stringValue ?? "index_\(index)"
+            let id = shadowgramRemovedGiftId(gift, index: index)
             let subject: GiftItemComponent.Subject
             var ribbon: GiftItemComponent.Ribbon?
             switch gift.gift {
@@ -42,7 +55,7 @@ public func shadowgramPresentRemovedGiftsScreen(context: AccountContext, peerId:
     }
 
     let controller = ShadowgramGiftGridController(context: context, title: strings.shadowgramGiftEditingRemovedGifts, style: .profile, emptyText: strings.shadowgramGiftEditingRemovedGiftsEmpty, footerText: strings.shadowgramGiftEditingRemovedFooter, items: items, selected: { controller, item in
-        guard let entry = shadowgramRemovedGifts(peerId: peerId).first(where: { ($0.gift.reference?.stringValue ?? "index_\($0.index)") == item.id }) else {
+        guard let entry = shadowgramRemovedGifts(peerId: peerId).first(where: { shadowgramRemovedGiftId($0.gift, index: $0.index) == item.id }) else {
             return
         }
         shadowgramRestoreRemovedGift(peerId: peerId, index: entry.index)
