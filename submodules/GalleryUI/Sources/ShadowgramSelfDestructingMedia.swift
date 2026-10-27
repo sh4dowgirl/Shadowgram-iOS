@@ -64,13 +64,7 @@ public func shadowgramForwardSelfDestructingMedia(context: AccountContext, messa
     }
     let regularMedia = shadowgramRegularMediaCopy(mediaBox: context.account.postbox.mediaBox, media: media)
 
-    // The same peer picker that a regular forward opens, instead of the share sheet. A view-once
-    // message cannot be forwarded by the server, so the picked chats get the media as a regular message.
-    let controller = context.sharedContext.makePeerSelectionController(PeerSelectionControllerParams(context: context, filter: [.onlyWriteable, .excludeDisabled, .doNotSearchMessages], hasFilters: true, multipleSelection: true, forwardedMessageIds: [message.id], selectForumThreads: true))
-    controller.multiplePeersSelected = { [weak controller] peers, peerMap, messageText, _, _, _ in
-        controller?.dismiss()
-
-        let caption = messageText.string
+    func send(_ peers: [EnginePeer], peerMap: [EnginePeer.Id: EnginePeer], caption: String) {
         for peer in peers {
             var messages: [EnqueueMessage] = []
             messages.append(.message(text: "", attributes: [], inlineStickers: [:], mediaReference: .standalone(media: regularMedia), threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: []))
@@ -109,6 +103,21 @@ public func shadowgramForwardSelfDestructingMedia(context: AccountContext, messa
             return
         }
         present(UndoOverlayController(presentationData: presentationData, content: .forward(savedMessages: savedMessages, text: text), elevatedLayout: false, animateInAsReplacement: true, action: { _ in return false }))
+    }
+
+    // The same peer picker that a regular forward opens, instead of the share sheet. A view-once
+    // message cannot be forwarded by the server, so the picked chats get the media as a regular message.
+    let controller = context.sharedContext.makePeerSelectionController(PeerSelectionControllerParams(context: context, filter: [.onlyWriteable, .excludeDisabled, .doNotSearchMessages], hasFilters: true, multipleSelection: true, forwardedMessageIds: [message.id], selectForumThreads: true))
+    // A plain tap on a chat row always goes through `peerSelected` (it's how the picker's row
+    // tap is wired regardless of `multipleSelection`) - without this, tapping a chat did
+    // nothing and the only way to send was through the multi-select batch below.
+    controller.peerSelected = { [weak controller] peer, _ in
+        controller?.dismiss()
+        send([peer], peerMap: [peer.id: peer], caption: "")
+    }
+    controller.multiplePeersSelected = { [weak controller] peers, peerMap, messageText, _, _, _ in
+        controller?.dismiss()
+        send(peers, peerMap: peerMap, caption: messageText.string)
     }
     present(controller)
 }

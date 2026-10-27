@@ -1299,7 +1299,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
             self.shadowgramBlockedIconView.isHidden = !shadowgramIsBlocked
             self.shadowgramBlockedExpandedIconView.isHidden = !shadowgramIsBlocked
             if shadowgramIsBlocked {
-                let iconImage = shadowgramBlockedIcon(height: 20.0)
+                let iconImage = shadowgramBlockedIcon(height: 15.0)
                 self.shadowgramBlockedIconView.image = iconImage
                 self.shadowgramBlockedExpandedIconView.image = iconImage
             }
@@ -1762,7 +1762,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
         }
         
         if !self.shadowgramBlockedIconView.isHidden {
-            let iconSize = CGSize(width: 20.0, height: 20.0)
+            let iconSize = CGSize(width: 15.0, height: 15.0)
             titleHorizontalOffset += (iconSize.width + 4.0) / 2.0
             titleExpandedHorizontalOffset += iconSize.width - 2.0
             let leftOffset = -iconSize.width - 4.0

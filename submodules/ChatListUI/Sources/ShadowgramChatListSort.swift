@@ -38,25 +38,25 @@ private func shadowgramChatListItem(_ item: EngineChatList.Item, index: EngineCh
 }
 
 func shadowgramOldestFirstChatListUpdate(_ update: ChatListNodeViewUpdate) -> ChatListNodeViewUpdate {
-    var fixed: [EngineChatList.Item] = []
+    // Only unread chats are reordered (oldest-unread-first, pulled above everything else).
+    // Read chats are passed through completely untouched, in their normal (server) order -
+    // sorting never rewrites their index.
+    var items: [EngineChatList.Item] = []
     var unread: [EngineChatList.Item] = []
-    var read: [EngineChatList.Item] = []
     for item in update.list.items {
         guard case let .chatList(index) = item.index, index.pinningIndex == nil else {
-            fixed.append(item)
+            items.append(item)
             continue
         }
         if item.readCounters?.isUnread == true {
             unread.append(item)
         } else {
-            read.append(item)
+            items.append(item)
         }
     }
     unread.sort(by: { $0.index < $1.index })
-    read.sort(by: { $0.index > $1.index })
 
-    var items = fixed
-    for (rank, item) in (unread + read).enumerated() {
+    for (rank, item) in unread.enumerated() {
         guard case let .chatList(index) = item.index else {
             continue
         }

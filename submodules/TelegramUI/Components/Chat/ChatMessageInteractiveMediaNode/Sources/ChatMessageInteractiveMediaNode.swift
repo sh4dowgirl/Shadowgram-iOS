@@ -927,7 +927,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
             
             let isSecretMedia = message.containsSecretMedia
             // Shadowgram: with Unlimited View-Once Media the preview is neither blurred nor covered by the dust shader.
-            let shadowgramRevealsViewOnce = isSecretMedia && message.minAutoremoveOrClearTimeout == viewOnceTimeout && ShadowgramSettings.shared.values.bypassViewOnce
+            let shadowgramRevealsViewOnce = isSecretMedia && ShadowgramSettings.shared.values.bypassViewOnce
             var secretBeginTimeAndTimeout: (Double, Double)?
             if isSecretMedia {
                 if let attribute = message.autoclearAttribute {
@@ -2577,7 +2577,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
         var secretBeginTimeAndTimeout: (Double?, Double)?
         let isSecretMedia = message.containsSecretMedia
         // Shadowgram: with Unlimited View-Once Media the preview is neither blurred nor covered by the dust shader.
-        let shadowgramRevealsViewOnce = isSecretMedia && message.minAutoremoveOrClearTimeout == viewOnceTimeout && ShadowgramSettings.shared.values.bypassViewOnce
+        let shadowgramRevealsViewOnce = isSecretMedia && ShadowgramSettings.shared.values.bypassViewOnce
         if isSecretMedia {
             if let attribute = message.autoclearAttribute {
                 if let countdownBeginTime = attribute.countdownBeginTime {

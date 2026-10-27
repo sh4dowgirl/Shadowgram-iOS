@@ -7,8 +7,12 @@ import ShadowgramSettings
 func _internal_markMessageContentAsConsumedInteractively(postbox: Postbox, messageId: MessageId) -> Signal<Void, NoError> {
     return postbox.transaction { transaction -> Void in
         if let message = transaction.getMessage(messageId), message.flags.contains(.Incoming) {
-            let isViewOnce = message.minAutoremoveOrClearTimeout == viewOnceTimeout
-            let shadowgramBypassViewOnce = isViewOnce && ShadowgramSettings.shared.values.bypassViewOnce
+            // Shadowgram: this must cover every self-destructing photo/video, not just the
+            // count-limited "View Once" sentinel - a time-limited (e.g. 1-60s) secret media
+            // message has minAutoremoveOrClearTimeout set to that duration, not to
+            // viewOnceTimeout, and used to fall through to the normal countdown-start branch
+            // below even with the bypass enabled.
+            let shadowgramBypassViewOnce = message.containsSecretMedia && ShadowgramSettings.shared.values.bypassViewOnce
 
             var updateMessage = false
             var updatedAttributes = message.attributes

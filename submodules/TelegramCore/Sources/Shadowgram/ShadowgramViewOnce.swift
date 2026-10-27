@@ -4,7 +4,11 @@ import SwiftSignalKit
 import ShadowgramSettings
 
 func shadowgramKeepsViewOnceMedia(_ message: Message) -> Bool {
-    return message.flags.contains(.Incoming) && message.minAutoremoveOrClearTimeout == viewOnceTimeout && ShadowgramSettings.shared.values.bypassViewOnce
+    // Covers both the count-limited "View Once" media (minAutoremoveOrClearTimeout ==
+    // viewOnceTimeout) and time-limited self-destructing media (an ordinary short TTL) - both
+    // are `containsSecretMedia`, and both should get the same "mark as viewed" button and the
+    // same immunity from the countdown starting on their own.
+    return message.flags.contains(.Incoming) && message.containsSecretMedia && ShadowgramSettings.shared.values.bypassViewOnce
 }
 
 public func shadowgramViewOnceMediaIsUnreported(_ message: Message) -> Bool {

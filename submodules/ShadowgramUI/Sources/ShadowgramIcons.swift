@@ -93,19 +93,14 @@ public func shadowgramBlockedIcon(height: CGFloat) -> UIImage {
         let barInset = rect.width * 0.2
         let barRect = CGRect(x: rect.minX + barInset, y: rect.midY - barHeight / 2.0, width: rect.width - barInset * 2.0, height: barHeight)
         context.setFillColor(UIColor.white.cgColor)
-        let angle: CGFloat = -CGFloat.pi / 4.0
-        context.saveGState()
-        context.translateBy(x: rect.midX, y: rect.midY)
-        context.rotate(by: angle)
-        context.fill(CGRect(x: -barRect.width / 2.0, y: -barHeight / 2.0, width: barRect.width, height: barHeight))
-        context.restoreGState()
+        context.fill(barRect)
     }
 }
 
 /// Returns an `NSAttributedString` containing just the blocked icon as an inline image attachment,
 /// sized to match the given font, with a trailing space.
 public func shadowgramBlockedIconAttachment(font: UIFont) -> NSAttributedString {
-    let height = round(font.capHeight * 0.85)
+    let height = round(font.capHeight * 0.62)
     let image = shadowgramBlockedIcon(height: height)
     let attachment = NSTextAttachment()
     attachment.image = image

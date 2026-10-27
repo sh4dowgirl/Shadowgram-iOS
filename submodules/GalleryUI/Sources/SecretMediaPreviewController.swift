@@ -366,7 +366,16 @@ public final class SecretMediaPreviewController: ViewController {
                 return
             }
             shadowgramForwardSelfDestructingMedia(context: self.context, message: message, present: { [weak self] controller in
-                self?.present(controller, in: .window(.root))
+                guard let self else {
+                    return
+                }
+                // The picker needs to be hosted inside a NavigationController to get its
+                // "Select"/cancel chrome and its swipe-to-dismiss handling (the same way every
+                // other forward entry point in the app pushes it onto an existing navigation
+                // controller) - this gallery viewer has none of its own, so build a throwaway one.
+                let navigationController = NavigationController(mode: .single, theme: NavigationControllerTheme(presentationTheme: self.presentationData.theme))
+                navigationController.viewControllers = [controller]
+                self.present(navigationController, animated: true, completion: nil)
             })
         }
         

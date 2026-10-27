@@ -1584,7 +1584,10 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                 }, action: { _, f in
                     f(.dismissWithoutContent)
                     shadowgramForwardSelfDestructingMedia(context: context, message: message, present: { c in
-                        controllerInteraction.presentController(c, nil)
+                        // Push, like every other forward entry point in the app, so the
+                        // picker gets its "Select"/cancel chrome and swipe-to-dismiss; a bare
+                        // `presentController` left it with no way to cancel out.
+                        controllerInteraction.navigationController()?.pushViewController(c)
                     })
                 })))
             }
