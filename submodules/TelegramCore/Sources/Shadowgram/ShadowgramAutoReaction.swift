@@ -42,36 +42,50 @@ func shadowgramApplyAutoReactions(transaction: Transaction, accountPeerId: PeerI
         if message.media.contains(where: { $0 is TelegramMediaAction }) {
             continue
         }
-        guard let authorId = message.author?.id, authorId != accountPeerId, authorId.namespace == Namespaces.Peer.CloudUser else {
+        // A channel's own post resolves its author to the channel itself (no separate fromId),
+        // so allowing CloudChannel here is what lets a channel be added as an auto-reaction
+        // target, not just users.
+        guard let authorId = message.author?.id, authorId != accountPeerId, authorId.namespace == Namespaces.Peer.CloudUser || authorId.namespace == Namespaces.Peer.CloudChannel else {
             continue
         }
-        guard let value = autoReactions[authorId.toInt64()] else {
+        guard let values = autoReactions[authorId.toInt64()], !values.isEmpty else {
             continue
         }
         if let user = transaction.getPeer(authorId) as? TelegramUser, user.botInfo != nil {
             continue
         }
 
-        let reaction: MessageReaction.Reaction
-        switch value {
-        case let .emoji(emoji):
-            reaction = .builtin(emoji)
-        case let .custom(fileId):
-            let isPremium: Bool
-            if let accountIsPremium {
-                isPremium = accountIsPremium
-            } else {
-                isPremium = (transaction.getPeer(accountPeerId) as? TelegramUser)?.isPremium ?? false
-                accountIsPremium = isPremium
+        var reactions: [MessageReaction.Reaction] = []
+        for value in values {
+            let reaction: MessageReaction.Reaction
+            switch value {
+            case let .emoji(emoji):
+                reaction = .builtin(emoji)
+            case let .custom(fileId):
+                let isPremium: Bool
+                if let accountIsPremium {
+                    isPremium = accountIsPremium
+                } else {
+                    isPremium = (transaction.getPeer(accountPeerId) as? TelegramUser)?.isPremium ?? false
+                    accountIsPremium = isPremium
+                }
+                if !isPremium {
+                    continue
+                }
+                reaction = .custom(fileId)
             }
-            if !isPremium {
+            guard shadowgramAutoReactionAllowed(transaction: transaction, chatPeerId: id.peerId, reaction: reaction) else {
                 continue
             }
-            reaction = .custom(fileId)
+            if !reactions.contains(reaction) {
+                reactions.append(reaction)
+            }
         }
-
-        if !shadowgramAutoReactionAllowed(transaction: transaction, chatPeerId: id.peerId, reaction: reaction) {
+        guard !reactions.isEmpty else {
             continue
+        }
+        if let maxCount = shadowgramMaxReactionCount(transaction: transaction, chatPeerId: id.peerId) {
+            reactions = Array(reactions.prefix(Int(maxCount)))
         }
         if let groupingKey = message.groupingKey {
             if reactedGroupingKeys.contains(groupingKey) {
@@ -79,7 +93,7 @@ func shadowgramApplyAutoReactions(transaction: Transaction, accountPeerId: PeerI
             }
             reactedGroupingKeys.insert(groupingKey)
         }
-        shadowgramPutReaction(transaction: transaction, accountPeerId: accountPeerId, messageId: id, reaction: reaction)
+        shadowgramPutReaction(transaction: transaction, accountPeerId: accountPeerId, messageId: id, reactions: reactions)
     }
 }
 
@@ -106,7 +120,19 @@ private func shadowgramAutoReactionAllowed(transaction: Transaction, chatPeerId:
     }
 }
 
-private func shadowgramPutReaction(transaction: Transaction, accountPeerId: PeerId, messageId: MessageId, reaction: MessageReaction.Reaction) {
+/// A group or channel admin can raise or lower how many reactions one person may put on a
+/// single message; nil means no chat-specific cap is known (private chats never have one).
+private func shadowgramMaxReactionCount(transaction: Transaction, chatPeerId: PeerId) -> Int32? {
+    let cachedData = transaction.getPeerCachedData(peerId: chatPeerId)
+    if let cachedData = cachedData as? CachedChannelData {
+        return cachedData.reactionSettings.knownValue?.maxReactionCount
+    } else if let cachedData = cachedData as? CachedGroupData {
+        return cachedData.reactionSettings.knownValue?.maxReactionCount
+    }
+    return nil
+}
+
+private func shadowgramPutReaction(transaction: Transaction, accountPeerId: PeerId, messageId: MessageId, reactions reactionValues: [MessageReaction.Reaction]) {
     var sendAsPeerId = accountPeerId
     if let cachedData = transaction.getPeerCachedData(peerId: messageId.peerId) as? CachedChannelData, let sendAsPeerIdValue = cachedData.sendAsPeerId {
         sendAsPeerId = sendAsPeerIdValue
@@ -130,7 +156,7 @@ private func shadowgramPutReaction(transaction: Transaction, accountPeerId: Peer
             storeForwardInfo = StoreMessageForwardInfo(authorId: forwardInfo.author?.id, sourceId: forwardInfo.source?.id, sourceMessageId: forwardInfo.sourceMessageId, date: forwardInfo.date, authorSignature: forwardInfo.authorSignature, psaType: forwardInfo.psaType, flags: forwardInfo.flags)
         }
         var attributes = currentMessage.attributes
-        attributes.append(PendingReactionsMessageAttribute(accountPeerId: accountPeerId, reactions: [PendingReactionsMessageAttribute.PendingReaction(value: reaction, sendAsPeerId: sendAsPeerId)], isLarge: false, storeAsRecentlyUsed: false, isTags: false))
+        attributes.append(PendingReactionsMessageAttribute(accountPeerId: accountPeerId, reactions: reactionValues.map { PendingReactionsMessageAttribute.PendingReaction(value: $0, sendAsPeerId: sendAsPeerId) }, isLarge: false, storeAsRecentlyUsed: false, isTags: false))
         didUpdate = true
         return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
     })

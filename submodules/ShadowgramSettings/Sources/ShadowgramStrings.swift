@@ -95,8 +95,8 @@ extension ShadowgramStrings {
     public var autoReactionOff: String { return t("Выкл", "Off") }
     public var autoReactionUsersHeader: String { return t("ПОЛЬЗОВАТЕЛИ", "USERS") }
     public var autoReactionAddUser: String { return t("Добавить пользователя", "Add User") }
-    public var autoReactionSelectUser: String { return t("Выберите пользователя", "Select User") }
-    public var autoReactionFooter: String { return t("На каждое новое сообщение от этих пользователей Shadowgram сам поставит выбранную реакцию: в личном чате и, если включён переключатель «В группах», в группах, где такая реакция разрешена. Нажмите на пользователя, чтобы сменить реакцию, смахните влево, чтобы убрать. Реакции из своих эмодзи работают только с Telegram Premium.", "Shadowgram puts the chosen reaction on every new message from these users: in your private chat and, if In Groups is on, in groups that allow that reaction. Tap a user to change the reaction, swipe left to remove them. Custom emoji reactions require Telegram Premium.") }
+    public var autoReactionSelectUser: String { return t("Выберите пользователя или канал", "Select User or Channel") }
+    public var autoReactionFooter: String { return t("На каждое новое сообщение от этих пользователей или постов этих каналов Shadowgram сам поставит выбранные реакции: в личном чате всегда, в группах и каналах — если включён переключатель «В группах». Одного и того же пользователя или канал можно добавить до 3 раз, чтобы поставить сразу несколько реакций (как Premium при выборе вручную). Нажмите на строку, чтобы сменить реакцию, смахните влево, чтобы убрать. Реакции из своих эмодзи работают только с Telegram Premium.", "Shadowgram puts the chosen reactions on every new message from these users and posts from these channels: always in a private chat, and in groups/channels if In Groups is on. The same user or channel can be added up to 3 times to put several reactions at once, like Premium lets you do by hand. Tap a row to change its reaction, swipe left to remove it. Custom emoji reactions require Telegram Premium.") }
 
     public func autoReactionUserCount(_ count: Int) -> String {
         if self.isRussian {
@@ -183,8 +183,8 @@ extension ShadowgramStrings {
     public var messageBlockedUsers: String { return t("Писать заблокированным", "Message Blocked Users") }
     public var messageBlockedUsersFooter: String { return t("В чате с заблокированным вами пользователем вместо кнопки «Разблокировать» остаётся поле ввода, и сообщения можно отправлять, не снимая блокировку. Блокировка при этом сохраняется.", "In a chat with a user you have blocked, the message input stays instead of the Unblock button, so you can send messages without unblocking. The block itself stays in place.") }
 
-    public var autoReactionInGroups: String { return t("В группах", "In Groups") }
-    public var autoReactionInGroupsFooter: String { return t("Если включено, реакция ставится на сообщения выбранных пользователей и в группах (где такая реакция разрешена). Если выключено — только в личных чатах.", "When on, the reaction is also put on messages from the chosen users in groups (where that reaction is allowed). When off, only in private chats.") }
+    public var autoReactionInGroups: String { return t("В группах и каналах", "In Groups and Channels") }
+    public var autoReactionInGroupsFooter: String { return t("Если включено, реакция ставится на сообщения выбранных пользователей и постов выбранных каналов также в группах и каналах (где такая реакция разрешена). Если выключено — только в личных чатах.", "When on, the reaction is also put on messages from the chosen users and posts from the chosen channels in groups and channels (where that reaction is allowed). When off, only in private chats.") }
 
     public var blockedMeAlertTitle: String { return t("Возможно, вы заблокированы", "Possibly Blocked") }
     public var blockedMeAlertText: String { return t("У этого пользователя нет фото и он был в сети «давно». Это совпадает с тем, как выглядит заблокировавший вас контакт, но также бывает у неактивных аккаунтов.", "This user has no photo and was last seen \"a long time ago\". This matches how a contact who blocked you looks, but it can also be an inactive account.") }

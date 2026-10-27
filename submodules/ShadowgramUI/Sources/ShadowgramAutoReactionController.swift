@@ -14,15 +14,20 @@ import TextFormat
 import EntityKeyboard
 import ShadowgramSettings
 
+/// A message can carry at most this many reactions from one account (matches the limit a
+/// Premium account has when picking reactions by hand), so a peer can be added at most this
+/// many times.
+let shadowgramAutoReactionMaxPerPeer = 3
+
 private final class ShadowgramAutoReactionArguments {
     let context: AccountContext
     let addUser: () -> Void
-    let openUser: (EnginePeer.Id) -> Void
-    let removeUser: (EnginePeer.Id) -> Void
-    let setPeerIdWithRevealedOptions: (EnginePeer.Id?, EnginePeer.Id?) -> Void
+    let openUser: (EnginePeer.Id, Int) -> Void
+    let removeUser: (EnginePeer.Id, Int) -> Void
+    let setPeerIdWithRevealedOptions: (ShadowgramAutoReactionRowId?, ShadowgramAutoReactionRowId?) -> Void
     let setInGroups: (Bool) -> Void
 
-    init(context: AccountContext, addUser: @escaping () -> Void, openUser: @escaping (EnginePeer.Id) -> Void, removeUser: @escaping (EnginePeer.Id) -> Void, setPeerIdWithRevealedOptions: @escaping (EnginePeer.Id?, EnginePeer.Id?) -> Void, setInGroups: @escaping (Bool) -> Void) {
+    init(context: AccountContext, addUser: @escaping () -> Void, openUser: @escaping (EnginePeer.Id, Int) -> Void, removeUser: @escaping (EnginePeer.Id, Int) -> Void, setPeerIdWithRevealedOptions: @escaping (ShadowgramAutoReactionRowId?, ShadowgramAutoReactionRowId?) -> Void, setInGroups: @escaping (Bool) -> Void) {
         self.context = context
         self.addUser = addUser
         self.openUser = openUser
@@ -32,9 +37,16 @@ private final class ShadowgramAutoReactionArguments {
     }
 }
 
+/// Identifies one row - a peer can occupy up to `shadowgramAutoReactionMaxPerPeer` rows, one per
+/// occurrence, so the peer id alone is not a unique row identity any more.
+struct ShadowgramAutoReactionRowId: Hashable {
+    let peerId: EnginePeer.Id
+    let occurrenceIndex: Int
+}
+
 private enum ShadowgramAutoReactionTag: ItemListItemTag, Equatable {
     case addUser
-    case user(EnginePeer.Id)
+    case row(ShadowgramAutoReactionRowId)
 
     func isEqual(to other: ItemListItemTag) -> Bool {
         if let other = other as? ShadowgramAutoReactionTag {
@@ -46,7 +58,7 @@ private enum ShadowgramAutoReactionTag: ItemListItemTag, Equatable {
 }
 
 private struct ShadowgramAutoReactionState: Equatable {
-    var peerIdWithRevealedOptions: EnginePeer.Id?
+    var rowIdWithRevealedOptions: ShadowgramAutoReactionRowId?
 }
 
 private enum ShadowgramAutoReactionEntryId: Hashable {
@@ -54,7 +66,7 @@ private enum ShadowgramAutoReactionEntryId: Hashable {
     case groupsFooter
     case header
     case addUser
-    case user(EnginePeer.Id)
+    case row(ShadowgramAutoReactionRowId)
     case footer
 }
 
@@ -63,7 +75,7 @@ private enum ShadowgramAutoReactionEntry: ItemListNodeEntry {
     case groupsFooter
     case header
     case addUser
-    case user(index: Int32, peer: EnginePeer, reaction: ShadowgramAutoReactionValue, editing: ItemListPeerItemEditing)
+    case user(index: Int32, rowId: ShadowgramAutoReactionRowId, peer: EnginePeer, reaction: ShadowgramAutoReactionValue, editing: ItemListPeerItemEditing)
     case footer
 
     var section: ItemListSectionId {
@@ -85,8 +97,8 @@ private enum ShadowgramAutoReactionEntry: ItemListNodeEntry {
             return .header
         case .addUser:
             return .addUser
-        case let .user(_, peer, _, _):
-            return .user(peer.id)
+        case let .user(_, rowId, _, _, _):
+            return .row(rowId)
         case .footer:
             return .footer
         }
@@ -102,7 +114,7 @@ private enum ShadowgramAutoReactionEntry: ItemListNodeEntry {
             return 0
         case .addUser:
             return 1
-        case let .user(index, _, _, _):
+        case let .user(index, _, _, _, _):
             return 2 + index
         case .footer:
             return Int32.max
@@ -129,7 +141,7 @@ private enum ShadowgramAutoReactionEntry: ItemListNodeEntry {
             return ItemListPeerActionItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesItemList.addPersonIcon(presentationData.theme), title: strings.autoReactionAddUser, sectionId: self.section, height: .peerList, editing: false, action: {
                 arguments.addUser()
             }, tag: ShadowgramAutoReactionTag.addUser)
-        case let .user(_, peer, reaction, editing):
+        case let .user(_, rowId, peer, reaction, editing):
             let font = Font.regular(floor(presentationData.fontSize.itemListBaseFontSize * 20.0 / 17.0))
             let label: NSAttributedString
             switch reaction {
@@ -143,19 +155,19 @@ private enum ShadowgramAutoReactionEntry: ItemListNodeEntry {
                 ])
             }
             return ItemListPeerItem(presentationData: presentationData, systemStyle: .glass, dateTimeFormat: presentationData.dateTimeFormat, nameDisplayOrder: presentationData.nameDisplayOrder, context: arguments.context, peer: peer, presence: nil, text: .none, label: .attributedText(label), editing: editing, enabled: true, selectable: true, sectionId: self.section, action: {
-                arguments.openUser(peer.id)
+                arguments.openUser(rowId.peerId, rowId.occurrenceIndex)
             }, setPeerIdWithRevealedOptions: { peerId, fromPeerId in
-                arguments.setPeerIdWithRevealedOptions(peerId, fromPeerId)
-            }, removePeer: { peerId in
-                arguments.removeUser(peerId)
-            }, tag: ShadowgramAutoReactionTag.user(peer.id))
+                arguments.setPeerIdWithRevealedOptions(peerId.map { ShadowgramAutoReactionRowId(peerId: $0, occurrenceIndex: rowId.occurrenceIndex) }, fromPeerId.map { _ in rowId })
+            }, removePeer: { _ in
+                arguments.removeUser(rowId.peerId, rowId.occurrenceIndex)
+            }, tag: ShadowgramAutoReactionTag.row(rowId))
         case .footer:
             return ItemListTextItem(presentationData: presentationData, text: .plain(strings.autoReactionFooter), sectionId: self.section)
         }
     }
 }
 
-private func shadowgramAutoReactionEntries(presentationData: PresentationData, state: ShadowgramAutoReactionState, autoReactions: [Int64: ShadowgramAutoReactionValue], peers: [EnginePeer], inGroups: Bool) -> [ShadowgramAutoReactionEntry] {
+private func shadowgramAutoReactionEntries(presentationData: PresentationData, state: ShadowgramAutoReactionState, autoReactions: [Int64: [ShadowgramAutoReactionValue]], peers: [EnginePeer], inGroups: Bool) -> [ShadowgramAutoReactionEntry] {
     var entries: [ShadowgramAutoReactionEntry] = []
     entries.append(.groupsSwitch(inGroups))
     entries.append(.groupsFooter)
@@ -172,11 +184,14 @@ private func shadowgramAutoReactionEntries(presentationData: PresentationData, s
     }
     var index: Int32 = 0
     for peer in sortedPeers {
-        guard let reaction = autoReactions[peer.id.toInt64()] else {
+        guard let reactions = autoReactions[peer.id.toInt64()], !reactions.isEmpty else {
             continue
         }
-        entries.append(.user(index: index, peer: peer, reaction: reaction, editing: ItemListPeerItemEditing(editable: true, editing: false, revealed: state.peerIdWithRevealedOptions == peer.id)))
-        index += 1
+        for (occurrenceIndex, reaction) in reactions.enumerated() {
+            let rowId = ShadowgramAutoReactionRowId(peerId: peer.id, occurrenceIndex: occurrenceIndex)
+            entries.append(.user(index: index, rowId: rowId, peer: peer, reaction: reaction, editing: ItemListPeerItemEditing(editable: true, editing: false, revealed: state.rowIdWithRevealedOptions == rowId)))
+            index += 1
+        }
     }
     entries.append(.footer)
     return entries
@@ -199,9 +214,12 @@ private func shadowgramAutoReactionSourceView(controller: ItemListController, ta
     return result
 }
 
-private func shadowgramPresentAutoReactionSelector(context: AccountContext, controller: ItemListController, peerId: EnginePeer.Id, anchor: ShadowgramAutoReactionTag) {
+/// `occurrenceIndex`: nil appends a new reaction for `peerId` (capped at
+/// `shadowgramAutoReactionMaxPerPeer`); a value replaces that existing occurrence.
+private func shadowgramPresentAutoReactionSelector(context: AccountContext, controller: ItemListController, peerId: EnginePeer.Id, occurrenceIndex: Int?, anchor: ShadowgramAutoReactionTag) {
     let isPremium = context.isPremium
-    let current = ShadowgramSettings.shared.values.autoReactions[peerId.toInt64()]
+    let existing = ShadowgramSettings.shared.values.autoReactions[peerId.toInt64()] ?? []
+    let current = occurrenceIndex.flatMap { existing.indices.contains($0) ? existing[$0] : nil }
     let _ = (context.engine.stickers.availableReactions()
     |> take(1)
     |> deliverOnMainQueue).start(next: { [weak controller] availableReactions in
@@ -239,7 +257,19 @@ private func shadowgramPresentAutoReactionSelector(context: AccountContext, cont
                 } else {
                     return
                 }
-                ShadowgramSettings.shared.update { $0.autoReactions[peerId.toInt64()] = value }
+                ShadowgramSettings.shared.update { settings in
+                    var reactions = settings.autoReactions[peerId.toInt64()] ?? []
+                    if let occurrenceIndex, reactions.indices.contains(occurrenceIndex) {
+                        reactions[occurrenceIndex] = value
+                    } else if !reactions.contains(value) && reactions.count < shadowgramAutoReactionMaxPerPeer {
+                        reactions.append(value)
+                    }
+                    if reactions.isEmpty {
+                        settings.autoReactions.removeValue(forKey: peerId.toInt64())
+                    } else {
+                        settings.autoReactions[peerId.toInt64()] = reactions
+                    }
+                }
             }),
             sourceView: sourceView,
             emojiContent: EmojiPagerContentComponent.emojiInputData(
@@ -266,7 +296,7 @@ private func shadowgramPresentAutoReactionSelector(context: AccountContext, cont
 }
 
 public func shadowgramAutoReactionController(context: AccountContext) -> ViewController {
-    let initialState = ShadowgramAutoReactionState(peerIdWithRevealedOptions: nil)
+    let initialState = ShadowgramAutoReactionState(rowIdWithRevealedOptions: nil)
     let statePromise = ValuePromise(initialState, ignoreRepeated: true)
     let stateValue = Atomic(value: initialState)
     let updateState: ((ShadowgramAutoReactionState) -> ShadowgramAutoReactionState) -> Void = { f in
@@ -281,38 +311,68 @@ public func shadowgramAutoReactionController(context: AccountContext) -> ViewCon
         }
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
         let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
-        let peerController = context.sharedContext.makePeerSelectionController(PeerSelectionControllerParams(context: context, filter: [.onlyPrivateChats, .excludeSavedMessages, .excludeSecretChats, .excludeBots, .removeSearchHeader, .excludeRecent, .doNotSearchMessages], title: strings.autoReactionSelectUser))
+        // Users and broadcast channels (a channel's own posts show the channel as the author),
+        // but not groups/supergroups or secret chats - those aren't valid auto-reaction targets.
+        let peerController = context.sharedContext.makePeerSelectionController(PeerSelectionControllerParams(context: context, filter: [.excludeGroups, .excludeSavedMessages, .excludeSecretChats, .excludeBots, .removeSearchHeader, .excludeRecent, .doNotSearchMessages], title: strings.autoReactionSelectUser))
         peerController.peerSelected = { [weak peerController] peer, _ in
             peerController?.dismiss()
-            guard case let .user(user) = peer, user.botInfo == nil, peer.id != context.account.peerId else {
+            let isValidTarget: Bool
+            switch peer {
+            case let .user(user):
+                isValidTarget = user.botInfo == nil
+            case let .channel(channel):
+                if case .broadcast = channel.info {
+                    isValidTarget = true
+                } else {
+                    isValidTarget = false
+                }
+            default:
+                isValidTarget = false
+            }
+            guard isValidTarget, peer.id != context.account.peerId else {
                 return
             }
             let peerId = peer.id
+            let existingCount = (ShadowgramSettings.shared.values.autoReactions[peerId.toInt64()] ?? []).count
+            guard existingCount < shadowgramAutoReactionMaxPerPeer else {
+                return
+            }
             Queue.mainQueue().after(0.45, {
                 guard let controller = weakController else {
                     return
                 }
-                shadowgramPresentAutoReactionSelector(context: context, controller: controller, peerId: peerId, anchor: .addUser)
+                shadowgramPresentAutoReactionSelector(context: context, controller: controller, peerId: peerId, occurrenceIndex: nil, anchor: .addUser)
             })
         }
         controller.push(peerController)
-    }, openUser: { peerId in
+    }, openUser: { peerId, occurrenceIndex in
         guard let controller = weakController else {
             return
         }
-        shadowgramPresentAutoReactionSelector(context: context, controller: controller, peerId: peerId, anchor: .user(peerId))
-    }, removeUser: { peerId in
+        let rowId = ShadowgramAutoReactionRowId(peerId: peerId, occurrenceIndex: occurrenceIndex)
+        shadowgramPresentAutoReactionSelector(context: context, controller: controller, peerId: peerId, occurrenceIndex: occurrenceIndex, anchor: .row(rowId))
+    }, removeUser: { peerId, occurrenceIndex in
         updateState { state in
             var state = state
-            state.peerIdWithRevealedOptions = nil
+            state.rowIdWithRevealedOptions = nil
             return state
         }
-        ShadowgramSettings.shared.update { $0.autoReactions[peerId.toInt64()] = nil }
-    }, setPeerIdWithRevealedOptions: { peerId, fromPeerId in
+        ShadowgramSettings.shared.update { settings in
+            var reactions = settings.autoReactions[peerId.toInt64()] ?? []
+            if reactions.indices.contains(occurrenceIndex) {
+                reactions.remove(at: occurrenceIndex)
+            }
+            if reactions.isEmpty {
+                settings.autoReactions.removeValue(forKey: peerId.toInt64())
+            } else {
+                settings.autoReactions[peerId.toInt64()] = reactions
+            }
+        }
+    }, setPeerIdWithRevealedOptions: { rowId, fromRowId in
         updateState { state in
-            if (peerId == nil && fromPeerId == state.peerIdWithRevealedOptions) || (peerId != nil && fromPeerId == nil) {
+            if (rowId == nil && fromRowId == state.rowIdWithRevealedOptions) || (rowId != nil && fromRowId == nil) {
                 var state = state
-                state.peerIdWithRevealedOptions = peerId
+                state.rowIdWithRevealedOptions = rowId
                 return state
             } else {
                 return state
@@ -322,16 +382,16 @@ public func shadowgramAutoReactionController(context: AccountContext) -> ViewCon
         ShadowgramSettings.shared.update { $0.autoReactionsInGroups = value }
     })
 
-    let peers: Signal<([Int64: ShadowgramAutoReactionValue], [EnginePeer]), NoError> = ShadowgramSettings.shared.valuesSignal
+    let peers: Signal<([Int64: [ShadowgramAutoReactionValue]], [EnginePeer]), NoError> = ShadowgramSettings.shared.valuesSignal
     |> map { $0.autoReactions }
     |> distinctUntilChanged
-    |> mapToSignal { autoReactions -> Signal<([Int64: ShadowgramAutoReactionValue], [EnginePeer]), NoError> in
+    |> mapToSignal { autoReactions -> Signal<([Int64: [ShadowgramAutoReactionValue]], [EnginePeer]), NoError> in
         let peerIds = autoReactions.keys.map { EnginePeer.Id($0) }
         if peerIds.isEmpty {
             return .single((autoReactions, []))
         }
         return context.engine.data.subscribe(EngineDataMap(peerIds.map(TelegramEngine.EngineData.Item.Peer.Peer.init)))
-        |> map { peerMap -> ([Int64: ShadowgramAutoReactionValue], [EnginePeer]) in
+        |> map { peerMap -> ([Int64: [ShadowgramAutoReactionValue]], [EnginePeer]) in
             var peers: [EnginePeer] = []
             for peerId in peerIds {
                 if let maybePeer = peerMap[peerId], let peer = maybePeer {

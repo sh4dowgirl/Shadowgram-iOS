@@ -89,7 +89,9 @@ public struct ShadowgramSettingsValues: Equatable {
     public var privateChatIds: Set<Int64>
     /// Where the groups folder shows up.
     public var groupsFolderPlacement: ShadowgramGroupsFolderPlacement
-    public var autoReactions: [Int64: ShadowgramAutoReactionValue]
+    /// Up to `shadowgramAutoReactionMaxPerPeer` (3) reactions per peer, matching the limit a
+    /// Premium account can put on one message by hand.
+    public var autoReactions: [Int64: [ShadowgramAutoReactionValue]]
     public var chatListOldestFirst: Bool
     /// Show exact last-seen timestamps even when users hide them.
     public var showExactLastSeen: Bool
@@ -152,7 +154,7 @@ public struct ShadowgramSettingsValues: Equatable {
         starsOverrides: [:]
     )
 
-    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactions: [Int64: ShadowgramAutoReactionValue], chatListOldestFirst: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool, roundVideoCamera: ShadowgramRoundVideoCamera, pictureInPictureOnBackground: Bool, forwardSelfDestructingMedia: Bool, unlockStoryTools: Bool, unlockMediaSaving: Bool, unlockChatTranslation: Bool, hideAds: Bool, unlockExtraFolders: Bool, messageBlockedUsers: Bool, autoReactionsInGroups: Bool, starsOverrides: [Int64: Int64]) {
+    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactions: [Int64: [ShadowgramAutoReactionValue]], chatListOldestFirst: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool, roundVideoCamera: ShadowgramRoundVideoCamera, pictureInPictureOnBackground: Bool, forwardSelfDestructingMedia: Bool, unlockStoryTools: Bool, unlockMediaSaving: Bool, unlockChatTranslation: Bool, hideAds: Bool, unlockExtraFolders: Bool, messageBlockedUsers: Bool, autoReactionsInGroups: Bool, starsOverrides: [Int64: Int64]) {
         self.saveDeletedMessages = saveDeletedMessages
         self.unlimitedAccounts = unlimitedAccounts
         self.ghostModeEnabled = ghostModeEnabled
@@ -278,10 +280,14 @@ public final class ShadowgramSettings {
         func idSet(_ key: String) -> Set<Int64> {
             return Set(((defaults.array(forKey: key) as? [NSNumber]) ?? []).map { $0.int64Value })
         }
-        var autoReactions: [Int64: ShadowgramAutoReactionValue] = [:]
+        var autoReactions: [Int64: [ShadowgramAutoReactionValue]] = [:]
         for (key, value) in (defaults.dictionary(forKey: Key.autoReactions) as? [String: String]) ?? [:] {
-            if let peerId = Int64(key), let reaction = ShadowgramAutoReactionValue(encoded: value) {
-                autoReactions[peerId] = reaction
+            guard let peerId = Int64(key) else {
+                continue
+            }
+            let reactions = value.split(separator: "|").compactMap { ShadowgramAutoReactionValue(encoded: String($0)) }
+            if !reactions.isEmpty {
+                autoReactions[peerId] = Array(reactions.prefix(3))
             }
         }
         var starsOverrides: [Int64: Int64] = [:]
@@ -374,8 +380,8 @@ public final class ShadowgramSettings {
         self.defaults.set(values.privateChatIds.sorted().map { NSNumber(value: $0) }, forKey: Key.privateChatIds)
         self.defaults.set(NSNumber(value: values.groupsFolderPlacement.rawValue), forKey: Key.groupsFolderPlacement)
         var encodedAutoReactions: [String: String] = [:]
-        for (peerId, reaction) in values.autoReactions {
-            encodedAutoReactions["\(peerId)"] = reaction.encoded
+        for (peerId, reactions) in values.autoReactions {
+            encodedAutoReactions["\(peerId)"] = reactions.map { $0.encoded }.joined(separator: "|")
         }
         self.defaults.set(encodedAutoReactions, forKey: Key.autoReactions)
         self.defaults.set(values.chatListOldestFirst, forKey: Key.chatListOldestFirst)
