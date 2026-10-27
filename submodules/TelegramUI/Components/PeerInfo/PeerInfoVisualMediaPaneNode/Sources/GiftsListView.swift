@@ -808,7 +808,7 @@ final class GiftsListView: UIView {
                             minusButton.setTitle("–", for: .normal)
                             minusButton.titleLabel?.font = Font.bold(18.0)
                             minusButton.setTitleColor(.white, for: .normal)
-                            minusButton.titleEdgeInsets = UIEdgeInsets(top: -2.0, left: 0.0, right: 0.0, bottom: 0.0)
+                            minusButton.titleEdgeInsets = UIEdgeInsets(top: -2.0, left: 0.0, bottom: 0.0, right: 0.0)
                             self.addSubview(minusButton)
                             minusButton.layer.animateScale(from: 0.01, to: 1.0, duration: 0.2)
                             minusButton.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
