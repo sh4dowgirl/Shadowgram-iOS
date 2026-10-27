@@ -108,6 +108,9 @@ public struct ShadowgramSettingsValues: Equatable {
     /// Keep the message input in chats with users that this account has blocked, instead of the
     /// "Unblock" button, so messages can be sent without unblocking first.
     public var messageBlockedUsers: Bool
+    /// Gift Editing / Stars Editing: a purely local, per-device display override of this
+    /// account's Stars balance. Keyed by `PeerId.toInt64()`; absent means "show the real value".
+    public var starsOverrides: [Int64: Int64]
     /// Auto reactions also apply to messages from the chosen users in groups, not only in private chats.
     public var autoReactionsInGroups: Bool
 
@@ -145,10 +148,11 @@ public struct ShadowgramSettingsValues: Equatable {
         hideAds: false,
         unlockExtraFolders: false,
         messageBlockedUsers: false,
-        autoReactionsInGroups: true
+        autoReactionsInGroups: true,
+        starsOverrides: [:]
     )
 
-    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactions: [Int64: ShadowgramAutoReactionValue], chatListOldestFirst: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool, roundVideoCamera: ShadowgramRoundVideoCamera, pictureInPictureOnBackground: Bool, forwardSelfDestructingMedia: Bool, unlockStoryTools: Bool, unlockMediaSaving: Bool, unlockChatTranslation: Bool, hideAds: Bool, unlockExtraFolders: Bool, messageBlockedUsers: Bool, autoReactionsInGroups: Bool) {
+    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactions: [Int64: ShadowgramAutoReactionValue], chatListOldestFirst: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool, roundVideoCamera: ShadowgramRoundVideoCamera, pictureInPictureOnBackground: Bool, forwardSelfDestructingMedia: Bool, unlockStoryTools: Bool, unlockMediaSaving: Bool, unlockChatTranslation: Bool, hideAds: Bool, unlockExtraFolders: Bool, messageBlockedUsers: Bool, autoReactionsInGroups: Bool, starsOverrides: [Int64: Int64]) {
         self.saveDeletedMessages = saveDeletedMessages
         self.unlimitedAccounts = unlimitedAccounts
         self.ghostModeEnabled = ghostModeEnabled
@@ -183,6 +187,7 @@ public struct ShadowgramSettingsValues: Equatable {
         self.unlockExtraFolders = unlockExtraFolders
         self.messageBlockedUsers = messageBlockedUsers
         self.autoReactionsInGroups = autoReactionsInGroups
+        self.starsOverrides = starsOverrides
     }
 
     /// What the client actually sends: everything unless ghost mode is on and hides it.
@@ -253,6 +258,7 @@ public final class ShadowgramSettings {
         static let unlockExtraFolders = "shadowgram.premium.extraFolders"
         static let messageBlockedUsers = "shadowgram.messageBlockedUsers"
         static let autoReactionsInGroups = "shadowgram.autoReaction.inGroups"
+        static let starsOverrides = "shadowgram.starsOverrides"
     }
 
     private let defaults: UserDefaults
@@ -276,6 +282,12 @@ public final class ShadowgramSettings {
         for (key, value) in (defaults.dictionary(forKey: Key.autoReactions) as? [String: String]) ?? [:] {
             if let peerId = Int64(key), let reaction = ShadowgramAutoReactionValue(encoded: value) {
                 autoReactions[peerId] = reaction
+            }
+        }
+        var starsOverrides: [Int64: Int64] = [:]
+        for (key, value) in (defaults.dictionary(forKey: Key.starsOverrides) as? [String: NSNumber]) ?? [:] {
+            if let peerId = Int64(key) {
+                starsOverrides[peerId] = value.int64Value
             }
         }
 
@@ -313,7 +325,8 @@ public final class ShadowgramSettings {
             hideAds: bool(Key.hideAds, defaultValues.hideAds),
             unlockExtraFolders: bool(Key.unlockExtraFolders, defaultValues.unlockExtraFolders),
             messageBlockedUsers: bool(Key.messageBlockedUsers, defaultValues.messageBlockedUsers),
-            autoReactionsInGroups: bool(Key.autoReactionsInGroups, defaultValues.autoReactionsInGroups)
+            autoReactionsInGroups: bool(Key.autoReactionsInGroups, defaultValues.autoReactionsInGroups),
+            starsOverrides: starsOverrides
         )
         self.currentValues = values
         self.valuesPromise = ValuePromise(values, ignoreRepeated: true)
@@ -379,6 +392,11 @@ public final class ShadowgramSettings {
         self.defaults.set(values.unlockExtraFolders, forKey: Key.unlockExtraFolders)
         self.defaults.set(values.messageBlockedUsers, forKey: Key.messageBlockedUsers)
         self.defaults.set(values.autoReactionsInGroups, forKey: Key.autoReactionsInGroups)
+        var encodedStarsOverrides: [String: NSNumber] = [:]
+        for (peerId, amount) in values.starsOverrides {
+            encodedStarsOverrides["\(peerId)"] = NSNumber(value: amount)
+        }
+        self.defaults.set(encodedStarsOverrides, forKey: Key.starsOverrides)
 
         self.valuesPromise.set(values)
     }

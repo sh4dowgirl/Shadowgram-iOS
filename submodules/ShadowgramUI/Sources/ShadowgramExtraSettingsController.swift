@@ -12,10 +12,12 @@ import ShadowgramSettings
 private final class ShadowgramExtraSettingsArguments {
     let update: ((inout ShadowgramSettingsValues) -> Void) -> Void
     let openAutoReaction: () -> Void
+    let openStarsEditing: () -> Void
 
-    init(update: @escaping ((inout ShadowgramSettingsValues) -> Void) -> Void, openAutoReaction: @escaping () -> Void) {
+    init(update: @escaping ((inout ShadowgramSettingsValues) -> Void) -> Void, openAutoReaction: @escaping () -> Void, openStarsEditing: @escaping () -> Void) {
         self.update = update
         self.openAutoReaction = openAutoReaction
+        self.openStarsEditing = openStarsEditing
     }
 }
 
@@ -100,6 +102,8 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
     case forwardSelfDestructingMediaFooter
     case messageBlockedUsers(Bool)
     case messageBlockedUsersFooter
+    case starsEditing(String)
+    case starsEditingFooter
 
     case roundVideoCameraHeader
     case roundVideoCamera(ShadowgramRoundVideoCamera, Bool)
@@ -117,7 +121,7 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
 
     var category: ShadowgramExtraSettingsCategory {
         switch self {
-        case .ghostHeader, .ghostMode, .ghostFooter, .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter, .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter, .messageBlockedUsers, .messageBlockedUsersFooter:
+        case .ghostHeader, .ghostMode, .ghostFooter, .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter, .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter, .messageBlockedUsers, .messageBlockedUsersFooter, .starsEditing, .starsEditingFooter:
             return .privacy
         case .messagesHeader, .saveDeletedMessages, .messagesFooter, .messagesExtraHeader, .keepEditHistory, .keepEditHistoryFooter, .autoReaction, .roundVideoCameraHeader, .roundVideoCamera, .mediaHeader, .pictureInPictureOnBackground, .pictureInPictureOnBackgroundFooter:
             return .messages
@@ -161,7 +165,7 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return ShadowgramExtraSettingsSection.messagesExtra.rawValue
         case .captureHeader, .hidePhoneOnCapture, .hideEmailOnCapture, .hideIdOnCapture, .hideUsernameOnCapture, .captureFooter:
             return ShadowgramExtraSettingsSection.capture.rawValue
-        case .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter, .messageBlockedUsers, .messageBlockedUsersFooter:
+        case .privacyHeader, .showExactLastSeen, .showExactLastSeenFooter, .bypassCopyProtection, .bypassCopyProtectionFooter, .bypassViewOnce, .bypassViewOnceFooter, .forwardSelfDestructingMedia, .forwardSelfDestructingMediaFooter, .messageBlockedUsers, .messageBlockedUsersFooter, .starsEditing, .starsEditingFooter:
             return ShadowgramExtraSettingsSection.privacy.rawValue
         case .roundVideoCameraHeader, .roundVideoCamera:
             return ShadowgramExtraSettingsSection.roundVideoCamera.rawValue
@@ -266,6 +270,10 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             return 2400
         case .messageBlockedUsersFooter:
             return 2401
+        case .starsEditing:
+            return 2402
+        case .starsEditingFooter:
+            return 2403
         case .roundVideoCameraHeader:
             return 50
         case let .roundVideoCamera(camera, _):
@@ -458,6 +466,12 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
             })
         case .messageBlockedUsersFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain(strings.messageBlockedUsersFooter), sectionId: self.section)
+        case let .starsEditing(summary):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Stars Editing", label: summary, sectionId: self.section, style: .blocks, action: {
+                arguments.openStarsEditing()
+            })
+        case .starsEditingFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain("Locally change what the Stars balance shows, on this device only. Nothing is actually credited or debited - the real balance is unaffected."), sectionId: self.section)
         case .roundVideoCameraHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: strings.roundVideoCameraHeader, sectionId: self.section)
         case let .roundVideoCamera(camera, checked):
@@ -500,13 +514,13 @@ private enum ShadowgramExtraSettingsEntry: ItemListNodeEntry {
     }
 }
 
-private func shadowgramExtraSettingsEntries(values: ShadowgramSettingsValues, strings: ShadowgramStrings, category: ShadowgramExtraSettingsCategory) -> [ShadowgramExtraSettingsEntry] {
-    return shadowgramAllExtraSettingsEntries(values: values, strings: strings).filter { entry in
+private func shadowgramExtraSettingsEntries(values: ShadowgramSettingsValues, strings: ShadowgramStrings, category: ShadowgramExtraSettingsCategory, accountPeerId: Int64) -> [ShadowgramExtraSettingsEntry] {
+    return shadowgramAllExtraSettingsEntries(values: values, strings: strings, accountPeerId: accountPeerId).filter { entry in
         return entry.category == category && !entry.isCategoryTitleHeader
     }
 }
 
-private func shadowgramAllExtraSettingsEntries(values: ShadowgramSettingsValues, strings: ShadowgramStrings) -> [ShadowgramExtraSettingsEntry] {
+private func shadowgramAllExtraSettingsEntries(values: ShadowgramSettingsValues, strings: ShadowgramStrings, accountPeerId: Int64) -> [ShadowgramExtraSettingsEntry] {
     var entries: [ShadowgramExtraSettingsEntry] = []
 
     entries.append(.messagesHeader)
@@ -576,6 +590,8 @@ private func shadowgramAllExtraSettingsEntries(values: ShadowgramSettingsValues,
     entries.append(.forwardSelfDestructingMediaFooter)
     entries.append(.messageBlockedUsers(values.messageBlockedUsers))
     entries.append(.messageBlockedUsersFooter)
+    entries.append(.starsEditing(values.starsOverrides[accountPeerId] != nil ? "Overridden" : ""))
+    entries.append(.starsEditingFooter)
 
     entries.append(.premiumUnlocksHeader)
     entries.append(.unlockStoryTools(values.unlockStoryTools))
@@ -597,6 +613,11 @@ private func shadowgramExtraSettingsCategoryController(context: AccountContext, 
             return
         }
         controller.push(shadowgramAutoReactionController(context: context))
+    }, openStarsEditing: { [weak context] in
+        guard let context, let controller = weakController else {
+            return
+        }
+        presentShadowgramStarsEditing(context: context, from: controller)
     })
 
     let signal = combineLatest(queue: .mainQueue(),
@@ -606,7 +627,7 @@ private func shadowgramExtraSettingsCategoryController(context: AccountContext, 
     |> map { presentationData, values -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = ShadowgramStrings(languageCode: presentationData.strings.primaryComponent.languageCode)
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(strings.extraSettingsCategoryTitle(category.rawValue)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: shadowgramExtraSettingsEntries(values: values, strings: strings, category: category), style: .blocks, animateChanges: false)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: shadowgramExtraSettingsEntries(values: values, strings: strings, category: category, accountPeerId: context.account.peerId.toInt64()), style: .blocks, animateChanges: false)
         return (controllerState, (listState, arguments))
     }
 

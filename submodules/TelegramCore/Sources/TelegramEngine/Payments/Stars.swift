@@ -5,6 +5,7 @@ import SwiftSignalKit
 internal import TelegramApi
 import FlatBuffers
 import FlatSerialization
+import ShadowgramSettings
 
 public struct StarsTopUpOption: Equatable, Codable {
     enum CodingKeys: String, CodingKey {
@@ -642,10 +643,13 @@ private final class StarsContextImpl {
     }
     
     private func updateState(_ state: StarsContext.State) {
+        // `_state` keeps the real, server-reported balance - every future `add()` computes its
+        // delta against it, which is what lets "Stars Editing" survive a later real balance
+        // update. Only the published, publicly-observed state carries the Shadowgram override.
         self._state = state
-        self._statePromise.set(.single(state))
+        self._statePromise.set(.single(shadowgramApplyStarsOverride(ton: self.ton, peerId: self.peerId, state: state)))
     }
-    
+
     var onUpdate: Signal<Void, NoError> {
         return self._statePromise.get()
         |> take(until: { value in
