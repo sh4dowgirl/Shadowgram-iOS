@@ -28,6 +28,25 @@ import LottieComponent
 import ButtonComponent
 import ContextUI
 
+/// Plain `UIButton` with a closure instead of target/action - simplest way to wire the red
+/// minus badge without worrying about leftover targets across layout passes.
+private final class ShadowgramClosureButton: UIButton {
+    var pressed: (() -> Void)?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        self.addTarget(self, action: #selector(self.handleTap), for: .touchUpInside)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    @objc private func handleTap() {
+        self.pressed?()
+    }
+}
+
 final class GiftsListView: UIView {
     private let context: AccountContext
     private let peerId: EnginePeer.Id

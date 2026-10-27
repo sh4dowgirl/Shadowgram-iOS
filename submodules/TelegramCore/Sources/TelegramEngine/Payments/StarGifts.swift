@@ -1967,11 +1967,12 @@ private final class ProfileGiftsContextImpl {
     private let disposable = MetaDisposable()
     private let cacheDisposable = MetaDisposable()
     private let actionDisposable = MetaDisposable()
-    
+    private let shadowgramOverrideDisposable = MetaDisposable()
+
     private var sorting: ProfileGiftsContext.Sorting
     private var filter: ProfileGiftsContext.Filters
     private var limit: Int32
-    
+
     private var gifts: [ProfileGiftsContext.State.StarGift] = []
     private var count: Int32?
     private var dataState: ProfileGiftsContext.State.DataState = .ready(canLoadMore: true, nextOffset: nil)
@@ -2004,14 +2005,22 @@ private final class ProfileGiftsContextImpl {
         self.sorting = sorting
         self.filter = filter
         self.limit = limit
-        
+
         self.loadMore()
+
+        // "Gift Editing" is local-only and never touches the network, so the usual loadMore/
+        // reload path never runs for it - re-push whenever the local overlay changes instead.
+        self.shadowgramOverrideDisposable.set((ShadowgramGiftOverrides.shared.changeSignal
+        |> deliverOn(queue)).start(next: { [weak self] in
+            self?.pushState()
+        }))
     }
-    
+
     deinit {
         self.disposable.dispose()
         self.cacheDisposable.dispose()
         self.actionDisposable.dispose()
+        self.shadowgramOverrideDisposable.dispose()
     }
     
     func reload() {
@@ -2761,17 +2770,24 @@ private final class ProfileGiftsContextImpl {
         
     private func pushState() {
         let useMainData = (self.filter == .All && self.sorting == .date) || self.filteredCount == nil
-        
+
         let effectiveGifts = useMainData ? self.gifts : self.filteredGifts
         let effectiveCount = useMainData ? self.count : self.filteredCount
         let effectiveDataState = useMainData ? self.dataState : self.filteredDataState
-        
+
+        // "Gift Editing": a local-only, per-device overlay - fake gifts added on top, real ones
+        // hidden - applied here, the one place this context's list gets published, so it stays
+        // in effect across every reload/filter/sort change without needing its own cache logic.
+        let overlaidAllGifts = shadowgramOverlayGifts(peerId: self.peerId, base: self.gifts)
+        let overlaidFilteredGifts = shadowgramOverlayGifts(peerId: self.peerId, base: effectiveGifts)
+        let countDelta = Int32(overlaidFilteredGifts.count - effectiveGifts.count)
+
         let state = ProfileGiftsContext.State(
             filter: self.filter,
             sorting: self.sorting,
-            gifts: self.gifts,
-            filteredGifts: effectiveGifts,
-            count: effectiveCount,
+            gifts: overlaidAllGifts,
+            filteredGifts: overlaidFilteredGifts,
+            count: effectiveCount.map { max(0, $0 + countDelta) },
             dataState: effectiveDataState,
             notificationsEnabled: self.notificationsEnabled
         )

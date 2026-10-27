@@ -1,4 +1,5 @@
 import Foundation
+import Postbox
 import ShadowgramSettings
 
 /// "Stars Editing": a purely local, per-device display override of the account's Stars
