@@ -197,12 +197,16 @@ private func shadowgramExtraSettingsEntries(values: ShadowgramSettingsValues, st
                 .checkbox(312, strings.groupsFolderPlacementTab, values.groupsFolderPlacement == .tab, { $0.groupsFolderPlacement = .tab })
             ])
         }
-        blocks.append([
+        var sorting: [ShadowgramExtraSettingsRow] = [
             .header(320, strings.chatListSortHeader),
-            .checkbox(321, strings.chatListSortNewestFirst, !values.chatListOldestFirst, { $0.chatListOldestFirst = false }),
-            .checkbox(322, strings.chatListSortOldestFirst, values.chatListOldestFirst, { $0.chatListOldestFirst = true }),
-            .footer(323, strings.chatListSortFooter)
-        ])
+            .toggle(324, strings.chatListUnreadSort, values.chatListUnreadSortEnabled, \.chatListUnreadSortEnabled)
+        ]
+        if values.chatListUnreadSortEnabled {
+            sorting.append(.checkbox(321, strings.chatListSortNewestFirst, !values.chatListOldestFirst, { $0.chatListOldestFirst = false }))
+            sorting.append(.checkbox(322, strings.chatListSortOldestFirst, values.chatListOldestFirst, { $0.chatListOldestFirst = true }))
+        }
+        sorting.append(.footer(323, strings.chatListUnreadSortFooter))
+        blocks.append(sorting)
         blocks.append([
             .toggle(330, strings.disableCameraSwipe, values.disableCameraSwipe, \.disableCameraSwipe),
             .footer(331, strings.disableCameraSwipeFooter)
@@ -368,7 +372,7 @@ private func shadowgramExtraSettingsCategoryLabel(_ category: ShadowgramExtraSet
     case .restrictions:
         enabled = [values.bypassCopyProtection, values.bypassViewOnce, values.forwardSelfDestructingMedia]
     case .chatList:
-        enabled = [values.groupsFolderEnabled, values.chatListOldestFirst, values.disableCameraSwipe]
+        enabled = [values.groupsFolderEnabled, values.chatListUnreadSortEnabled, values.disableCameraSwipe]
     case .media:
         enabled = [values.roundVideoCamera == .back, values.pictureInPictureOnBackground]
     case .interface:

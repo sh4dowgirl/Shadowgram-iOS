@@ -255,6 +255,8 @@ extension ShadowgramStrings {
     public var messagesSendingHeader: String { return t("ОТПРАВКА", "SENDING") }
     public var restrictionsProtectedHeader: String { return t("ЗАЩИЩЁННЫЕ ЧАТЫ", "PROTECTED CHATS") }
     public var restrictionsSelfDestructingHeader: String { return t("ИСЧЕЗАЮЩИЕ МЕДИА", "SELF-DESTRUCTING MEDIA") }
+    public var chatListUnreadSort: String { return t("Сортировка непрочитанных", "Unread Sorting") }
+    public var chatListUnreadSortFooter: String { return t("Добавляет кнопку сортировки в шапку списка чатов: в ней можно выбрать, показывать непрочитанные чаты сначала новые или сначала старые. Прочитанные чаты всегда остаются на своих местах. Если выключить, кнопка пропадает и чаты идут в обычном порядке.", "Adds a sort button to the chat list header to show unread chats newest or oldest first. Read chats always keep their places. Turning this off removes the button and restores the normal order.") }
     public var chatListSortFooter: String { return t("Порядок меняется только у непрочитанных чатов, прочитанные остаются на своих местах.", "Only unread chats are reordered; read chats keep their places.") }
     public var peerIdsHeader: String { return t("ID ПОЛЬЗОВАТЕЛЕЙ И ЧАТОВ", "USER AND CHAT IDS") }
     public var localEditsStarsHeader: String { return t("ЗВЁЗДЫ", "STARS") }

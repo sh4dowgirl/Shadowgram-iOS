@@ -111,6 +111,15 @@ public func peerInfoNavigationButtonSets(_ flags: PeerInfoNavigationFlags) -> (n
     if flags.channelCanPostStories || flags.isMyProfile {
         normal.right.insert(.postStory, at: 0)
     }
+    // Gift Editing: an empty Gifts tab cannot scroll far enough to pin its tabs and reveal the pane's
+    // set, so the normal set carries add and removed (or Done) while the Gifts tab is selected.
+    if flags.showsGiftEditing, flags.paneKey == .gifts {
+        if flags.isEditingGifts {
+            normal.right.insert(.giftEditDone, at: 0)
+        } else {
+            normal.right.insert(contentsOf: [.giftAdd, .giftRemoved], at: 0)
+        }
+    }
     if flags.isSelectingOrReordering {
         expanded.right.append(.selectionDone)
     } else if let paneKey = flags.paneKey {

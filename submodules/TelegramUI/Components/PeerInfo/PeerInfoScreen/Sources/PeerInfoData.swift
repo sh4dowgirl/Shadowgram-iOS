@@ -1,4 +1,5 @@
 import Foundation
+import ShadowgramSettings
 import UIKit
 import TelegramCore
 import SwiftSignalKit
@@ -1602,6 +1603,8 @@ func peerInfoScreenData(
                     if availablePanes != nil, profileGiftsContext != nil, let cachedData = peerView.cachedData as? CachedUserData {
                         if let starGiftsCount = cachedData.starGiftsCount, starGiftsCount > 0 {
                             availablePanes?.insert(.gifts, at: 1)
+                        } else if shadowgramAlwaysShowsGiftsPane() {
+                            availablePanes?.insert(.gifts, at: 1)
                         }
                     }
                     if let hasStoryArchive, hasStoryArchive {
@@ -1614,6 +1617,8 @@ func peerInfoScreenData(
                     
                     if availablePanes != nil, profileGiftsContext != nil, let cachedData = peerView.cachedData as? CachedUserData, peerView.peerId != context.account.peerId {
                         if let starGiftsCount = cachedData.starGiftsCount, starGiftsCount > 0 {
+                            availablePanes?.insert(.gifts, at: hasStories ? 1 : 0)
+                        } else if shadowgramAlwaysShowsGiftsPane() {
                             availablePanes?.insert(.gifts, at: hasStories ? 1 : 0)
                         }
                     }
@@ -1953,7 +1958,7 @@ func peerInfoScreenData(
                     }
                     
                     if availablePanes != nil, let cachedData = peerView.cachedData as? CachedChannelData {
-                        if (cachedData.starGiftsCount ?? 0) > 0 || (profileGiftsState.count ?? 0) > 0 || forceHasGifts {
+                        if (cachedData.starGiftsCount ?? 0) > 0 || (profileGiftsState.count ?? 0) > 0 || forceHasGifts || shadowgramAlwaysShowsGiftsPane() {
                             availablePanes?.insert(.gifts, at: hasStories ? 1 : 0)
                         }
                     }
@@ -2917,4 +2922,9 @@ private func isPremiumRequiredForStoryPosting(context: AccountContext) -> Signal
             isPremiumRequired = value
         }
     )
+}
+
+/// Gift Editing needs the Gifts tab to add a gift to a profile that has none yet.
+private func shadowgramAlwaysShowsGiftsPane() -> Bool {
+    return ShadowgramSettings.shared.values.giftEditingEnabled
 }

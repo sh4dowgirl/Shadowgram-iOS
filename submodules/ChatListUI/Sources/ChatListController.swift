@@ -6904,6 +6904,8 @@ private final class ChatListLocationContext {
     var proxyButton: NavigationBarComponent.Button?
     var storyButton: NavigationBarComponent.Button?
     var sortButton: NavigationBarComponent.Button?
+    /// Extra Settings ▸ Chat List ▸ Unread Sorting.
+    private var shadowgramShowsSortButton = false
     
     var rightButtons: [NavigationBarComponent.Button] {
         var result: [NavigationBarComponent.Button] = []
@@ -7039,11 +7041,13 @@ private final class ChatListLocationContext {
                     isReorderingTabs,
                     peerStatus,
                     parentController.updatedPresentationData.1,
-                    storyPostingAvailable
-                ).startStrict(next: { [weak self] networkState, proxy, passcode, stateAndFilterId, isReorderingTabs, peerStatus, presentationData, storyPostingAvailable in
+                    combineLatest(storyPostingAvailable, shadowgramChatListSortButtonEnabled)
+                ).startStrict(next: { [weak self] networkState, proxy, passcode, stateAndFilterId, isReorderingTabs, peerStatus, presentationData, storyPostingAvailableAndSort in
                     guard let self else {
                         return
                     }
+                    let (storyPostingAvailable, showsSortButton) = storyPostingAvailableAndSort
+                    self.shadowgramShowsSortButton = showsSortButton
                     
                     self.updateChatList(
                         networkState: networkState,
@@ -7371,7 +7375,7 @@ private final class ChatListLocationContext {
                     )
                 }
                 
-                if isReorderingTabs {
+                if isReorderingTabs || !self.shadowgramShowsSortButton {
                     self.sortButton = nil
                 } else {
                     self.sortButton = NavigationBarComponent.Button(id: "shadowgramSort",

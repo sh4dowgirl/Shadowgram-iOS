@@ -7,7 +7,13 @@ let shadowgramChatListOldestFirstWindow = 5000
 
 let shadowgramChatListOldestFirst: Signal<Bool, NoError> = ShadowgramSettings.shared.valuesSignal
 |> map { values -> Bool in
-    return values.chatListOldestFirst
+    return values.chatListUnreadSortEnabled && values.chatListOldestFirst
+}
+|> distinctUntilChanged
+
+let shadowgramChatListSortButtonEnabled: Signal<Bool, NoError> = ShadowgramSettings.shared.valuesSignal
+|> map { values -> Bool in
+    return values.chatListUnreadSortEnabled
 }
 |> distinctUntilChanged
 

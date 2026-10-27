@@ -119,6 +119,9 @@ public struct ShadowgramSettingsValues: Equatable {
     public var starsEditingEnabled: Bool
     /// Shows the gift editing buttons on profiles; while off, the local gift overlay is kept but not applied.
     public var giftEditingEnabled: Bool
+    /// Shows the sort button in the chat list header; while off, chats keep the normal order
+    /// whatever `chatListOldestFirst` says.
+    public var chatListUnreadSortEnabled: Bool
 
     public static let defaultValues = ShadowgramSettingsValues(
         saveDeletedMessages: false,
@@ -157,10 +160,11 @@ public struct ShadowgramSettingsValues: Equatable {
         autoReactionsInGroups: true,
         starsOverrides: [:],
         starsEditingEnabled: false,
-        giftEditingEnabled: false
+        giftEditingEnabled: false,
+        chatListUnreadSortEnabled: false
     )
 
-    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactions: [Int64: [ShadowgramAutoReactionValue]], chatListOldestFirst: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool, roundVideoCamera: ShadowgramRoundVideoCamera, pictureInPictureOnBackground: Bool, forwardSelfDestructingMedia: Bool, unlockStoryTools: Bool, unlockMediaSaving: Bool, unlockChatTranslation: Bool, hideAds: Bool, unlockExtraFolders: Bool, messageBlockedUsers: Bool, autoReactionsInGroups: Bool, starsOverrides: [Int64: Int64], starsEditingEnabled: Bool, giftEditingEnabled: Bool) {
+    public init(saveDeletedMessages: Bool, unlimitedAccounts: Bool, ghostModeEnabled: Bool, sendReadReceipts: Bool, sendTyping: Bool, sendOnlineStatus: Bool, sendStoryViews: Bool, groupsFolderEnabled: Bool, groupsFolderMinMembers: Int32, showPeerIds: Bool, openByPeerId: Bool, keepEditHistory: Bool, disableCameraSwipe: Bool, hidePhoneOnCapture: Bool, hideEmailOnCapture: Bool, hideIdOnCapture: Bool, hideUsernameOnCapture: Bool, privateChatIds: Set<Int64>, groupsFolderPlacement: ShadowgramGroupsFolderPlacement, autoReactions: [Int64: [ShadowgramAutoReactionValue]], chatListOldestFirst: Bool, showExactLastSeen: Bool, bypassCopyProtection: Bool, bypassViewOnce: Bool, roundVideoCamera: ShadowgramRoundVideoCamera, pictureInPictureOnBackground: Bool, forwardSelfDestructingMedia: Bool, unlockStoryTools: Bool, unlockMediaSaving: Bool, unlockChatTranslation: Bool, hideAds: Bool, unlockExtraFolders: Bool, messageBlockedUsers: Bool, autoReactionsInGroups: Bool, starsOverrides: [Int64: Int64], starsEditingEnabled: Bool, giftEditingEnabled: Bool, chatListUnreadSortEnabled: Bool) {
         self.saveDeletedMessages = saveDeletedMessages
         self.unlimitedAccounts = unlimitedAccounts
         self.ghostModeEnabled = ghostModeEnabled
@@ -198,6 +202,7 @@ public struct ShadowgramSettingsValues: Equatable {
         self.starsOverrides = starsOverrides
         self.starsEditingEnabled = starsEditingEnabled
         self.giftEditingEnabled = giftEditingEnabled
+        self.chatListUnreadSortEnabled = chatListUnreadSortEnabled
     }
 
     /// What the client actually sends: everything unless ghost mode is on and hides it.
@@ -271,6 +276,7 @@ public final class ShadowgramSettings {
         static let starsOverrides = "shadowgram.starsOverrides"
         static let starsEditingEnabled = "shadowgram.starsEditing.enabled"
         static let giftEditingEnabled = "shadowgram.giftEditing.enabled"
+        static let chatListUnreadSortEnabled = "shadowgram.chatListSort.enabled"
     }
 
     private let defaults: UserDefaults
@@ -344,7 +350,8 @@ public final class ShadowgramSettings {
             autoReactionsInGroups: bool(Key.autoReactionsInGroups, defaultValues.autoReactionsInGroups),
             starsOverrides: starsOverrides,
             starsEditingEnabled: bool(Key.starsEditingEnabled, defaultValues.starsEditingEnabled),
-            giftEditingEnabled: bool(Key.giftEditingEnabled, defaultValues.giftEditingEnabled)
+            giftEditingEnabled: bool(Key.giftEditingEnabled, defaultValues.giftEditingEnabled),
+            chatListUnreadSortEnabled: bool(Key.chatListUnreadSortEnabled, defaultValues.chatListUnreadSortEnabled)
         )
         self.currentValues = values
         self.valuesPromise = ValuePromise(values, ignoreRepeated: true)
@@ -417,6 +424,7 @@ public final class ShadowgramSettings {
         self.defaults.set(encodedStarsOverrides, forKey: Key.starsOverrides)
         self.defaults.set(values.starsEditingEnabled, forKey: Key.starsEditingEnabled)
         self.defaults.set(values.giftEditingEnabled, forKey: Key.giftEditingEnabled)
+        self.defaults.set(values.chatListUnreadSortEnabled, forKey: Key.chatListUnreadSortEnabled)
 
         self.valuesPromise.set(values)
     }
