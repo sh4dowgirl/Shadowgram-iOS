@@ -2,6 +2,7 @@ import Foundation
 import Postbox
 import MtProtoKit
 import SwiftSignalKit
+import ShadowgramSettings
 internal import TelegramApi
 
 public final class StarGiftsList: Codable, Equatable {
