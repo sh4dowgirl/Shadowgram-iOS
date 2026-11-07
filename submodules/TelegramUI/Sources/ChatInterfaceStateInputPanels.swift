@@ -13,6 +13,7 @@ import RichTextEditorMediaView
 import RichTextEditorUIKit
 import InstantPageUI
 import ShadowgramSettings
+import BrowserUI
 
 func chatInputFormulaRenderResult(context: RichTextFormulaRenderContext) -> RichTextFormulaRenderResult? {
     guard let attachment = instantPageMathAttachment(
@@ -514,7 +515,7 @@ func inputPanelForChatPresentationIntefaceState(_ chatPresentationInterfaceState
                 panel.interfaceInteraction = interfaceInteraction
                 panel.context = context
                 panel.pastedMarkdownParser = { context, text in
-                    return chatInputContentFromPastedMarkdown(context: context, plainText: text)
+                    return chatInputContentFromPastedMarkdown(context: context, plainText: text, keepsBlankLines: true)
                 }
                 return (panel, nil)
             }

@@ -187,6 +187,15 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
             if let previousEphemeralReplacement, !updated.contains(where: { $0 is EphemeralReplacementMessageAttribute }) {
                 updated.append(previousEphemeralReplacement)
             }
+            // History confirmations and refetches carry only server attributes. Keep the fork's local metadata,
+            // while an edit replay that already supplied a newer history remains authoritative.
+            for attribute in previous {
+                if attribute is ShadowgramDeletedMessageAttribute, !updated.contains(where: { $0 is ShadowgramDeletedMessageAttribute }) {
+                    updated.append(attribute)
+                } else if attribute is ShadowgramEditHistoryMessageAttribute, !updated.contains(where: { $0 is ShadowgramEditHistoryMessageAttribute }) {
+                    updated.append(attribute)
+                }
+            }
         },
         decodeMessageThreadInfo: { entry in
             guard let data = entry.get(MessageHistoryThreadData.self) else {
