@@ -931,6 +931,7 @@ func enqueueMessages(transaction: Transaction, account: Account, peerId: PeerId,
     }
     
     var localGroupingKeyBySourceKey: [Int64: Int64] = [:]
+    var shadowgramCopyHeaderGroupingKeys = Set<Int64>()
     
     var updatedMessages: [(Bool, EnqueueMessage)] = []
     outer: for (transformedMedia, message) in messages {
@@ -979,13 +980,19 @@ func enqueueMessages(transaction: Transaction, account: Account, peerId: PeerId,
                     continue outer
                 }
                 if let sourceMessage = transaction.getMessage(sourceId), shadowgramForwardsProtectedMessageAsCopy(transaction: transaction, message: sourceMessage) {
+                    let localGroupingKey = forwardGroupingKey(grouping: grouping, sourceGroupingKey: sourceMessage.groupingKey, generatedKeys: &localGroupingKeyBySourceKey)
+                    var includesHeader = true
+                    if let localGroupingKey {
+                        includesHeader = shadowgramCopyHeaderGroupingKeys.insert(localGroupingKey).inserted
+                    }
                     let replacement = shadowgramForwardCopyOfProtectedMessage(
                         sourceMessage: sourceMessage,
                         mediaBox: account.postbox.mediaBox,
                         peerId: peerId,
                         threadId: threadId,
                         forwardAttributes: forwardAttributes,
-                        localGroupingKey: forwardGroupingKey(grouping: grouping, sourceGroupingKey: sourceMessage.groupingKey, generatedKeys: &localGroupingKeyBySourceKey)
+                        localGroupingKey: localGroupingKey,
+                        includesHeader: includesHeader
                     )
                     updatedMessages.append((true, replacement))
                     continue outer

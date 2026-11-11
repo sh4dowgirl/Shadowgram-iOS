@@ -530,7 +530,7 @@ private func validateChannelMessagesBatch(postbox: Postbox, network: Network, ac
         var previousMessages: [Message] = []
         var previous: [MessageId: Message] = [:]
         for messageId in messageIds {
-            if let message = transaction.getMessage(messageId) {
+            if let message = transaction.getMessage(messageId), !message.shadowgramIsDeleted {
                 previousMessages.append(message)
                 previous[message.id] = message
             }
@@ -609,7 +609,7 @@ private func validateReplyThreadMessagesBatch(postbox: Postbox, network: Network
         var previousMessages: [Message] = []
         var previous: [MessageId: Message] = [:]
         for messageId in messageIds {
-            if let message = transaction.getMessage(messageId) {
+            if let message = transaction.getMessage(messageId), !message.shadowgramIsDeleted {
                 previousMessages.append(message)
                 previous[message.id] = message
             }
@@ -856,6 +856,9 @@ private func validateBatch(postbox: Postbox, network: Network, transaction: Tran
                                         return Set(maybeRemovedMessageIds).subtracting(ids)
                                     }
                                     |> `catch` { _ -> Signal<Set<MessageId>, NoError> in
+                                        if shadowgramSavesDeletedMessages() {
+                                            return .single(Set())
+                                        }
                                         return .single(Set(maybeRemovedMessageIds))
                                     }
                                 }
@@ -992,8 +995,11 @@ private func validateBatch(postbox: Postbox, network: Network, transaction: Tran
                                         return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: updatedTags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
                                     })
                                 } else {
-                                    _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: [id])
-                                    Logger.shared.log("HistoryValidation", "deleting message \(id) in \(id.peerId)")
+                                    let deletedIds = shadowgramKeepDeletedMessages(transaction: transaction, ids: [id])
+                                    if !deletedIds.isEmpty {
+                                        _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: deletedIds)
+                                        Logger.shared.log("HistoryValidation", "deleting message \(id) in \(id.peerId)")
+                                    }
                                 }
                             }
                         }
@@ -1102,6 +1108,9 @@ private func validateReplyThreadBatch(postbox: Postbox, network: Network, transa
                             return Set(maybeRemovedMessageIds).subtracting(ids)
                         }
                         |> `catch` { _ -> Signal<Set<MessageId>, NoError> in
+                            if shadowgramSavesDeletedMessages() {
+                                return .single(Set())
+                            }
                             return .single(Set(maybeRemovedMessageIds))
                         }
                     }
@@ -1175,8 +1184,11 @@ private func validateReplyThreadBatch(postbox: Postbox, network: Network, transa
                 
                     for id in removedMessageIds {
                         if !validMessageIds.contains(id) {
-                            _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: [id])
-                            Logger.shared.log("HistoryValidation", "deleting thread message \(id) in \(id.peerId)")
+                            let deletedIds = shadowgramKeepDeletedMessages(transaction: transaction, ids: [id])
+                            if !deletedIds.isEmpty {
+                                _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: deletedIds)
+                                Logger.shared.log("HistoryValidation", "deleting thread message \(id) in \(id.peerId)")
+                            }
                         }
                     }
                 }

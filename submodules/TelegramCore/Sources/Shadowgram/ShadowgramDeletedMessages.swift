@@ -225,6 +225,9 @@ private func shadowgramUploadableMediaCopy(mediaBox: MediaBox, media: Media) -> 
 }
 
 func shadowgramForwardsProtectedMessageAsCopy(transaction: Transaction, message: Message) -> Bool {
+    if message.containsSecretMedia && message.id.peerId.namespace != Namespaces.Peer.SecretChat {
+        return true
+    }
     // The server refuses forwards from chats that restrict them, so with the bypass on such a message
     // is always sent as a copy, the way a kept deleted message is.
     guard ShadowgramSettings.shared.values.bypassCopyProtection else {
@@ -241,31 +244,109 @@ func shadowgramForwardsProtectedMessageAsCopy(transaction: Transaction, message:
     return false
 }
 
-func shadowgramForwardCopyOfProtectedMessage(sourceMessage: Message, mediaBox: MediaBox, peerId: PeerId, threadId: Int64?, forwardAttributes: [MessageAttribute], localGroupingKey: Int64?) -> EnqueueMessage {
+private func shadowgramForwardedFromHeader(_ message: Message) -> (name: String, peer: Peer?) {
+    if let forwardInfo = message.forwardInfo {
+        if let author = forwardInfo.author {
+            return (author.debugDisplayTitle, author)
+        } else if let source = forwardInfo.source {
+            return (source.debugDisplayTitle, source)
+        } else if let authorSignature = forwardInfo.authorSignature, !authorSignature.isEmpty {
+            return (authorSignature, nil)
+        }
+    }
+    if let author = message.author {
+        return (author.debugDisplayTitle, author)
+    }
+    if let peer = message.peers[message.id.peerId] {
+        return (peer.debugDisplayTitle, peer)
+    }
+    return ("", nil)
+}
+
+private func shadowgramForwardedFromLabel() -> String {
+    let languageCode = Locale.preferredLanguages.first ?? Locale.current.identifier
+    return ShadowgramStrings(languageCode: languageCode).forwardedFrom
+}
+
+func shadowgramForwardCopyOfProtectedMessage(sourceMessage: Message, mediaBox: MediaBox, peerId: PeerId, threadId: Int64?, forwardAttributes: [MessageAttribute], localGroupingKey: Int64?, includesHeader: Bool) -> EnqueueMessage {
+    var hideNames = false
+    var hideCaptions = false
+    for attribute in forwardAttributes {
+        if let attribute = attribute as? ForwardOptionsMessageAttribute {
+            hideNames = attribute.hideNames
+            hideCaptions = attribute.hideCaptions
+        }
+    }
+
     var mediaReference: AnyMediaReference?
     for media in sourceMessage.media {
         if media is TelegramMediaImage || media is TelegramMediaFile {
             if let copy = shadowgramUploadableMediaCopy(mediaBox: mediaBox, media: media) {
                 mediaReference = .standalone(media: copy)
+            } else {
+                mediaReference = .standalone(media: media)
             }
             break
         }
     }
 
-    let quote = shadowgramDeletedMessageQuote(sourceMessage)
-    var attributes: [MessageAttribute] = [TextEntitiesMessageAttribute(entities: quote.entities)]
+    var body = sourceMessage.text
+    var bodyEntities: [MessageTextEntity] = []
+    if mediaReference != nil && hideCaptions {
+        body = ""
+    } else {
+        for attribute in sourceMessage.attributes {
+            if let attribute = attribute as? TextEntitiesMessageAttribute {
+                bodyEntities = attribute.entities
+            }
+        }
+    }
+
+    var text = body
+    var entities = bodyEntities
+    var headerHasLink = false
+    let header = shadowgramForwardedFromHeader(sourceMessage)
+    if includesHeader && !hideNames && !header.name.isEmpty {
+        let label = shadowgramForwardedFromLabel() + " "
+        let labelLength = (label as NSString).length
+        let nameLength = (header.name as NSString).length
+        var headerText = label + header.name
+        if !body.isEmpty {
+            headerText += "\n"
+        }
+        let offset = (headerText as NSString).length
+        var headerEntities: [MessageTextEntity] = [MessageTextEntity(range: labelLength ..< (labelLength + nameLength), type: .Bold)]
+        if let peer = header.peer {
+            if peer is TelegramUser {
+                headerEntities.append(MessageTextEntity(range: labelLength ..< (labelLength + nameLength), type: .TextMention(peerId: peer.id)))
+            } else if let username = peer.addressName, !username.isEmpty {
+                headerEntities.append(MessageTextEntity(range: labelLength ..< (labelLength + nameLength), type: .TextUrl(url: "https://t.me/\(username)")))
+                headerHasLink = true
+            }
+        }
+        for entity in bodyEntities {
+            headerEntities.append(MessageTextEntity(range: (entity.range.lowerBound + offset) ..< (entity.range.upperBound + offset), type: entity.type))
+        }
+        text = headerText + body
+        entities = headerEntities
+    }
+
+    var attributes: [MessageAttribute] = []
+    if !entities.isEmpty {
+        attributes.append(TextEntitiesMessageAttribute(entities: entities))
+    }
     for attribute in forwardAttributes {
         if attribute is ForwardOptionsMessageAttribute {
             continue
         }
         attributes.append(attribute)
     }
-    if mediaReference == nil {
+    if mediaReference == nil && headerHasLink {
         attributes = shadowgramDisablingLinkPreview(attributes)
     }
 
     let replyToMessageId = threadId.flatMap { EngineMessageReplySubject(messageId: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: Int32(clamping: $0)), quote: nil, innerSubject: nil) }
-    return .message(text: quote.text, attributes: attributes, inlineStickers: [:], mediaReference: mediaReference, threadId: threadId, replyToMessageId: replyToMessageId, replyToStoryId: nil, localGroupingKey: localGroupingKey, correlationId: nil, bubbleUpEmojiOrStickersets: [])
+    return .message(text: text, attributes: attributes, inlineStickers: [:], mediaReference: mediaReference, threadId: threadId, replyToMessageId: replyToMessageId, replyToStoryId: nil, localGroupingKey: localGroupingKey, correlationId: nil, bubbleUpEmojiOrStickersets: [])
 }
 
 func shadowgramReplacingReplyToDeletedMessage(transaction: Transaction, peerId: PeerId, message: EnqueueMessage) -> EnqueueMessage {

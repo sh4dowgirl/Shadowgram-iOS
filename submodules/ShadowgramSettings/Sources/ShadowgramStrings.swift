@@ -19,6 +19,8 @@ public struct ShadowgramStrings {
     public var saveDeletedMessages: String { return t("Сохранять удалённые сообщения", "Save Deleted Messages") }
     public var saveDeletedMessagesFooter: String { return t("Сообщения, которые удалил собеседник, остаются в чате со значком корзины. Медиа сохраняются, только если успели загрузиться. Секретные чаты не затрагиваются.", "Messages deleted by others stay in the chat, marked with a trash icon. Media is kept only if it was already downloaded. Secret chats are not affected.") }
 
+    public var forwardedFrom: String { return t("Переслано от", "Forwarded from") }
+
     public var accountsHeader: String { return t("АККАУНТЫ", "ACCOUNTS") }
     public var unlimitedAccounts: String { return t("Без лимита аккаунтов", "Unlimited Accounts") }
     public var unlimitedAccountsFooter: String { return t("Можно добавить сколько угодно аккаунтов, с Telegram Premium и без.", "Add any number of accounts, with or without Telegram Premium.") }

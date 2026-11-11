@@ -4506,11 +4506,22 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         let shadowgramWasDeleted = strongSelf.shadowgramDisplaysDeletedTint
         strongSelf.shadowgramDisplaysDeletedTint = shadowgramIsDeleted
         let shadowgramTintColor: UIColor? = shadowgramIsDeleted ? UIColor(red: 0.55, green: 0.0, blue: 0.0, alpha: item.presentationData.theme.theme.overallDarkAppearance ? 0.35 : 0.25) : nil
+        var shadowgramBubbleTintColor: UIColor?
+        if shadowgramIsDeleted {
+            let isIncoming: Bool
+            if case .outgoing = backgroundType {
+                isIncoming = false
+            } else {
+                isIncoming = true
+            }
+            let bubbleFill = bubbleColorComponents(theme: item.presentationData.theme.theme, incoming: isIncoming, wallpaper: hasWallpaper).fill
+            shadowgramBubbleTintColor = shadowgramDeletedBubbleColor(fill: bubbleFill, isDark: item.presentationData.theme.theme.overallDarkAppearance)
+        }
         var shadowgramAnimateTint = false
         if shadowgramIsDeleted && shadowgramWasDeleted == false {
             shadowgramAnimateTint = shadowgramMarkDeletedTintAnimated(stableId: item.message.stableId)
         }
-        strongSelf.backgroundNode.setShadowgramDeletedTint(color: shadowgramTintColor, animated: shadowgramAnimateTint)
+        strongSelf.backgroundNode.setShadowgramDeletedTint(color: shadowgramBubbleTintColor, animated: shadowgramAnimateTint)
 
         if let shadowgramTintColor {
             let overlayView: UIImageView
@@ -9209,6 +9220,41 @@ public final class NameNavigateButton: HighlightableButton {
 }
 
 private let shadowgramDeletedTintAnimatedStableIds = Atomic<Set<UInt32>>(value: Set())
+
+private func shadowgramDeletedBubbleColor(fill: [UIColor], isDark: Bool) -> UIColor {
+    var red: CGFloat = 0.0
+    var green: CGFloat = 0.0
+    var blue: CGFloat = 0.0
+    var count: CGFloat = 0.0
+    for color in fill {
+        var r: CGFloat = 0.0
+        var g: CGFloat = 0.0
+        var b: CGFloat = 0.0
+        var a: CGFloat = 0.0
+        if color.getRed(&r, green: &g, blue: &b, alpha: &a) {
+            red += r
+            green += g
+            blue += b
+            count += 1.0
+        }
+    }
+    let base: UIColor
+    if count > 0.0 {
+        base = UIColor(red: red / count, green: green / count, blue: blue / count, alpha: 1.0)
+    } else {
+        base = isDark ? UIColor(white: 0.15, alpha: 1.0) : UIColor.white
+    }
+    var hue: CGFloat = 0.0
+    var saturation: CGFloat = 0.0
+    var brightness: CGFloat = 0.0
+    if !base.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil) {
+        saturation = 0.0
+        brightness = isDark ? 0.15 : 1.0
+    }
+    let resultSaturation = min(max(saturation, isDark ? 0.6 : 0.3), 0.65)
+    let resultBrightness = isDark ? min(max(brightness, 0.3), 0.6) : max(brightness, 0.75)
+    return UIColor(hue: 0.0, saturation: resultSaturation, brightness: resultBrightness, alpha: 1.0)
+}
 
 private func shadowgramMarkDeletedTintAnimated(stableId: UInt32) -> Bool {
     var inserted = false
