@@ -52,7 +52,7 @@ func shadowgramSavesDeletedMessages() -> Bool {
 /// Deletions made in this client never get here: they remove the message locally first.
 /// Returns the ids that must still be deleted for real: everything outside the cloud namespace
 /// (scheduled and quick-reply messages), or everything when the setting is off.
-func shadowgramKeepDeletedMessages(transaction: Transaction, ids: [MessageId]) -> [MessageId] {
+public func shadowgramKeepDeletedMessages(transaction: Transaction, ids: [MessageId]) -> [MessageId] {
     if !shadowgramSavesDeletedMessages() {
         return ids
     }
@@ -317,11 +317,17 @@ func shadowgramForwardCopyOfProtectedMessage(sourceMessage: Message, mediaBox: M
         let offset = (headerText as NSString).length
         var headerEntities: [MessageTextEntity] = [MessageTextEntity(range: labelLength ..< (labelLength + nameLength), type: .Bold)]
         if let peer = header.peer {
-            if peer is TelegramUser {
-                headerEntities.append(MessageTextEntity(range: labelLength ..< (labelLength + nameLength), type: .TextMention(peerId: peer.id)))
-            } else if let username = peer.addressName, !username.isEmpty {
-                headerEntities.append(MessageTextEntity(range: labelLength ..< (labelLength + nameLength), type: .TextUrl(url: "https://t.me/\(username)")))
+            let nameRange = labelLength ..< (labelLength + nameLength)
+            if let username = peer.addressName, !username.isEmpty {
+                headerEntities.append(MessageTextEntity(range: nameRange, type: .TextUrl(url: "https://t.me/\(username)")))
                 headerHasLink = true
+            } else if let user = peer as? TelegramUser {
+                if let accessHash = user.accessHash, case .personal = accessHash {
+                    headerEntities.append(MessageTextEntity(range: nameRange, type: .TextMention(peerId: user.id)))
+                } else {
+                    headerEntities.append(MessageTextEntity(range: nameRange, type: .TextUrl(url: "tg://user?id=\(user.id.id._internalGetInt64Value())")))
+                    headerHasLink = true
+                }
             }
         }
         for entity in bodyEntities {
@@ -343,6 +349,9 @@ func shadowgramForwardCopyOfProtectedMessage(sourceMessage: Message, mediaBox: M
     }
     if mediaReference == nil && headerHasLink {
         attributes = shadowgramDisablingLinkPreview(attributes)
+    }
+    if mediaReference != nil && !text.isEmpty && !attributes.contains(where: { $0 is InvertMediaMessageAttribute }) {
+        attributes.append(InvertMediaMessageAttribute())
     }
 
     let replyToMessageId = threadId.flatMap { EngineMessageReplySubject(messageId: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: Int32(clamping: $0)), quote: nil, innerSubject: nil) }

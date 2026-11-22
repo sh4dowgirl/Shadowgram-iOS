@@ -64,12 +64,13 @@ public func shadowgramForwardSelfDestructingMedia(context: AccountContext, messa
     }
     let regularMedia = shadowgramRegularMediaCopy(mediaBox: context.account.postbox.mediaBox, media: media)
 
-    func send(_ peers: [EnginePeer], peerMap: [EnginePeer.Id: EnginePeer], caption: String) {
+    func send(_ peers: [EnginePeer], peerMap: [EnginePeer.Id: EnginePeer], caption: String, threadId: Int64?) {
         for peer in peers {
+            let replyToMessageId = threadId.flatMap { EngineMessageReplySubject(messageId: EngineMessage.Id(peerId: peer.id, namespace: Namespaces.Message.Cloud, id: Int32(clamping: $0)), quote: nil, innerSubject: nil) }
             var messages: [EnqueueMessage] = []
-            messages.append(.message(text: "", attributes: [], inlineStickers: [:], mediaReference: .standalone(media: regularMedia), threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: []))
+            messages.append(.message(text: "", attributes: [], inlineStickers: [:], mediaReference: .standalone(media: regularMedia), threadId: threadId, replyToMessageId: replyToMessageId, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: []))
             if !caption.isEmpty {
-                messages.append(.message(text: caption, attributes: [], inlineStickers: [:], mediaReference: nil, threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: []))
+                messages.append(.message(text: caption, attributes: [], inlineStickers: [:], mediaReference: nil, threadId: threadId, replyToMessageId: replyToMessageId, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: []))
             }
             let _ = enqueueMessages(account: context.account, peerId: peer.id, messages: messages).start()
         }
@@ -102,7 +103,24 @@ public func shadowgramForwardSelfDestructingMedia(context: AccountContext, messa
         } else {
             return
         }
-        present(UndoOverlayController(presentationData: presentationData, content: .forward(savedMessages: savedMessages, text: text), elevatedLayout: false, animateInAsReplacement: true, action: { _ in return false }))
+        context.sharedContext.presentGlobalController(UndoOverlayController(presentationData: presentationData, content: .forward(savedMessages: savedMessages, text: text), elevatedLayout: false, animateInAsReplacement: true, action: { _ in return false }), nil)
+    }
+
+    func dismissPicker(_ controller: ViewController?) {
+        guard let controller else {
+            return
+        }
+        if let navigationController = controller.navigationController as? NavigationController, let index = navigationController.viewControllers.firstIndex(where: { $0 === controller }) {
+            if index > 0 {
+                navigationController.setViewControllers(Array(navigationController.viewControllers.prefix(upTo: index)), animated: true)
+            } else if navigationController.presentingViewController != nil {
+                navigationController.dismiss(animated: true, completion: nil)
+            } else {
+                controller.dismiss()
+            }
+        } else {
+            controller.dismiss()
+        }
     }
 
     // The same peer picker that a regular forward opens, instead of the share sheet. A view-once
@@ -111,13 +129,13 @@ public func shadowgramForwardSelfDestructingMedia(context: AccountContext, messa
     // A plain tap on a chat row always goes through `peerSelected` (it's how the picker's row
     // tap is wired regardless of `multipleSelection`) - without this, tapping a chat did
     // nothing and the only way to send was through the multi-select batch below.
-    controller.peerSelected = { [weak controller] peer, _ in
-        controller?.dismiss()
-        send([peer], peerMap: [peer.id: peer], caption: "")
+    controller.peerSelected = { [weak controller] peer, threadId in
+        dismissPicker(controller)
+        send([peer], peerMap: [peer.id: peer], caption: "", threadId: threadId)
     }
     controller.multiplePeersSelected = { [weak controller] peers, peerMap, messageText, _, _, _ in
-        controller?.dismiss()
-        send(peers, peerMap: peerMap, caption: messageText.string)
+        dismissPicker(controller)
+        send(peers, peerMap: peerMap, caption: messageText.string, threadId: nil)
     }
     present(controller)
 }
